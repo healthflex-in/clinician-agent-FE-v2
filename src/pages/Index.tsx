@@ -6,7 +6,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, WifiOff } from 'lucide-react';
 
 const Index = () => {
   const [transcriptText, setTranscriptText] = useState('');
@@ -25,7 +25,7 @@ const Index = () => {
     setTranscription,
     setSuggestions
   } = useWebSocket({
-    url: `${window.location.origin.replace(/^http/, 'ws')}/ws`,
+    url: '', // The URL will be constructed in the hook
     onOpen: () => {
       toast({
         title: "Connected",
@@ -50,7 +50,17 @@ const Index = () => {
 
   useEffect(() => {
     connect();
-  }, [connect]);
+    
+    // Automatically try to reconnect every 5 seconds if connection fails
+    const reconnectInterval = setInterval(() => {
+      if (!isConnected && !isConnecting) {
+        console.log('Attempting to reconnect WebSocket...');
+        connect();
+      }
+    }, 5000);
+    
+    return () => clearInterval(reconnectInterval);
+  }, [connect, isConnected, isConnecting]);
 
   useEffect(() => {
     if (transcription) {
@@ -120,6 +130,16 @@ const Index = () => {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {!isConnected && !isConnecting && (
+            <Alert variant="destructive" className="bg-red-50 border-red-200">
+              <WifiOff className="h-4 w-4" />
+              <AlertTitle>WebSocket Disconnected</AlertTitle>
+              <AlertDescription>
+                Cannot connect to the transcription service. Please check your network connection.
+              </AlertDescription>
+            </Alert>
+          )}
+        
           {suggestions && (
             <Alert variant="default" className="bg-slate-900 text-white border-slate-800">
               <AlertCircle className="h-4 w-4" />
@@ -147,9 +167,9 @@ const Index = () => {
           <div className="flex justify-center pt-2">
             <button 
               onClick={handleProcessTranscription}
-              disabled={isProcessing || !transcriptText.trim()}
+              disabled={isProcessing || !transcriptText.trim() || !isConnected}
               className={`px-4 py-2 rounded-md text-white font-medium 
-                ${isProcessing || !transcriptText.trim() 
+                ${isProcessing || !transcriptText.trim() || !isConnected
                   ? 'bg-parrot-400 cursor-not-allowed' 
                   : 'bg-parrot-600 hover:bg-parrot-700'}`}
             >

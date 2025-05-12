@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface WebSocketOptions {
@@ -47,8 +46,11 @@ export function useWebSocket(options: WebSocketOptions) {
     
     try {
       setIsConnecting(true);
-      // Use the same WebSocket URL pattern as the original file
-      const wsUrl = url || `${window.location.origin.replace(/^http/, 'ws')}/ws`;
+      
+      // Updated WebSocket URL format to match the expected format in the HTML file
+      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+      console.log('Attempting to connect to WebSocket at:', wsUrl);
+      
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
@@ -60,12 +62,14 @@ export function useWebSocket(options: WebSocketOptions) {
       };
 
       wsRef.current.onclose = (event) => {
+        console.log('WebSocket closed');
         setIsConnected(false);
         setIsConnecting(false);
         if (onClose) onClose();
       };
 
       wsRef.current.onerror = (event) => {
+        console.error('WebSocket error:', event);
         setError(event);
         setIsConnecting(false);
         if (onError) onError(event);
@@ -146,6 +150,7 @@ export function useWebSocket(options: WebSocketOptions) {
       localStorage.setItem('appointmentId', finalAppointmentId);
     }
     
+    // Updated to match the expected payload format from the HTML file
     const payload: WebSocketMessage = {
       payloadType: 'audio',
       audio: base64Audio,
@@ -154,6 +159,7 @@ export function useWebSocket(options: WebSocketOptions) {
       formKey: 'snc',  // Using 'snc' form key as in the original file
     };
     
+    console.log('Sending audio with payload:', payload);
     return sendMessage(payload);
   }, [sendMessage]);
 
@@ -169,7 +175,7 @@ export function useWebSocket(options: WebSocketOptions) {
     const finalUserId = userId || localStorage.getItem('userId') || '';
     const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || '';
     
-    // Prepare form data in the expected format
+    // Updated to match the expected payload format from the HTML file
     const payload: WebSocketMessage = {
       payloadType: 'text',
       text: transcriptionText,
@@ -180,6 +186,7 @@ export function useWebSocket(options: WebSocketOptions) {
       formData: formData || {},
     };
     
+    console.log('Processing transcription with payload:', payload);
     return sendMessage(payload);
   }, [sendMessage, formData]);
 

@@ -47,8 +47,8 @@ export function useWebSocket(options: WebSocketOptions) {
     try {
       setIsConnecting(true);
       
-      // Updated WebSocket URL format to match the expected format in the HTML file
-      const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+      // Using the original connection approach that worked in the first version
+      const wsUrl = `${window.location.origin.replace(/^http/, 'ws')}/ws`;
       console.log('Attempting to connect to WebSocket at:', wsUrl);
       
       wsRef.current = new WebSocket(wsUrl);
@@ -150,7 +150,7 @@ export function useWebSocket(options: WebSocketOptions) {
       localStorage.setItem('appointmentId', finalAppointmentId);
     }
     
-    // Updated to match the expected payload format from the HTML file
+    // Using the original payload format that worked in the first version
     const payload: WebSocketMessage = {
       payloadType: 'audio',
       audio: base64Audio,
@@ -175,7 +175,7 @@ export function useWebSocket(options: WebSocketOptions) {
     const finalUserId = userId || localStorage.getItem('userId') || '';
     const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || '';
     
-    // Updated to match the expected payload format from the HTML file
+    // Using the original payload format that worked in the first version
     const payload: WebSocketMessage = {
       payloadType: 'text',
       text: transcriptionText,

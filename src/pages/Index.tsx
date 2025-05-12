@@ -25,7 +25,8 @@ const Index = () => {
     setTranscription,
     setSuggestions
   } = useWebSocket({
-    url: '', // The URL will be constructed in the hook
+    // Use the original URL approach that worked in the first version
+    url: `${window.location.origin.replace(/^http/, 'ws')}/ws`,
     onOpen: () => {
       toast({
         title: "Connected",

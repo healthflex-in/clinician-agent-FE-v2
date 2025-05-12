@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
+import { Loader } from 'lucide-react';
 
 interface TranscriptBoxProps {
   value: string;
@@ -26,7 +27,14 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
 
   return (
     <div className={`relative w-full ${className}`}>
+      <label 
+        htmlFor="transcription"
+        className="block text-sm font-medium text-parrot-700 mb-1"
+      >
+        Transcription
+      </label>
       <Textarea
+        id="transcription"
         ref={textareaRef}
         placeholder={isProcessing ? "Processing audio..." : "Transcription will appear here..."}
         value={value}
@@ -36,9 +44,9 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
                    ${isProcessing ? 'bg-secondary/50' : ''}`}
       />
       {isProcessing && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/30 rounded-lg backdrop-blur-[1px]">
+        <div className="absolute inset-0 flex items-center justify-center bg-white/30 rounded-lg backdrop-blur-[1px] mt-7">
           <div className="flex flex-col items-center">
-            <div className="h-6 w-6 border-4 border-t-parrot-500 border-r-parrot-300 border-b-parrot-300 border-l-parrot-300 rounded-full animate-spin"></div>
+            <Loader className="h-6 w-6 text-parrot-500 animate-spin" />
             <span className="mt-2 font-medium text-sm text-parrot-700">Processing audio...</span>
           </div>
         </div>

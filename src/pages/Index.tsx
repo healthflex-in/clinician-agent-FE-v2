@@ -4,7 +4,9 @@ import Recorder from '@/components/Recorder';
 import TranscriptBox from '@/components/TranscriptBox';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const Index = () => {
   const [transcriptText, setTranscriptText] = useState('');
@@ -17,10 +19,13 @@ const Index = () => {
     isProcessing,
     error,
     sendAudio,
+    processTranscription,
     transcription,
-    setTranscription
+    suggestions,
+    setTranscription,
+    setSuggestions
   } = useWebSocket({
-    url: "ws://localhost:8080/ws",
+    url: `${window.location.origin.replace(/^http/, 'ws')}/ws`,
     onOpen: () => {
       toast({
         title: "Connected",
@@ -74,6 +79,37 @@ const Index = () => {
     }
   };
 
+  const handleProcessTranscription = () => {
+    if (!transcriptText.trim()) {
+      toast({
+        title: "Empty transcription",
+        description: "Please record audio or enter text to process",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const sent = processTranscription(transcriptText);
+    if (!sent) {
+      toast({
+        title: "Failed to process transcription",
+        description: "Connection issues detected",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Automatically hide suggestions after 7 seconds
+  useEffect(() => {
+    if (suggestions) {
+      const timer = setTimeout(() => {
+        setSuggestions(null);
+      }, 7000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [suggestions, setSuggestions]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-parrot-100 to-white">
       <Card className="w-full max-w-md shadow-lg border-parrot-200">
@@ -84,6 +120,16 @@ const Index = () => {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {suggestions && (
+            <Alert variant="default" className="bg-slate-900 text-white border-slate-800">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Suggestions</AlertTitle>
+              <AlertDescription>
+                <div className="text-sm whitespace-pre-wrap">{suggestions}</div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="flex justify-center py-4">
             <Recorder 
               onAudioEncoded={handleAudioEncoded} 
@@ -97,6 +143,19 @@ const Index = () => {
             isProcessing={isProcessing}
             className="mt-4"
           />
+          
+          <div className="flex justify-center pt-2">
+            <button 
+              onClick={handleProcessTranscription}
+              disabled={isProcessing || !transcriptText.trim()}
+              className={`px-4 py-2 rounded-md text-white font-medium 
+                ${isProcessing || !transcriptText.trim() 
+                  ? 'bg-parrot-400 cursor-not-allowed' 
+                  : 'bg-parrot-600 hover:bg-parrot-700'}`}
+            >
+              Process Transcription
+            </button>
+          </div>
         </CardContent>
         
         <CardFooter className="flex justify-center pt-0 pb-4">

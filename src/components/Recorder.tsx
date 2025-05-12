@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader } from 'lucide-react';
-import { encodeWAV, blobToBase64, detectSilence, getUserMedia } from '@/utils/audio';
+import { encodeWAV, blobToBase64, detectSilence, getUserMedia, resampleAudio } from '@/utils/audio';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface RecorderProps {
   onAudioEncoded: (base64Audio: string) => void;
@@ -60,21 +60,28 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
     }
   }, [toast]);
 
-  // Process audio data and encode to WAV
+  // Process audio data, resample, encode to WAV, and convert to base64
   const processAudioData = useCallback(async () => {
     if (chunksRef.current.length === 0) return;
     
     try {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      // Create a blob from the audio chunks
+      const originalBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
       chunksRef.current = [];
       
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioContext = new AudioContext();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      // Convert blob to ArrayBuffer for resampling
+      const arrayBuffer = await originalBlob.arrayBuffer();
       
-      const wavBlob = encodeWAV(audioBuffer);
+      // Resample to 16kHz to match the original implementation
+      const resampledBuffer = await resampleAudio(arrayBuffer, 16000);
+      
+      // Encode as WAV
+      const wavBlob = encodeWAV(resampledBuffer);
+      
+      // Convert to base64
       const base64Audio = await blobToBase64(wavBlob);
       
+      // Send to the parent component
       onAudioEncoded(base64Audio);
     } catch (err) {
       console.error('Error processing audio:', err);
@@ -103,7 +110,7 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
     
     mediaRecorder.onstop = processAudioData;
     
-    // Start the silence detector
+    // Start the silence detector - stop recording after 5 seconds of silence
     if (analyserRef.current) {
       silenceDetectorRef.current = detectSilence(
         analyserRef.current,
@@ -185,7 +192,7 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
         streamRef.current.getTracks().forEach(track => track.stop());
       }
       
-      if (audioContextRef.current) {
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close();
       }
     };

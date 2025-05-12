@@ -52,6 +52,38 @@ export function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+// Function to resample audio to a target sample rate (usually 16000Hz)
+export function resampleAudio(arrayBuffer: ArrayBuffer, targetSampleRate: number): Promise<AudioBuffer> {
+  return new Promise((resolve, reject) => {
+    const audioContext = new AudioContext();
+    
+    audioContext.decodeAudioData(arrayBuffer).then(audioBuffer => {
+      const numberOfChannels = audioBuffer.numberOfChannels;
+      const duration = audioBuffer.duration;
+      const offlineContext = new OfflineAudioContext(
+        numberOfChannels,
+        Math.ceil(duration * targetSampleRate),
+        targetSampleRate
+      );
+      
+      const source = offlineContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(offlineContext.destination);
+      source.start(0);
+      
+      offlineContext.startRendering()
+        .then(renderedBuffer => resolve(renderedBuffer))
+        .catch(err => {
+          console.error('Offline rendering error:', err);
+          reject(err);
+        });
+    }).catch(err => {
+      console.error('Audio decoding error:', err);
+      reject(err);
+    });
+  });
+}
+
 // Function to detect silence based on audio volume
 export function detectSilence(
   analyser: AnalyserNode,

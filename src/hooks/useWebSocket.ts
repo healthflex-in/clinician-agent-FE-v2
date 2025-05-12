@@ -15,6 +15,9 @@ interface WebSocketMessage {
   appointmentId?: string;
   formKey?: string;
   operation_mode?: string;
+  text?: string;
+  formData?: any;
+  form_data?: any;
   [key: string]: any;
 }
 
@@ -22,6 +25,8 @@ interface ServerResponse {
   transcription?: string;
   form_data?: any;
   formData?: any;
+  payloadType?: string;
+  suggestions?: string;
   [key: string]: any;
 }
 
@@ -32,6 +37,7 @@ export function useWebSocket(options: WebSocketOptions) {
   const [error, setError] = useState<Event | null>(null);
   const [transcription, setTranscription] = useState<string>('');
   const [formData, setFormData] = useState<any>(null);
+  const [suggestions, setSuggestions] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -41,9 +47,12 @@ export function useWebSocket(options: WebSocketOptions) {
     
     try {
       setIsConnecting(true);
-      wsRef.current = new WebSocket(url);
+      // Use the same WebSocket URL pattern as the original file
+      const wsUrl = url || `${window.location.origin.replace(/^http/, 'ws')}/ws`;
+      wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
+        console.log('WebSocket connected');
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -64,9 +73,11 @@ export function useWebSocket(options: WebSocketOptions) {
 
       wsRef.current.onmessage = (event) => {
         try {
+          console.log('Message received:', event.data);
           const data = JSON.parse(event.data) as ServerResponse;
+          console.log('data--> ', data);
           
-          if (data.transcription) {
+          if (data.transcription !== undefined) {
             setTranscription(data.transcription);
             setIsProcessing(false);
           }
@@ -75,6 +86,17 @@ export function useWebSocket(options: WebSocketOptions) {
             const formDataResponse = data.form_data || data.formData;
             setFormData(formDataResponse);
             console.log('Form data received:', formDataResponse);
+          }
+
+          // Handle structured data format with suggestions
+          if (data.payloadType === 'structured' && data.formData) {
+            setFormData(data.formData);
+            console.log('Structured form data received:', data.formData);
+            
+            if (data.suggestions) {
+              setSuggestions(data.suggestions);
+              console.log('Suggestions received:', data.suggestions);
+            }
           }
         } catch (e) {
           console.error('Error parsing WebSocket message:', e);
@@ -97,6 +119,7 @@ export function useWebSocket(options: WebSocketOptions) {
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setIsProcessing(true);
+      console.log('Sending message:', message);
       wsRef.current.send(JSON.stringify(message));
       return true;
     }
@@ -104,20 +127,61 @@ export function useWebSocket(options: WebSocketOptions) {
   }, []);
   
   const sendAudio = useCallback((base64Audio: string) => {
-    const userId = localStorage.getItem('userId') || 'default-user';
-    const appointmentId = localStorage.getItem('appointmentId') || 'default-appointment';
+    // Get user ID and appointment ID from localStorage, matching the original implementation
+    const selectedPatient = localStorage.getItem('selectedPatient');
+    const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
+    
+    const selectedAppointment = localStorage.getItem('selectedAppointment');
+    const appointmentId = selectedAppointment ? JSON.parse(selectedAppointment)._id : '';
+    
+    // If not available in localStorage, use default values
+    const finalUserId = userId || localStorage.getItem('userId') || `user-${Math.random().toString(36).substring(2, 9)}`;
+    const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || `apt-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Save defaults if not already stored
+    if (!localStorage.getItem('userId')) {
+      localStorage.setItem('userId', finalUserId);
+    }
+    if (!localStorage.getItem('appointmentId')) {
+      localStorage.setItem('appointmentId', finalAppointmentId);
+    }
     
     const payload: WebSocketMessage = {
       payloadType: 'audio',
       audio: base64Audio,
-      userId,
-      appointmentId,
-      formKey: 'physio',
-      operation_mode: 'transcribe and fill',
+      userId: finalUserId,
+      appointmentId: finalAppointmentId,
+      formKey: 'snc',  // Using 'snc' form key as in the original file
     };
     
     return sendMessage(payload);
   }, [sendMessage]);
+
+  const processTranscription = useCallback((transcriptionText: string) => {
+    // Get user ID and appointment ID from localStorage, matching the original implementation
+    const selectedPatient = localStorage.getItem('selectedPatient');
+    const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
+    
+    const selectedAppointment = localStorage.getItem('selectedAppointment');
+    const appointmentId = selectedAppointment ? JSON.parse(selectedAppointment)._id : '';
+    
+    // If not available in localStorage, use default values
+    const finalUserId = userId || localStorage.getItem('userId') || '';
+    const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || '';
+    
+    // Prepare form data in the expected format
+    const payload: WebSocketMessage = {
+      payloadType: 'text',
+      text: transcriptionText,
+      userId: finalUserId,
+      appointmentId: finalAppointmentId,
+      formKey: 'snc',
+      // Include any existing form data
+      formData: formData || {},
+    };
+    
+    return sendMessage(payload);
+  }, [sendMessage, formData]);
 
   useEffect(() => {
     return () => {
@@ -136,8 +200,11 @@ export function useWebSocket(options: WebSocketOptions) {
     disconnect,
     sendMessage,
     sendAudio,
+    processTranscription,
     transcription,
     formData,
+    suggestions,
     setTranscription,
+    setSuggestions,
   };
 }

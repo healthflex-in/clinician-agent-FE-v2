@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader } from 'lucide-react';
 import { encodeWAV, blobToBase64, detectSilence, getUserMedia, resampleAudio } from '@/utils/audio';
@@ -78,7 +77,7 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
       // Encode as WAV
       const wavBlob = encodeWAV(resampledBuffer);
       
-      // Convert to base64
+      // Convert to base64 (includes data URL prefix)
       const base64Audio = await blobToBase64(wavBlob);
       
       // Send to the parent component

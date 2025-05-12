@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface WebSocketOptions {
@@ -47,8 +48,8 @@ export function useWebSocket(options: WebSocketOptions) {
     try {
       setIsConnecting(true);
       
-      // Using the original connection approach that worked in the first version
-      const wsUrl = `${window.location.origin.replace(/^http/, 'ws')}/ws`;
+      // Hardcoded WebSocket URL as requested
+      const wsUrl = 'ws://localhost:8080/ws';
       console.log('Attempting to connect to WebSocket at:', wsUrl);
       
       wsRef.current = new WebSocket(wsUrl);
@@ -150,7 +151,7 @@ export function useWebSocket(options: WebSocketOptions) {
       localStorage.setItem('appointmentId', finalAppointmentId);
     }
     
-    // Using the original payload format that worked in the first version
+    // Exactly matching the payload format from the HTML file
     const payload: WebSocketMessage = {
       payloadType: 'audio',
       audio: base64Audio,

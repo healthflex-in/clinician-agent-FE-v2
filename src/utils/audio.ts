@@ -40,12 +40,14 @@ export function encodeWAV(audioBuffer: AudioBuffer): Blob {
   return new Blob([view], { type: 'audio/wav' });
 }
 
+// Updated to ensure we include the data URL prefix before the base64 data
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64 = reader.result as string;
-      resolve(base64.split(',')[1]); // Remove the data URL prefix
+      // Return the full data URL instead of just the base64 part
+      resolve(base64);
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);

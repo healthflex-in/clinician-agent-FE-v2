@@ -25,8 +25,8 @@ const Index = () => {
     setTranscription,
     setSuggestions
   } = useWebSocket({
-    // Use the original URL approach that worked in the first version
-    url: `${window.location.origin.replace(/^http/, 'ws')}/ws`,
+    // Hardcoded WebSocket URL as requested
+    url: 'ws://localhost:8080/ws',
     onOpen: () => {
       toast({
         title: "Connected",

@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,20 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+        // Add our custom parrot green colors
+        parrot: {
+          50: '#f2fce2',
+          100: '#e1f7c6',
+          200: '#c7ef96',
+          300: '#a9e564',
+          400: '#8ddb3e',
+          500: '#69c219',
+          600: '#529c14',
+          700: '#3c750f',
+          800: '#2b5d0a',
+          900: '#1a4605',
+        },
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +98,31 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+        'pulse-ring': {
+          '0%': {
+            transform: 'scale(0.8)',
+            opacity: '0.8'
+          },
+          '100%': {
+            transform: 'scale(1.3)',
+            opacity: '0'
+          }
+        },
+        'bounce-soft': {
+          '0%, 100%': {
+            transform: 'translateY(0)'
+          },
+          '50%': {
+            transform: 'translateY(-5%)'
+          }
+        }
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite',
+        'bounce-soft': 'bounce-soft 2s infinite ease-in-out'
 			}
 		}
 	},

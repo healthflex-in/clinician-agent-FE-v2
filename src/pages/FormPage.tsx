@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -287,6 +286,6 @@ const FormPage = () => {
       </div>
     </div>
   );
-});
+};
 
 export default FormPage;

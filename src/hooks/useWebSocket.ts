@@ -6,6 +6,7 @@ interface WebSocketOptions {
   onOpen?: () => void;
   onClose?: () => void;
   onError?: (error: Event) => void;
+  onFormData?: (formData: any) => void;
 }
 
 interface WebSocketMessage {
@@ -31,7 +32,7 @@ interface ServerResponse {
 }
 
 export function useWebSocket(options: WebSocketOptions) {
-  const { url, onOpen, onClose, onError } = options;
+  const { url, onOpen, onClose, onError, onFormData } = options;
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Event | null>(null);
@@ -91,6 +92,11 @@ export function useWebSocket(options: WebSocketOptions) {
             const formDataResponse = data.form_data || data.formData;
             setFormData(formDataResponse);
             console.log('Form data received:', formDataResponse);
+            
+            // Forward form data to parent component if callback is provided
+            if (onFormData) {
+              onFormData(formDataResponse);
+            }
           }
 
           // Handle structured data format with suggestions
@@ -98,13 +104,22 @@ export function useWebSocket(options: WebSocketOptions) {
             setFormData(data.formData);
             console.log('Structured form data received:', data.formData);
             
+            // Forward form data to parent component if callback is provided
+            if (onFormData) {
+              onFormData(data.formData);
+            }
+            
             if (data.suggestions) {
               setSuggestions(data.suggestions);
               console.log('Suggestions received:', data.suggestions);
             }
           }
+          
+          // Set processing to false when we receive any response
+          setIsProcessing(false);
         } catch (e) {
           console.error('Error parsing WebSocket message:', e);
+          setIsProcessing(false);
         }
       };
     } catch (e) {
@@ -112,7 +127,7 @@ export function useWebSocket(options: WebSocketOptions) {
       setError(e as any);
       console.error('WebSocket connection error:', e);
     }
-  }, [url, isConnecting, onOpen, onClose, onError]);
+  }, [url, isConnecting, onOpen, onClose, onError, onFormData]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -131,7 +146,7 @@ export function useWebSocket(options: WebSocketOptions) {
     return false;
   }, []);
   
-  const sendAudio = useCallback((base64Audio: string) => {
+  const sendAudio = useCallback((base64Audio: string, currentFormData?: any) => {
     // Get user ID and appointment ID from localStorage, matching the original implementation
     const selectedPatient = localStorage.getItem('selectedPatient');
     const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
@@ -160,11 +175,16 @@ export function useWebSocket(options: WebSocketOptions) {
       formKey: 'snc',  // Using 'snc' form key as in the original file
     };
     
+    // If form data is provided, include it in the payload
+    if (currentFormData) {
+      payload.formData = currentFormData;
+    }
+    
     console.log('Sending audio with payload:', payload);
     return sendMessage(payload);
   }, [sendMessage]);
 
-  const processTranscription = useCallback((transcriptionText: string) => {
+  const processTranscription = useCallback((transcriptionText: string, currentFormData?: any) => {
     // Get user ID and appointment ID from localStorage, matching the original implementation
     const selectedPatient = localStorage.getItem('selectedPatient');
     const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
@@ -183,9 +203,10 @@ export function useWebSocket(options: WebSocketOptions) {
       userId: finalUserId,
       appointmentId: finalAppointmentId,
       formKey: 'snc',
-      // Include any existing form data
-      formData: formData || {},
     };
+    
+    // Include any existing form data or passed current form data
+    payload.formData = currentFormData || formData || {};
     
     console.log('Processing transcription with payload:', payload);
     return sendMessage(payload);

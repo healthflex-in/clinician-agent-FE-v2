@@ -1,43 +1,185 @@
 
-export function encodeWAV(audioBuffer: AudioBuffer): Blob {
-  const numChannels = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const bitsPerSample = 16;
-  const channelData = audioBuffer.getChannelData(0);
-  const bufferLength = channelData.length;
-  const blockAlign = (numChannels * bitsPerSample) / 8;
-  const byteRate = sampleRate * blockAlign;
-  const wavBuffer = new ArrayBuffer(44 + bufferLength * 2);
-  const view = new DataView(wavBuffer);
+/**
+ * Get user media (microphone access)
+ */
+export function getUserMedia(): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  });
+}
 
-  function writeString(view: DataView, offset: number, string: string): void {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
+/**
+ * Detect silence in an audio stream
+ */
+export function detectSilence(
+  analyser: AnalyserNode, 
+  silenceThreshold: number, 
+  onSilence: () => void, 
+  silenceDuration: number = 3000
+): () => void {
+  const dataArray = new Uint8Array(analyser.fftSize);
+  let silenceStart: number | null = null;
+  let timeout: number | null = null;
+  
+  const checkSilence = () => {
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate average volume
+    const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+    
+    if (average < silenceThreshold) {
+      // Silence detected
+      if (silenceStart === null) {
+        silenceStart = Date.now();
+      } else if (Date.now() - silenceStart > silenceDuration) {
+        // Silence has lasted long enough, stop recording
+        onSilence();
+        return;
+      }
+    } else {
+      // Reset silence detection
+      silenceStart = null;
+    }
+    
+    // Continue checking
+    timeout = window.setTimeout(checkSilence, 100);
+  };
+  
+  // Start the detection
+  checkSilence();
+  
+  // Return a cleanup function
+  return () => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+  };
+}
+
+/**
+ * Resample audio to the specified sample rate
+ */
+export async function resampleAudio(buffer: ArrayBuffer, targetSampleRate: number): Promise<AudioBuffer> {
+  const audioCtx = new AudioContext();
+  const audioBuffer = await audioCtx.decodeAudioData(buffer);
+  
+  const originalSampleRate = audioBuffer.sampleRate;
+  
+  if (originalSampleRate === targetSampleRate) {
+    return audioBuffer;
+  }
+  
+  const channelCount = audioBuffer.numberOfChannels;
+  const frameCount = (audioBuffer.length * targetSampleRate) / originalSampleRate;
+  
+  const resampledBuffer = audioCtx.createBuffer(
+    channelCount,
+    frameCount,
+    targetSampleRate
+  );
+  
+  for (let channel = 0; channel < channelCount; channel++) {
+    const inputData = audioBuffer.getChannelData(channel);
+    const outputData = resampledBuffer.getChannelData(channel);
+    
+    // Simple linear interpolation resampling
+    const stepSize = originalSampleRate / targetSampleRate;
+    
+    for (let i = 0; i < frameCount; i++) {
+      const position = i * stepSize;
+      const index = Math.floor(position);
+      const fraction = position - index;
+      
+      if (index + 1 < inputData.length) {
+        outputData[i] = inputData[index] * (1 - fraction) + inputData[index + 1] * fraction;
+      } else {
+        outputData[i] = inputData[index];
+      }
     }
   }
+  
+  return resampledBuffer;
+}
 
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + bufferLength * 2, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(view, 36, 'data');
-  view.setUint32(40, bufferLength * 2, true);
+/**
+ * Encode audio buffer to WAV format
+ */
+export function encodeWAV(audioBuffer: AudioBuffer): Blob {
+  const interleaved = interleaveChannels(audioBuffer);
+  const dataView = encodeWAVHeader(interleaved, audioBuffer.sampleRate);
+  return new Blob([dataView], { type: 'audio/wav' });
+}
 
-  let offset = 44;
-  for (let i = 0; i < bufferLength; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, channelData[i]));
-    s = s < 0 ? s * 0x8000 : s * 0x7fff;
-    view.setInt16(offset, s, true);
+function interleaveChannels(audioBuffer: AudioBuffer): Float32Array {
+  const channelCount = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  const result = new Float32Array(length * channelCount);
+  
+  for (let channel = 0; channel < channelCount; channel++) {
+    const channelData = audioBuffer.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      result[i * channelCount + channel] = channelData[i];
+    }
   }
+  
+  return result;
+}
 
-  return new Blob([view], { type: 'audio/wav' });
+function encodeWAVHeader(samples: Float32Array, sampleRate: number): DataView {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const channels = 1; // Mono
+  const bitDepth = 16;
+  
+  // RIFF identifier
+  writeString(view, 0, 'RIFF');
+  // RIFF chunk length
+  view.setUint32(4, 36 + samples.length * 2, true);
+  // RIFF type
+  writeString(view, 8, 'WAVE');
+  // Format chunk identifier
+  writeString(view, 12, 'fmt ');
+  // Format chunk length
+  view.setUint32(16, 16, true);
+  // Sample format (1 is PCM)
+  view.setUint16(20, 1, true);
+  // Channel count
+  view.setUint16(22, channels, true);
+  // Sample rate
+  view.setUint32(24, sampleRate, true);
+  // Byte rate (sample rate * block align)
+  view.setUint32(28, sampleRate * channels * (bitDepth / 8), true);
+  // Block align (channel count * bytes per sample)
+  view.setUint16(32, channels * (bitDepth / 8), true);
+  // Bits per sample
+  view.setUint16(34, bitDepth, true);
+  // Data chunk identifier
+  writeString(view, 36, 'data');
+  // Data chunk length
+  view.setUint32(40, samples.length * 2, true);
+  
+  // Write the PCM samples
+  floatTo16BitPCM(view, 44, samples);
+  
+  return view;
+}
+
+function writeString(view: DataView, offset: number, string: string): void {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+function floatTo16BitPCM(output: DataView, offset: number, input: Float32Array): void {
+  for (let i = 0; i < input.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
 }
 
 // Updated to ensure we include the data URL prefix before the base64 data
@@ -51,103 +193,5 @@ export function blobToBase64(blob: Blob): Promise<string> {
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
-  });
-}
-
-// Function to resample audio to a target sample rate (usually 16000Hz)
-export function resampleAudio(arrayBuffer: ArrayBuffer, targetSampleRate: number): Promise<AudioBuffer> {
-  return new Promise((resolve, reject) => {
-    const audioContext = new AudioContext();
-    
-    audioContext.decodeAudioData(arrayBuffer).then(audioBuffer => {
-      const numberOfChannels = audioBuffer.numberOfChannels;
-      const duration = audioBuffer.duration;
-      const offlineContext = new OfflineAudioContext(
-        numberOfChannels,
-        Math.ceil(duration * targetSampleRate),
-        targetSampleRate
-      );
-      
-      const source = offlineContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(offlineContext.destination);
-      source.start(0);
-      
-      offlineContext.startRendering()
-        .then(renderedBuffer => resolve(renderedBuffer))
-        .catch(err => {
-          console.error('Offline rendering error:', err);
-          reject(err);
-        });
-    }).catch(err => {
-      console.error('Audio decoding error:', err);
-      reject(err);
-    });
-  });
-}
-
-// Function to detect silence based on audio volume
-export function detectSilence(
-  analyser: AnalyserNode,
-  silenceThreshold: number = -50,
-  silenceCallback: () => void,
-  silenceDuration: number = 5000,
-): () => void {
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-  let silenceStart = null;
-  let silenceTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const checkSilence = () => {
-    analyser.getByteFrequencyData(dataArray);
-    
-    // Calculate average volume level
-    let sum = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      sum += dataArray[i];
-    }
-    const average = sum / bufferLength;
-    const volumeDb = 20 * Math.log10(average / 255);
-
-    if (volumeDb < silenceThreshold) {
-      // Silent
-      if (silenceStart === null) {
-        silenceStart = Date.now();
-      } else if (Date.now() - silenceStart >= silenceDuration) {
-        if (silenceTimer === null) {
-          silenceTimer = setTimeout(() => {
-            silenceCallback();
-            silenceStart = null;
-            silenceTimer = null;
-          }, 0);
-        }
-      }
-    } else {
-      // Not silent
-      silenceStart = null;
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-        silenceTimer = null;
-      }
-    }
-  };
-
-  const intervalId = setInterval(checkSilence, 300);
-
-  return () => {
-    clearInterval(intervalId);
-    if (silenceTimer) {
-      clearTimeout(silenceTimer);
-    }
-  };
-}
-
-export function getUserMedia(): Promise<MediaStream> {
-  return navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
   });
 }

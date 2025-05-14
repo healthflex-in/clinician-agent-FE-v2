@@ -1,191 +1,119 @@
 
-import React, { useEffect, useState } from 'react';
-import Recorder from '@/components/Recorder';
-import TranscriptBox from '@/components/TranscriptBox';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, WifiOff } from 'lucide-react';
+
+import formSchemas from '@/schemas/formSchemas';
 
 const Index = () => {
-  const [transcriptText, setTranscriptText] = useState('');
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [formKey, setFormKey] = useState<string>('snc');
+  const [patientId, setPatientId] = useState<string>('');
+  const [appointmentId, setAppointmentId] = useState<string>('');
   
-  const { 
-    connect,
-    isConnected,
-    isConnecting,
-    isProcessing,
-    error,
-    sendAudio,
-    processTranscription,
-    transcription,
-    suggestions,
-    setTranscription,
-    setSuggestions
-  } = useWebSocket({
-    // Hardcoded WebSocket URL as requested
-    url: 'ws://localhost:8080/ws',
-    onOpen: () => {
-      toast({
-        title: "Connected",
-        description: "Ready to transcribe audio",
-      });
-    },
-    onClose: () => {
-      toast({
-        title: "Disconnected",
-        description: "WebSocket connection closed",
-        variant: "destructive",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to transcription service",
-        variant: "destructive",
-      });
-    }
-  });
-
+  // Get previous values from localStorage
   useEffect(() => {
-    connect();
+    const savedPatientId = localStorage.getItem('userId');
+    const savedAppointmentId = localStorage.getItem('appointmentId');
     
-    // Automatically try to reconnect every 5 seconds if connection fails
-    const reconnectInterval = setInterval(() => {
-      if (!isConnected && !isConnecting) {
-        console.log('Attempting to reconnect WebSocket...');
-        connect();
-      }
-    }, 5000);
+    if (savedPatientId) setPatientId(savedPatientId);
+    if (savedAppointmentId) setAppointmentId(savedAppointmentId);
+  }, []);
+
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     
-    return () => clearInterval(reconnectInterval);
-  }, [connect, isConnected, isConnecting]);
-
-  useEffect(() => {
-    if (transcription) {
-      setTranscriptText(transcription);
-    }
-  }, [transcription]);
-
-  const handleAudioEncoded = (base64Audio: string) => {
-    if (!isConnected) {
+    // Validate form
+    if (!formKey) {
       toast({
-        title: "Not connected",
-        description: "Attempting to reconnect...",
-        variant: "destructive",
-      });
-      connect();
-      return;
-    }
-
-    const sent = sendAudio(base64Audio);
-    if (!sent) {
-      toast({
-        title: "Failed to send audio",
-        description: "Connection issues detected",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleProcessTranscription = () => {
-    if (!transcriptText.trim()) {
-      toast({
-        title: "Empty transcription",
-        description: "Please record audio or enter text to process",
+        title: "Form Selection Required",
+        description: "Please select a form type",
         variant: "destructive",
       });
       return;
     }
-
-    const sent = processTranscription(transcriptText);
-    if (!sent) {
-      toast({
-        title: "Failed to process transcription",
-        description: "Connection issues detected",
-        variant: "destructive",
-      });
-    }
+    
+    // Generate random IDs if not provided
+    const finalPatientId = patientId || `user-${Math.random().toString(36).substring(2, 9)}`;
+    const finalAppointmentId = appointmentId || `apt-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Store in localStorage
+    localStorage.setItem('userId', finalPatientId);
+    localStorage.setItem('appointmentId', finalAppointmentId);
+    
+    // Navigate to form page
+    navigate(`/${formKey}/${finalPatientId}/${finalAppointmentId}`);
   };
-
-  // Automatically hide suggestions after 7 seconds
-  useEffect(() => {
-    if (suggestions) {
-      const timer = setTimeout(() => {
-        setSuggestions(null);
-      }, 7000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [suggestions, setSuggestions]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-parrot-100 to-white">
-      <Card className="w-full max-w-md shadow-lg border-parrot-200">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-center text-parrot-800">
-            Voice Recorder
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-primary/10 to-background">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl font-bold">
+            Audio Transcription App
           </CardTitle>
         </CardHeader>
-
-        <CardContent className="space-y-6">
-          {!isConnected && !isConnecting && (
-            <Alert variant="destructive" className="bg-red-50 border-red-200">
-              <WifiOff className="h-4 w-4" />
-              <AlertTitle>WebSocket Disconnected</AlertTitle>
-              <AlertDescription>
-                Cannot connect to the transcription service. Please check your network connection.
-              </AlertDescription>
-            </Alert>
-          )}
         
-          {suggestions && (
-            <Alert variant="default" className="bg-slate-900 text-white border-slate-800">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Suggestions</AlertTitle>
-              <AlertDescription>
-                <div className="text-sm whitespace-pre-wrap">{suggestions}</div>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="flex justify-center py-4">
-            <Recorder 
-              onAudioEncoded={handleAudioEncoded} 
-              isProcessing={isProcessing} 
-            />
-          </div>
-          
-          <TranscriptBox
-            value={transcriptText}
-            onChange={setTranscription}
-            isProcessing={isProcessing}
-            className="mt-4"
-          />
-          
-          <div className="flex justify-center pt-2">
-            <button 
-              onClick={handleProcessTranscription}
-              disabled={isProcessing || !transcriptText.trim() || !isConnected}
-              className={`px-4 py-2 rounded-md text-white font-medium 
-                ${isProcessing || !transcriptText.trim() || !isConnected
-                  ? 'bg-parrot-400 cursor-not-allowed' 
-                  : 'bg-parrot-600 hover:bg-parrot-700'}`}
-            >
-              Process Transcription
-            </button>
-          </div>
+        <CardContent>
+          <form onSubmit={handleFormSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="formKey">Form Type</Label>
+              <Select 
+                value={formKey} 
+                onValueChange={setFormKey}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a form type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(formSchemas).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {key.charAt(0).toUpperCase() + key.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="patientId">Patient ID (Optional)</Label>
+              <Input
+                id="patientId"
+                value={patientId}
+                onChange={(e) => setPatientId(e.target.value)}
+                placeholder="Enter patient ID or leave blank for demo"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="appointmentId">Appointment ID (Optional)</Label>
+              <Input
+                id="appointmentId"
+                value={appointmentId}
+                onChange={(e) => setAppointmentId(e.target.value)}
+                placeholder="Enter appointment ID or leave blank for demo"
+              />
+            </div>
+            
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+              Start Session
+            </Button>
+          </form>
         </CardContent>
         
-        <CardFooter className="flex justify-center pt-0 pb-4">
-          <div className="text-sm text-center text-muted-foreground">
-            {isConnecting && "Connecting to transcription service..."}
-            {error && "Connection error. Please try again."}
-            {!isConnecting && isConnected && !isProcessing && "Ready to record"}
-            {!isConnecting && isConnected && isProcessing && "Processing audio..."}
-          </div>
+        <CardFooter className="flex-col gap-2">
+          <p className="text-sm text-muted-foreground text-center">
+            Select a form type and optionally provide patient and appointment IDs.
+          </p>
+          <p className="text-xs text-muted-foreground text-center">
+            Random IDs will be generated if not provided.
+          </p>
         </CardFooter>
       </Card>
     </div>

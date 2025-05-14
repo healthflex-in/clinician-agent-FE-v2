@@ -60,10 +60,7 @@ export async function updateAgentReport(input: {
     }
   `;
   
-  return graphqlRequest({ 
-    query, 
-    variables: { input } 
-  });
+  return graphqlRequest(query, { input });
 }
 
 /**
@@ -80,7 +77,7 @@ export async function fetchCenters() {
     }
   `;
   
-  return graphqlRequest({ query });
+  return graphqlRequest(query);
 }
 
 /**
@@ -105,13 +102,10 @@ export async function searchUsers(userType: string, centerId: string[], search?:
     }
   `;
   
-  return graphqlRequest({ 
-    query, 
-    variables: { 
-      userType, 
-      centerId,
-      search 
-    } 
+  return graphqlRequest(query, { 
+    userType, 
+    centerId,
+    search 
   });
 }
 
@@ -131,8 +125,5 @@ export async function fetchAppointments(filter: any) {
     }
   `;
   
-  return graphqlRequest({ 
-    query, 
-    variables: { filter } 
-  });
+  return graphqlRequest(query, { filter });
 }

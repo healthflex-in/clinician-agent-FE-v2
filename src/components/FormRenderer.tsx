@@ -86,8 +86,6 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
         }
         
         // Merge the LLM data with current state
-        // We're using a shallow spread here as the deepUpdateObject function
-        // should handle merging nested structures correctly
         return { ...state, ...action.data };
       default:
         return state;
@@ -239,6 +237,11 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
 
   // Render a field based on its type (string, number, object, array)
   const renderField = (fieldSchema: any, path: string, fieldName: string, parentIsArray: boolean = false): JSX.Element => {
+    // Skip "record" fields as requested
+    if (fieldName === 'record') {
+      return <></>; // Return empty fragment to skip rendering
+    }
+    
     // Get current value from state
     const value = path ? getNestedValue(state, path) : state;
     
@@ -286,10 +289,10 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
                   
                   {/* Render each field in the array item */}
                   <div className="space-y-3">
-                    {Object.entries(item || {}).map(([key, _]) => (
+                    {Object.entries(fieldSchema[0] || {}).map(([key, subSchema]) => (
                       <div key={key} className="mb-4">
                         {renderField(
-                          fieldSchema[0][key],
+                          subSchema,
                           `${path}.${index}.${key}`,
                           key,
                           true
@@ -343,9 +346,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
             {labelText}
           </Label>
           
-          {fieldName.toLowerCase().includes('record') || fieldName.toLowerCase().includes('comment') || fieldName.toLowerCase().includes('advice')
-            ? renderInputForType('textarea', value, path, isLLMUpdated, `Enter ${labelText.toLowerCase()}`)
-            : renderInputForType(fieldType, value, path, isLLMUpdated, `Enter ${labelText.toLowerCase()}`)}
+          {fieldName.toLowerCase().includes('comment') || fieldName.toLowerCase().includes('advice') ? 
+            renderInputForType('textarea', value, path, isLLMUpdated, `Enter ${labelText.toLowerCase()}`) :
+            renderInputForType(fieldType, value, path, isLLMUpdated, `Enter ${labelText.toLowerCase()}`)}
         </div>
       );
     }
@@ -369,9 +372,11 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
         </Card>
       )}
       
-      <div className="space-y-4">
-        {renderField(schema, '', 'root')}
-      </div>
+      <ScrollArea className="h-[calc(100vh-350px)] pr-4">
+        <div className="space-y-4">
+          {renderField(schema, '', 'root')}
+        </div>
+      </ScrollArea>
     </div>
   );
 });

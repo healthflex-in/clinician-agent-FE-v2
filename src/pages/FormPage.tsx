@@ -188,8 +188,8 @@ const FormPage = () => {
   }, [suggestions, setSuggestions]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/10 to-background">
-      <div className="w-full max-w-4xl space-y-6">
+    <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/10 to-background overflow-auto">
+      <div className="w-full max-w-4xl space-y-6 pb-10">
         {/* Header with form info */}
         <Card className="w-full bg-card">
           <CardHeader>
@@ -274,7 +274,7 @@ const FormPage = () => {
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="p-6">
+          <CardContent className="p-6 max-h-[calc(80vh)] overflow-visible">
             <FormRenderer 
               ref={formRendererRef}
               schema={schema}
@@ -287,6 +287,6 @@ const FormPage = () => {
       </div>
     </div>
   );
-};
+});
 
 export default FormPage;

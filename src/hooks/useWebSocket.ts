@@ -28,6 +28,8 @@ interface ServerResponse {
   formData?: any;
   payloadType?: string;
   suggestions?: string;
+  realTimeRecommendations?: string;
+  error?: string;
   [key: string]: any;
 }
 
@@ -39,6 +41,7 @@ export function useWebSocket(options: WebSocketOptions) {
   const [transcription, setTranscription] = useState<string>('');
   const [formData, setFormData] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<string | null>(null);
+  const [recommendations, setRecommendations] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
@@ -53,6 +56,8 @@ export function useWebSocket(options: WebSocketOptions) {
       const wsUrl = 'ws://localhost:8080/ws';
       console.log('Attempting to connect to WebSocket at:', wsUrl);
       
+      // Add the API key as a header if possible
+      // Note: Custom headers aren't directly supported in native WebSocket
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
@@ -61,6 +66,15 @@ export function useWebSocket(options: WebSocketOptions) {
         setIsConnecting(false);
         setError(null);
         if (onOpen) onOpen();
+        
+        // Send an initial message with the API key
+        // This is a workaround since headers can't be sent directly
+        if (wsRef.current) {
+          wsRef.current.send(JSON.stringify({
+            payloadType: 'authentication',
+            apiKey: '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20'
+          }));
+        }
       };
 
       wsRef.current.onclose = (event) => {
@@ -83,6 +97,13 @@ export function useWebSocket(options: WebSocketOptions) {
           const data = JSON.parse(event.data) as ServerResponse;
           console.log('data--> ', data);
           
+          // Handle different response types
+          if (data.error) {
+            console.error('Server error:', data.error);
+            setIsProcessing(false);
+            return;
+          }
+          
           if (data.transcription !== undefined) {
             setTranscription(data.transcription);
             setIsProcessing(false);
@@ -100,18 +121,25 @@ export function useWebSocket(options: WebSocketOptions) {
           }
 
           // Handle structured data format with suggestions
-          if (data.payloadType === 'structured' && data.formData) {
-            setFormData(data.formData);
-            console.log('Structured form data received:', data.formData);
-            
-            // Forward form data to parent component if callback is provided
-            if (onFormData) {
-              onFormData(data.formData);
+          if (data.payloadType === 'structured') {
+            if (data.formData) {
+              setFormData(data.formData);
+              console.log('Structured form data received:', data.formData);
+              
+              // Forward form data to parent component if callback is provided
+              if (onFormData) {
+                onFormData(data.formData);
+              }
             }
             
             if (data.suggestions) {
               setSuggestions(data.suggestions);
               console.log('Suggestions received:', data.suggestions);
+            }
+            
+            if (data.realTimeRecommendations) {
+              setRecommendations(data.realTimeRecommendations);
+              console.log('Recommendations received:', data.realTimeRecommendations);
             }
           }
           
@@ -140,77 +168,66 @@ export function useWebSocket(options: WebSocketOptions) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setIsProcessing(true);
       console.log('Sending message:', message);
-      wsRef.current.send(JSON.stringify(message));
+      
+      // Add API key to every message
+      const messageWithAuth = {
+        ...message,
+        apiKey: '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20'
+      };
+      
+      wsRef.current.send(JSON.stringify(messageWithAuth));
       return true;
     }
     return false;
   }, []);
   
   const sendAudio = useCallback((base64Audio: string, currentFormData?: any) => {
-    // Get user ID and appointment ID from localStorage, matching the original implementation
-    const selectedPatient = localStorage.getItem('selectedPatient');
-    const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
+    // Get user ID and appointment ID from localStorage or route params
+    const userId = localStorage.getItem('userId') || '';
+    const appointmentId = localStorage.getItem('appointmentId') || '';
+    const formKey = localStorage.getItem('formKey') || 'snc';
     
-    const selectedAppointment = localStorage.getItem('selectedAppointment');
-    const appointmentId = selectedAppointment ? JSON.parse(selectedAppointment)._id : '';
-    
-    // If not available in localStorage, use default values
-    const finalUserId = userId || localStorage.getItem('userId') || `user-${Math.random().toString(36).substring(2, 9)}`;
-    const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || `apt-${Math.random().toString(36).substring(2, 9)}`;
-    
-    // Save defaults if not already stored
-    if (!localStorage.getItem('userId')) {
-      localStorage.setItem('userId', finalUserId);
-    }
-    if (!localStorage.getItem('appointmentId')) {
-      localStorage.setItem('appointmentId', finalAppointmentId);
-    }
-    
-    // Exactly matching the payload format from the HTML file
+    // Format for audio-only payload
     const payload: WebSocketMessage = {
       payloadType: 'audio',
       audio: base64Audio,
-      userId: finalUserId,
-      appointmentId: finalAppointmentId,
-      formKey: 'snc',  // Using 'snc' form key as in the original file
+      userId: userId,
+      appointmentId: appointmentId,
+      formKey: formKey,
+      operation_mode: 'transcribe_only',
+      storeInChat: true
     };
     
-    // If form data is provided, include it in the payload
+    // If form data is provided, include it
     if (currentFormData) {
       payload.formData = currentFormData;
     }
     
-    console.log('Sending audio with payload:', payload);
     return sendMessage(payload);
   }, [sendMessage]);
 
   const processTranscription = useCallback((transcriptionText: string, currentFormData?: any) => {
-    // Get user ID and appointment ID from localStorage, matching the original implementation
-    const selectedPatient = localStorage.getItem('selectedPatient');
-    const userId = selectedPatient ? JSON.parse(selectedPatient)._id : '';
+    // Get user ID and appointment ID from localStorage or route params
+    const userId = localStorage.getItem('userId') || '';
+    const appointmentId = localStorage.getItem('appointmentId') || '';
+    const formKey = localStorage.getItem('formKey') || 'snc';
     
-    const selectedAppointment = localStorage.getItem('selectedAppointment');
-    const appointmentId = selectedAppointment ? JSON.parse(selectedAppointment)._id : '';
-    
-    // If not available in localStorage, use default values
-    const finalUserId = userId || localStorage.getItem('userId') || '';
-    const finalAppointmentId = appointmentId || localStorage.getItem('appointmentId') || '';
-    
-    // Using the original payload format that worked in the first version
+    // Payload for text + form data
     const payload: WebSocketMessage = {
       payloadType: 'text',
       text: transcriptionText,
-      userId: finalUserId,
-      appointmentId: finalAppointmentId,
-      formKey: 'snc',
+      userId: userId,
+      appointmentId: appointmentId,
+      formKey: formKey
     };
     
-    // Include any existing form data or passed current form data
-    payload.formData = currentFormData || formData || {};
+    // Include form data if available
+    if (currentFormData) {
+      payload.formData = currentFormData;
+    }
     
-    console.log('Processing transcription with payload:', payload);
     return sendMessage(payload);
-  }, [sendMessage, formData]);
+  }, [sendMessage]);
 
   useEffect(() => {
     return () => {
@@ -233,7 +250,9 @@ export function useWebSocket(options: WebSocketOptions) {
     transcription,
     formData,
     suggestions,
+    recommendations,
     setTranscription,
     setSuggestions,
+    setRecommendations
   };
 }

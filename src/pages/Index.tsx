@@ -21,9 +21,11 @@ const Index = () => {
   useEffect(() => {
     const savedPatientId = localStorage.getItem('userId');
     const savedAppointmentId = localStorage.getItem('appointmentId');
+    const savedFormKey = localStorage.getItem('formKey');
     
     if (savedPatientId) setPatientId(savedPatientId);
     if (savedAppointmentId) setAppointmentId(savedAppointmentId);
+    if (savedFormKey) setFormKey(savedFormKey);
   }, []);
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -46,6 +48,7 @@ const Index = () => {
     // Store in localStorage
     localStorage.setItem('userId', finalPatientId);
     localStorage.setItem('appointmentId', finalAppointmentId);
+    localStorage.setItem('formKey', formKey);
     
     // Navigate to form page
     navigate(`/${formKey}/${finalPatientId}/${finalAppointmentId}`);
@@ -101,7 +104,7 @@ const Index = () => {
               />
             </div>
             
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+            <Button type="submit" className="w-full bg-[#DDFE71] hover:bg-[#DDFE71]/90 text-black">
               Start Session
             </Button>
           </form>

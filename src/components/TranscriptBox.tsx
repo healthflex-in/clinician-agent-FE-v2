@@ -29,7 +29,7 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
     <div className={`relative w-full ${className}`}>
       <label 
         htmlFor="transcription"
-        className="block text-sm font-medium text-parrot-700 mb-1"
+        className="block text-sm font-medium text-[#DDFE71] mb-1"
       >
         Transcription
       </label>
@@ -39,15 +39,15 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
         placeholder={isProcessing ? "Processing audio..." : "Transcription will appear here..."}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`min-h-[120px] w-full p-4 bg-white border-parrot-300 focus:border-parrot-500 
+        className={`min-h-[120px] w-full p-4 bg-white border-[#DDFE71]/30 focus:border-[#DDFE71] 
                    rounded-lg shadow-sm resize-none transition-all duration-200 ease-in-out
                    ${isProcessing ? 'bg-secondary/50' : ''}`}
       />
       {isProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/30 rounded-lg backdrop-blur-[1px] mt-7">
           <div className="flex flex-col items-center">
-            <Loader className="h-6 w-6 text-parrot-500 animate-spin" />
-            <span className="mt-2 font-medium text-sm text-parrot-700">Processing audio...</span>
+            <Loader className="h-6 w-6 text-[#DDFE71] animate-spin" />
+            <span className="mt-2 font-medium text-sm text-[#DDFE71]">Processing audio...</span>
           </div>
         </div>
       )}

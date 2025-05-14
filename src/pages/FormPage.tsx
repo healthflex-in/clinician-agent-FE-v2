@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, WifiOff } from 'lucide-react';
 import FormRenderer, { FormRendererRef } from '@/components/FormRenderer';
 import formSchemas from '@/schemas/formSchemas';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type FormPageParams = {
   formKey: string;
@@ -187,8 +189,8 @@ const FormPage = () => {
   }, [suggestions, setSuggestions]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/10 to-background overflow-auto">
-      <div className="w-full max-w-4xl space-y-6 pb-10">
+    <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/10 to-background">
+      <div className="w-full max-w-4xl space-y-6 pb-16">
         {/* Header with form info */}
         <Card className="w-full bg-card">
           <CardHeader>
@@ -273,14 +275,18 @@ const FormPage = () => {
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="p-6 max-h-[calc(80vh)] overflow-visible">
-            <FormRenderer 
-              ref={formRendererRef}
-              schema={schema}
-              formKey={formKey}
-              formData={formData}
-              onChange={handleFormChange}
-            />
+          <CardContent className="p-6">
+            <ScrollArea className="h-[calc(100vh-400px)] pr-4 overflow-y-auto">
+              <div className="pb-6">
+                <FormRenderer 
+                  ref={formRendererRef}
+                  schema={schema}
+                  formKey={formKey}
+                  formData={formData}
+                  onChange={handleFormChange}
+                />
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>

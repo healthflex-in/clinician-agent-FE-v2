@@ -1,4 +1,3 @@
-
 import React, { useReducer, useCallback, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { defaultStateFromSchema, deepUpdateObject, getNestedValue, findDifferences } from '@/utils/schemaUtils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { MinusCircle, PlusCircle } from 'lucide-react';
 
@@ -372,11 +370,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
         </Card>
       )}
       
-      <ScrollArea className="h-[calc(100vh-350px)] pr-4">
-        <div className="space-y-4">
-          {renderField(schema, '', 'root')}
-        </div>
-      </ScrollArea>
+      <div className="space-y-4">
+        {renderField(schema, '', 'root')}
+      </div>
     </div>
   );
 });

@@ -60,7 +60,10 @@ export async function updateAgentReport(input: {
     }
   `;
   
-  return graphqlRequest({ query, variables: { input } });
+  return graphqlRequest({ 
+    query, 
+    variables: { input } 
+  });
 }
 
 /**

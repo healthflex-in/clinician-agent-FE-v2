@@ -75,10 +75,22 @@ const Index = () => {
     const savedFormKey = localStorage.getItem('formKey');
     const savedCenterId = localStorage.getItem('centerId');
 
-    if (savedPatientId) setPatientId(savedPatientId);
-    if (savedAppointmentId) setAppointmentId(savedAppointmentId);
-    if (savedFormKey) setFormKey(savedFormKey);
     if (savedCenterId) setCenterId(savedCenterId);
+
+    // Only restore these values if centerId exists
+    if (savedCenterId) {
+      if (savedPatientId) setPatientId(savedPatientId);
+
+      // Only restore appointmentId if patientId exists
+      if (savedPatientId && savedAppointmentId) {
+        setAppointmentId(savedAppointmentId);
+
+        // Only restore formKey if appointmentId exists
+        if (savedAppointmentId && savedFormKey) {
+          setFormKey(savedFormKey);
+        }
+      }
+    }
 
     // Load centers on component mount
     loadCenters();
@@ -151,6 +163,10 @@ const Index = () => {
   useEffect(() => {
     if (patientId) {
       loadAppointments(patientId);
+    } else {
+      // Clear appointment selection if patient is deselected
+      setAppointmentId('');
+      setAppointments([]);
     }
   }, [patientId]);
 
@@ -159,7 +175,7 @@ const Index = () => {
     try {
       setLoadingAppointments(true);
       const filter = {
-        patientId: patientId,
+        patient: patientId,
       };
 
       const response = await fetchAppointments(filter);
@@ -188,12 +204,60 @@ const Index = () => {
     );
     setPatientSearch('');
     setPatients([]); // Clear search results after selection
+
+    // Clear downstream selections
+    setAppointmentId('');
+  };
+
+  // Handle center change
+  const handleCenterChange = (newCenterId: string) => {
+    setCenterId(newCenterId);
+
+    // Clear downstream selections
+    setPatientId('');
+    setPatientName('');
+    setPatientSearch('');
+    setAppointmentId('');
+    setPatients([]);
+    setAppointments([]);
+  };
+
+  // Handle appointment change
+  const handleAppointmentChange = (newAppointmentId: string) => {
+    setAppointmentId(newAppointmentId);
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Validate form
+    // Validate entire flow
+    if (!centerId) {
+      toast({
+        title: 'Center Required',
+        description: 'Please select a center first',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!patientId) {
+      toast({
+        title: 'Patient Required',
+        description: 'Please select a patient',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!appointmentId) {
+      toast({
+        title: 'Appointment Required',
+        description: 'Please select an appointment',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!formKey) {
       toast({
         title: 'Form Selection Required',
@@ -203,22 +267,14 @@ const Index = () => {
       return;
     }
 
-    // Generate random IDs if not provided (for demo purposes)
-    const finalPatientId =
-      patientId || `user-${Math.random().toString(36).substring(2, 9)}`;
-    const finalAppointmentId =
-      appointmentId || `apt-${Math.random().toString(36).substring(2, 9)}`;
-    const finalCenterId =
-      centerId || `center-${Math.random().toString(36).substring(2, 9)}`;
-
     // Store in localStorage
-    localStorage.setItem('userId', finalPatientId);
-    localStorage.setItem('appointmentId', finalAppointmentId);
+    localStorage.setItem('userId', patientId);
+    localStorage.setItem('appointmentId', appointmentId);
     localStorage.setItem('formKey', formKey);
-    localStorage.setItem('centerId', finalCenterId);
+    localStorage.setItem('centerId', centerId);
 
     // Navigate to form page
-    navigate(`/${formKey}/${finalPatientId}/${finalAppointmentId}`);
+    navigate(`/${formKey}/${patientId}/${appointmentId}`);
   };
 
   return (
@@ -235,7 +291,7 @@ const Index = () => {
             {/* Center Selection */}
             <div className="space-y-2">
               <Label htmlFor="center">Select Center</Label>
-              <Select value={centerId} onValueChange={setCenterId}>
+              <Select value={centerId} onValueChange={handleCenterChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a center" />
                 </SelectTrigger>
@@ -299,6 +355,7 @@ const Index = () => {
                     onClick={() => {
                       setPatientId('');
                       setPatientName('');
+                      setAppointmentId(''); // Clear appointment when patient is changed
                     }}
                   >
                     Change
@@ -312,7 +369,7 @@ const Index = () => {
               <Label htmlFor="appointmentId">Appointment</Label>
               <Select
                 value={appointmentId}
-                onValueChange={setAppointmentId}
+                onValueChange={handleAppointmentChange}
                 disabled={!patientId}
               >
                 <SelectTrigger>
@@ -340,7 +397,11 @@ const Index = () => {
             {/* Form Type Selection */}
             <div className="space-y-2">
               <Label htmlFor="formKey">Form Type</Label>
-              <Select value={formKey} onValueChange={setFormKey}>
+              <Select
+                value={formKey}
+                onValueChange={setFormKey}
+                disabled={!appointmentId}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a form type" />
                 </SelectTrigger>
@@ -368,7 +429,8 @@ const Index = () => {
             Select a center, patient, appointment and form type to continue.
           </p>
           <p className="text-xs text-muted-foreground text-center">
-            Random IDs will be generated for demo purposes if not selected.
+            Items must be selected in order: center → patient → appointment →
+            form.
           </p>
         </CardFooter>
       </Card>

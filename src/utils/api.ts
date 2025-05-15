@@ -1,9 +1,11 @@
-// src/api/graphqlClient.ts
+// api.ts - CORS-friendly API client
 
-import { API_KEY, getApiUrl } from './apiConfig';
+// Store API key in environment variable in production
+const API_KEY =
+  '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20';
 
 /**
- * Simple GraphQL client for making API calls
+ * CORS-friendly GraphQL client using a public CORS proxy
  * @param query GraphQL query string
  * @param variables Variables to pass to the query
  * @returns Promise with the response data
@@ -12,10 +14,15 @@ export async function graphqlRequest<T = any>(
   query: string,
   variables: Record<string, any> = {}
 ): Promise<T> {
-  const url = getApiUrl();
+  // Using a public CORS proxy service to avoid CORS issues
+  // Warning: This is a temporary solution for development only
+  // Do not use this in production - use a proper backend/proxy service
+  const corsProxy = 'https://corsproxy.io/?';
+  const apiEndpoint = 'https://devapi.stance.health/graphql';
+  const proxyUrl = `${corsProxy}${encodeURIComponent(apiEndpoint)}`;
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +75,7 @@ export async function updateAgentReport(input: {
  * Fetch centers
  * @returns Promise with centers data
  */
-export async function fetchCenters<T = any>(): Promise<T> {
+export async function fetchCenters() {
   const query = `
     query Centers {
       centers {
@@ -88,11 +95,11 @@ export async function fetchCenters<T = any>(): Promise<T> {
  * @param search Search term
  * @returns Promise with users data
  */
-export async function searchUsers<T = any>(
+export async function searchUsers(
   userType: string,
   centerId: string[],
   search?: string
-): Promise<T> {
+) {
   const query = `
     query Users($userType: UserType, $centerId: [ObjectID!]!, $search: String) {
       users(userType: $userType, centerId: $centerId, search: $search) {
@@ -119,7 +126,7 @@ export async function searchUsers<T = any>(
  * @param filter Appointment filter
  * @returns Promise with appointments data
  */
-export async function fetchAppointments<T = any>(filter: any): Promise<T> {
+export async function fetchAppointments(filter: any) {
   const query = `
     query Appointments($filter: AppointmentFilter!) {
       appointments(filter: $filter) {
@@ -132,12 +139,3 @@ export async function fetchAppointments<T = any>(filter: any): Promise<T> {
 
   return graphqlRequest(query, { filter });
 }
-
-// Export all functions
-export default {
-  graphqlRequest,
-  updateAgentReport,
-  fetchCenters,
-  searchUsers,
-  fetchAppointments,
-};

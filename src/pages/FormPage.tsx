@@ -13,9 +13,11 @@ import TranscriptBox from '@/components/TranscriptBox';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, WifiOff } from 'lucide-react';
+import { AlertCircle, WifiOff, Save, RefreshCw } from 'lucide-react';
 import FormRenderer, { FormRendererRef } from '@/components/FormRenderer';
 import formSchemas from '@/schemas/formSchemas';
+import { Button } from '@/components/ui/button';
+import { graphqlRequest } from '@/utils/graphqlClient';
 
 type FormPageParams = {
   formKey: string;
@@ -32,11 +34,156 @@ const FormPage = () => {
   const formRendererRef = useRef<FormRendererRef>(null);
   const [transcriptText, setTranscriptText] = useState('');
   const [formData, setFormData] = useState<any>(null);
+  const [reportId, setReportId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   // Initialize form schema based on formKey
   const schema =
     formSchemas[formKey as keyof typeof formSchemas] || formSchemas.snc;
+
+  // Create agent report on initial load
+  useEffect(() => {
+    const createInitialReport = async () => {
+      if (!patientId || !appointmentId) return;
+      
+      try {
+        // Check if report already exists in localStorage
+        const existingReport = localStorage.getItem('agentReport');
+        if (existingReport) {
+          try {
+            const parsedReport = JSON.parse(existingReport);
+            if (parsedReport._id) {
+              setReportId(parsedReport._id);
+              return; // Report already exists
+            }
+          } catch (e) {
+            console.error('Error parsing existing report:', e);
+          }
+        }
+        
+        // Creating the new report
+        const mutation = `
+          mutation CreateAgentReport($input: CreateAgentReportInput!) {
+            createAgentReport(input: $input) {
+              _id
+              createdAt
+              updatedAt
+              version
+              isActive
+              snc {
+                exerciseName
+                repsUnit
+                repsValue
+                rpe
+                duration
+              }
+              physio {
+                testName
+                unitName
+                value
+                rightValue
+                leftValue
+                comments
+              }
+              firstAssessment {
+                clinicalDetails {
+                  clinicalHistory
+                  chiefComplaint
+                  duration
+                }
+                objectiveAssessments {
+                  testName
+                  unitName
+                  value
+                  rightValue
+                  leftValue
+                  comments
+                }
+                subjectiveAssessments {
+                  testName
+                  conclusion
+                }
+                subjectiveGoals {
+                  goalDetails
+                  targetDate
+                }
+                objectiveGoals {
+                  goalName
+                  goalCategory
+                  unitName
+                  value
+                  targetDate
+                }
+                recommendation {
+                  sessionType
+                  sessionFrequency
+                }
+                patientAdvice {
+                  adviceDetails
+                }
+              }
+              assessment {
+                plan {
+                  exerciseName
+                  repsUnit
+                  repsValue
+                  rpe
+                  duration
+                }
+                subjectiveInputs {
+                  inputs
+                }
+                objectiveAssessments {
+                  testName
+                  unitName
+                  value
+                  rightValue
+                  leftValue
+                  comments
+                }
+              }
+            }
+          }
+        `;
+
+        // Get center ID (you might need to adjust this based on your app's logic)
+        const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
+
+        const variables = {
+          input: {
+            patient: patientId,
+            center: centerId,
+            appointment: appointmentId,
+          },
+        };
+
+        const result = await graphqlRequest(mutation, variables);
+        
+        if (result && result.createAgentReport && result.createAgentReport._id) {
+          // Save the report ID
+          setReportId(result.createAgentReport._id);
+          
+          // Save the full report in localStorage
+          localStorage.setItem('agentReport', JSON.stringify(result.createAgentReport));
+          
+          toast({
+            title: "Report Created",
+            description: "New report initialized successfully",
+          });
+        }
+      } catch (error) {
+        console.error('Error creating initial report:', error);
+        toast({
+          title: "Failed to Create Report",
+          description: "Could not initialize the form data",
+          variant: "destructive",
+        });
+      }
+    };
+
+    createInitialReport();
+  }, [patientId, appointmentId, toast]);
 
   // Store formKey, patientId and appointmentId in localStorage for WebSocket access
   useEffect(() => {
@@ -51,8 +198,19 @@ const FormPage = () => {
     if (savedReport) {
       try {
         const parsedReport = JSON.parse(savedReport);
-        if (parsedReport.formKey === formKey) {
-          setFormData(parsedReport.formData || {});
+        if (parsedReport._id) {
+          setReportId(parsedReport._id);
+        }
+        
+        // Load form data based on formKey
+        if (formKey === 'snc' && parsedReport.snc) {
+          setFormData(parsedReport.snc);
+        } else if (formKey === 'physio' && parsedReport.physio) {
+          setFormData(parsedReport.physio);
+        } else if (formKey === 'firstAssessment' && parsedReport.firstAssessment) {
+          setFormData(parsedReport.firstAssessment);
+        } else if (formKey === 'assessment' && parsedReport.assessment) {
+          setFormData(parsedReport.assessment);
         }
       } catch (error) {
         console.error('Error parsing saved report:', error);
@@ -131,6 +289,11 @@ const FormPage = () => {
   useEffect(() => {
     if (transcription) {
       setTranscriptText(transcription);
+      
+      // Auto-process transcription if we have text
+      if (transcription.trim() && isConnected) {
+        processTranscription(transcription, formData);
+      }
     }
   }, [transcription]);
 
@@ -180,14 +343,144 @@ const FormPage = () => {
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
 
-    // Save to localStorage
-    const reportData = {
-      formKey,
-      patientId,
-      appointmentId,
-      formData: newFormData,
-    };
-    localStorage.setItem('agentReport', JSON.stringify(reportData));
+    // Save to localStorage, preserving other report data
+    try {
+      const savedReport = localStorage.getItem('agentReport');
+      let reportData = savedReport ? JSON.parse(savedReport) : {};
+      
+      // Update the appropriate section based on formKey
+      if (formKey === 'snc') {
+        reportData.snc = newFormData;
+      } else if (formKey === 'physio') {
+        reportData.physio = newFormData;
+      } else if (formKey === 'firstAssessment') {
+        reportData.firstAssessment = newFormData;
+      } else if (formKey === 'assessment') {
+        reportData.assessment = newFormData;
+      }
+      
+      localStorage.setItem('agentReport', JSON.stringify(reportData));
+    } catch (error) {
+      console.error('Error updating localStorage:', error);
+    }
+  };
+  
+  const handleFormSubmit = async () => {
+    if (!reportId || !appointmentId) {
+      toast({
+        title: "Missing Information",
+        description: "Report ID or Appointment ID is missing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare the mutation based on formKey
+      let mutation = `
+        mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
+          updateAgentReport(appointmentId: $appointmentId, input: $input) {
+            _id
+            createdAt
+            updatedAt
+            version
+            isActive
+            isFilledCompletely
+          }
+        }
+      `;
+      
+      // Prepare input variables based on formKey
+      let input: any = {};
+      
+      if (formKey === 'snc') {
+        input.snc = formData;
+      } else if (formKey === 'physio') {
+        input.physio = formData;
+      } else if (formKey === 'firstAssessment') {
+        input.firstAssessment = formData;
+      } else if (formKey === 'assessment') {
+        input.assessment = formData;
+      }
+      
+      // Add userId if patientId is available
+      if (patientId) {
+        input.userId = patientId;
+      }
+      
+      const variables = {
+        appointmentId,
+        input
+      };
+      
+      // Send the GraphQL mutation
+      const result = await graphqlRequest(mutation, variables);
+      
+      if (result && result.updateAgentReport) {
+        toast({
+          title: "Form Submitted",
+          description: "Your form has been successfully saved",
+        });
+        
+        // Update localStorage with the latest data
+        const savedReport = localStorage.getItem('agentReport');
+        if (savedReport) {
+          try {
+            const reportData = JSON.parse(savedReport);
+            
+            // Update the specific form data
+            if (formKey === 'snc') {
+              reportData.snc = formData;
+            } else if (formKey === 'physio') {
+              reportData.physio = formData;
+            } else if (formKey === 'firstAssessment') {
+              reportData.firstAssessment = formData;
+            } else if (formKey === 'assessment') {
+              reportData.assessment = formData;
+            }
+            
+            // Update other fields from the response
+            reportData.updatedAt = result.updateAgentReport.updatedAt;
+            reportData.version = result.updateAgentReport.version;
+            reportData.isActive = result.updateAgentReport.isActive;
+            reportData.isFilledCompletely = result.updateAgentReport.isFilledCompletely;
+            
+            localStorage.setItem('agentReport', JSON.stringify(reportData));
+          } catch (error) {
+            console.error('Error updating localStorage after form submission:', error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your form",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFormReset = () => {
+    if (confirm("Are you sure you want to reset this form? All your data will be lost.")) {
+      // Reset transcription and form data
+      setTranscriptText('');
+      setFormData(null);
+      
+      // Update FormRenderer via ref
+      if (formRendererRef.current) {
+        formRendererRef.current.updateFormWithLLMData({});
+      }
+      
+      toast({
+        title: "Form Reset",
+        description: "All form data has been reset",
+      });
+    }
   };
 
   // Automatically hide suggestions after 7 seconds
@@ -240,8 +533,33 @@ const FormPage = () => {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Suggestions</AlertTitle>
                 <AlertDescription>
-                  <div className="text-sm whitespace-pre-wrap">
-                    {suggestions}
+                  <div className="text-sm whitespace-pre-wrap max-h-16 overflow-y-auto">
+                    {typeof suggestions === 'string' && suggestions.includes('[') && suggestions.includes(']') ? 
+                      (() => {
+                        try {
+                          // Try to parse as JSON if it looks like JSON
+                          const suggestionsText = suggestions.substring(
+                            suggestions.indexOf('['),
+                            suggestions.lastIndexOf(']') + 1
+                          );
+                          const parsedSuggestions = JSON.parse(suggestionsText);
+                          // Show only the first two suggestions
+                          const limitedSuggestions = parsedSuggestions.slice(0, 2);
+                          
+                          return (
+                            <ul className="list-disc pl-5">
+                              {limitedSuggestions.map((suggestion: string, index: number) => (
+                                <li key={index}>{suggestion}</li>
+                              ))}
+                            </ul>
+                          );
+                        } catch (e) {
+                          // If parsing fails, show as regular text
+                          return suggestions;
+                        }
+                      })() 
+                      : suggestions
+                    }
                   </div>
                 </AlertDescription>
               </Alert>
@@ -315,6 +633,26 @@ const FormPage = () => {
               />
             </div>
           </CardContent>
+          
+          <CardFooter className="flex justify-end space-x-4 p-6 pt-0">
+            <Button 
+              variant="outline" 
+              onClick={handleFormReset}
+              disabled={isSubmitting}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reset
+            </Button>
+            <Button 
+              onClick={handleFormSubmit}
+              disabled={isSubmitting}
+              className="flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </CardFooter>
         </Card>
       </div>
     </div>

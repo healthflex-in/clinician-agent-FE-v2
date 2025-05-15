@@ -115,19 +115,7 @@ export function useWebSocket(options: WebSocketOptions) {
           if (data.transcription !== undefined) {
             setTranscription(data.transcription);
             
-            // Auto-process transcription after receiving it
-            if (autoProcessTimeoutRef.current) {
-              clearTimeout(autoProcessTimeoutRef.current);
-            }
-            
-            // Set a small delay before auto-processing to allow the user to see the transcription
-            autoProcessTimeoutRef.current = setTimeout(() => {
-              if (data.transcription && data.transcription.trim() !== '') {
-                console.log('Auto-processing transcription:', data.transcription);
-                processTranscription(data.transcription, formData);
-              }
-            }, 800); // Small delay to see the transcription before processing
-            
+            // We'll let the component handle auto-processing, not here
             setIsProcessing(false);
           }
           
@@ -197,7 +185,7 @@ export function useWebSocket(options: WebSocketOptions) {
         variant: "destructive",
       });
     }
-  }, [url, isConnecting, onOpen, onClose, onError, onFormData, toast, formData]);
+  }, [url, isConnecting, onOpen, onClose, onError, onFormData, toast]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -233,22 +221,64 @@ export function useWebSocket(options: WebSocketOptions) {
     const appointmentId = localStorage.getItem('appointmentId') || '';
     const formKey = localStorage.getItem('formKey') || 'snc';
     
-    // Format for audio-only payload
+    // Make sure the audio is in the correct format (data URL)
+    let audioData = base64Audio;
+    if (!audioData.startsWith('data:')) {
+      audioData = `data:audio/wav;base64,${audioData.split(',')[1] || audioData}`;
+    }
+    
+    // Format for audio payload
     const payload: WebSocketMessage = {
       payloadType: 'audio',
-      audio: base64Audio,
-      userId: userId,
-      appointmentId: appointmentId,
-      formKey: formKey,
-      operation_mode: 'transcribe_only',
+      audio: audioData,
+      userId,
+      appointmentId,
+      formKey,
+      formIndex: 0, // Default to first form
       storeInChat: true
     };
     
     // If form data is provided, include it
     if (currentFormData) {
-      payload.formData = currentFormData;
+      // Format form data according to formKey
+      const formDataObj: any = {};
+      
+      if (formKey === 'physio') {
+        // For physio form, we need to structure it with assessment keys
+        const assessmentData = Array.isArray(currentFormData) ? 
+          currentFormData.reduce((acc, item, index) => {
+            acc[`assessment${index + 1}`] = {
+              Test_Name: item.testName || '',
+              Unit_Name: item.unitName || '',
+              Value: item.value || '',
+              Right_Value: item.rightValue || '',
+              Left_Value: item.leftValue || '',
+              comments: item.comments || '',
+            };
+            return acc;
+          }, {}) : 
+          { assessment1: currentFormData };
+          
+        payload.formData = assessmentData;
+        
+        // Also include form_data for backward compatibility
+        if (Array.isArray(currentFormData) && currentFormData[0]) {
+          payload.form_data = {
+            Test_Name: currentFormData[0].testName || '',
+            Unit_Name: currentFormData[0].unitName || '',
+            Value: currentFormData[0].value || '',
+            Right_Value: currentFormData[0].rightValue || '',
+            Left_Value: currentFormData[0].leftValue || '',
+            comments: currentFormData[0].comments || '',
+          };
+        }
+      } else {
+        // For other form types
+        payload.formData = currentFormData;
+      }
     }
     
+    console.log('Sending audio payload:', payload);
     return sendMessage(payload);
   }, [sendMessage]);
 
@@ -262,16 +292,51 @@ export function useWebSocket(options: WebSocketOptions) {
     const payload: WebSocketMessage = {
       payloadType: 'text',
       text: transcriptionText,
-      userId: userId,
-      appointmentId: appointmentId,
-      formKey: formKey
+      userId,
+      appointmentId,
+      formKey,
+      formIndex: 0 // Default to first form
     };
     
     // Include form data if available
     if (currentFormData) {
-      payload.formData = currentFormData;
+      // Format form data according to formKey
+      if (formKey === 'physio') {
+        // For physio form, we need to structure it with assessment keys
+        const assessmentData = Array.isArray(currentFormData) ? 
+          currentFormData.reduce((acc, item, index) => {
+            acc[`assessment${index + 1}`] = {
+              Test_Name: item.testName || '',
+              Unit_Name: item.unitName || '',
+              Value: item.value || '',
+              Right_Value: item.rightValue || '',
+              Left_Value: item.leftValue || '',
+              comments: item.comments || '',
+            };
+            return acc;
+          }, {}) : 
+          { assessment1: currentFormData };
+          
+        payload.formData = assessmentData;
+        
+        // Also include form_data for backward compatibility
+        if (Array.isArray(currentFormData) && currentFormData[0]) {
+          payload.form_data = {
+            Test_Name: currentFormData[0].testName || '',
+            Unit_Name: currentFormData[0].unitName || '',
+            Value: currentFormData[0].value || '',
+            Right_Value: currentFormData[0].rightValue || '',
+            Left_Value: currentFormData[0].leftValue || '',
+            comments: currentFormData[0].comments || '',
+          };
+        }
+      } else {
+        // For other form types
+        payload.formData = currentFormData;
+      }
     }
     
+    console.log('Processing transcription with payload:', payload);
     return sendMessage(payload);
   }, [sendMessage]);
 

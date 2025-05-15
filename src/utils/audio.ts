@@ -1,3 +1,4 @@
+
 /**
  * Get user media (microphone)
  */
@@ -63,81 +64,93 @@ export const detectSilence = (
 export const resampleAudio = async (audioBuffer: ArrayBuffer, targetSampleRate: number): Promise<ArrayBuffer> => {
   const audioContext = new AudioContext();
   const sourceBuffer = await audioContext.decodeAudioData(audioBuffer);
-  const sourceData = sourceBuffer.getChannelData(0);
-  const sourceSampleRate = audioContext.sampleRate;
+  const originalSampleRate = sourceBuffer.sampleRate;
   
-  const bufferLength = sourceBuffer.length;
-  const targetLength = bufferLength * (targetSampleRate / sourceSampleRate);
-  const resampledBuffer = audioContext.createBuffer(1, targetLength, targetSampleRate);
-  const resampledData = resampledBuffer.getChannelData(0);
-  
-  let offset = 0;
-  for (let i = 0; i < targetLength; i++) {
-    const sourceOffset = offset * (sourceSampleRate / targetSampleRate);
-    const sourceOffsetFloor = Math.floor(sourceOffset);
-    const sourceOffsetCeil = Math.ceil(sourceOffset);
-    const sourceOffsetDecimal = sourceOffset - sourceOffsetFloor;
-    
-    if (sourceOffsetCeil < bufferLength) {
-      resampledData[i] = sourceData[sourceOffsetFloor] * (1 - sourceOffsetDecimal) + sourceData[sourceOffsetCeil] * sourceOffsetDecimal;
-    } else {
-      resampledData[i] = sourceData[sourceOffsetFloor];
-    }
-    offset++;
+  // If the sample rate is already correct, no need to resample
+  if (originalSampleRate === targetSampleRate) {
+    return sourceBuffer.getChannelData(0).buffer;
   }
   
-  return resampledBuffer.getChannelData(0).buffer;
+  const duration = sourceBuffer.duration;
+  const offlineContext = new OfflineAudioContext(
+    1, // mono
+    Math.ceil(duration * targetSampleRate),
+    targetSampleRate
+  );
+  
+  const source = offlineContext.createBufferSource();
+  source.buffer = sourceBuffer;
+  source.connect(offlineContext.destination);
+  source.start(0);
+  
+  const renderedBuffer = await offlineContext.startRendering();
+  return renderedBuffer.getChannelData(0).buffer;
 };
 
 /**
- * Encode audio buffer to WAV format
+ * Encode audio buffer to WAV format with 16-bit PCM format
  */
-export const encodeWAV = (audioBuffer: ArrayBuffer): Blob => {
-  const numChannels = 1;
-  const sampleRate = 16000; // Fixed sample rate
+export const encodeWAV = (audioBuffer: AudioBuffer): Blob => {
+  const numChannels = 1; // Mono
+  const sampleRate = audioBuffer.sampleRate;
   const bitsPerSample = 16;
   const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
   const blockAlign = numChannels * (bitsPerSample / 8);
-  const dataSize = audioBuffer.byteLength;
+  
+  // Get audio data
+  const channelData = audioBuffer.getChannelData(0);
+  const dataSize = channelData.length * 2; // 16-bit = 2 bytes per sample
+  
+  // Create WAV header
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
-
-  /* RIFF identifier */
+  
+  // RIFF identifier
   writeString(view, 0, 'RIFF');
-  /* RIFF size */
+  // RIFF chunk length
   view.setUint32(4, 36 + dataSize, true);
-  /* RIFF format */
+  // RIFF type
   writeString(view, 8, 'WAVE');
-  /* format chunk identifier */
+  
+  // Format chunk identifier
   writeString(view, 12, 'fmt ');
-  /* format chunk byte count */
+  // Format chunk length
   view.setUint32(16, 16, true);
-  /* format code (PCM = 1) */
+  // Sample format (raw)
   view.setUint16(20, 1, true);
-  /* channel count */
+  // Channel count
   view.setUint16(22, numChannels, true);
-  /* sample rate */
+  // Sample rate
   view.setUint32(24, sampleRate, true);
-  /* byte rate (sample rate * block align) */
+  // Byte rate (sample rate * block align)
   view.setUint32(28, byteRate, true);
-  /* block align (channel count * bytes per sample) */
+  // Block align (channel count * bytes per sample)
   view.setUint16(32, blockAlign, true);
-  /* bits per sample */
+  // Bits per sample
   view.setUint16(34, bitsPerSample, true);
-  /* data chunk identifier */
+  
+  // Data chunk identifier
   writeString(view, 36, 'data');
-  /* data chunk byte count */
+  // Data chunk length
   view.setUint32(40, dataSize, true);
-
-  /* PCM data */
-  const dataView = new DataView(audioBuffer);
-  for (let i = 0; i < dataSize; i++) {
-    view.setUint8(44 + i, dataView.getUint8(i));
+  
+  // Write the PCM samples - convert Float32 to Int16
+  let offset = 44;
+  for (let i = 0; i < channelData.length; i++) {
+    // Clamp value between -1 and 1
+    const sample = Math.max(-1, Math.min(1, channelData[i]));
+    // Convert to 16-bit signed integer
+    const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    view.setInt16(offset, value, true);
+    offset += 2;
   }
-
-  return new Blob([view], { type: 'audio/wav' });
+  
+  return new Blob([buffer], { type: 'audio/wav' });
 };
 
+/**
+ * Write a string to a DataView at the specified offset
+ */
 const writeString = (view: DataView, offset: number, string: string) => {
   for (let i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i));

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader } from 'lucide-react';
 import { encodeWAV, blobToBase64, detectSilence, getUserMedia, resampleAudio } from '@/utils/audio';
@@ -59,7 +60,7 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
     }
   }, [toast]);
 
-  // Process audio data, resample, encode to WAV, and convert to base64
+  // Improved audio processing method based on the reference code
   const processAudioData = useCallback(async () => {
     if (chunksRef.current.length === 0) return;
     
@@ -68,20 +69,57 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
       const originalBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
       chunksRef.current = [];
       
-      // Convert blob to ArrayBuffer for resampling
-      const arrayBuffer = await originalBlob.arrayBuffer();
+      // Use FileReader to convert blob to ArrayBuffer
+      const reader = new FileReader();
       
-      // Resample to 16kHz to match the original implementation
-      const resampledBuffer = await resampleAudio(arrayBuffer, 16000);
-      
-      // Encode as WAV
-      const wavBlob = encodeWAV(resampledBuffer);
-      
-      // Convert to base64 (includes data URL prefix)
-      const base64Audio = await blobToBase64(wavBlob);
-      
-      // Send to the parent component
-      onAudioEncoded(base64Audio);
+      // Return a promise that resolves when the audio is processed
+      return new Promise<void>((resolve, reject) => {
+        reader.onloadend = async () => {
+          try {
+            const arrayBuffer = reader.result as ArrayBuffer;
+            
+            // Use offline AudioContext for resampling to 16kHz
+            const audioContext = new AudioContext();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            const offlineContext = new OfflineAudioContext(
+              1, // mono
+              audioBuffer.duration * 16000, // target sample rate
+              16000 // target sample rate
+            );
+            
+            const source = offlineContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(offlineContext.destination);
+            source.start(0);
+            
+            const renderedBuffer = await offlineContext.startRendering();
+            
+            // Encode as WAV
+            const wavBlob = encodeWAV(renderedBuffer);
+            
+            // Convert to base64 with data URL prefix
+            const base64Audio = await new Promise<string>((resolveBase64) => {
+              const reader2 = new FileReader();
+              reader2.onloadend = () => {
+                const base64data = reader2.result as string;
+                resolveBase64(base64data);
+              };
+              reader2.readAsDataURL(wavBlob);
+            });
+            
+            // Send to the parent component
+            onAudioEncoded(base64Audio);
+            resolve();
+          } catch (err) {
+            console.error('Error processing audio:', err);
+            reject(err);
+          }
+        };
+        
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(originalBlob);
+      });
     } catch (err) {
       console.error('Error processing audio:', err);
       toast({
@@ -107,7 +145,13 @@ const Recorder: React.FC<RecorderProps> = ({ onAudioEncoded, isProcessing }) => 
       }
     };
     
-    mediaRecorder.onstop = processAudioData;
+    mediaRecorder.onstop = async () => {
+      try {
+        await processAudioData();
+      } catch (err) {
+        console.error('Error handling recorded audio:', err);
+      }
+    };
     
     // Start the silence detector - stop recording after 5 seconds of silence
     if (analyserRef.current) {

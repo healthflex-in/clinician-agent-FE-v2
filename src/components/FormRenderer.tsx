@@ -260,6 +260,23 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
     // Check if this field was updated by LLM
     const isLLMUpdated = llmUpdatedFields.has(path);
     
+    // Skip rendering the "root" field label
+    if (fieldName === 'root') {
+      return (
+        <div className="space-y-4">
+          {Object.entries(fieldSchema).map(([key, nestedSchema]) => (
+            <div key={key} className="mb-4">
+              {renderField(
+                nestedSchema,
+                path ? `${path}.${key}` : key,
+                key
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    
     // Handle different field types
     if (Array.isArray(fieldSchema)) {
       // It's an array of items
@@ -366,6 +383,20 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
     }
   };
 
+  // Reset form to initial state
+  const handleResetForm = () => {
+    // Ask for confirmation
+    if (confirm("Are you sure you want to reset this form? All your data will be lost.")) {
+      // Reset to initial state based on schema
+      dispatch({ type: 'RESET_FORM', data: defaultStateFromSchema(schema) });
+      setLlmUpdatedFields(new Set());
+      toast({
+        title: "Form Reset",
+        description: "All form data has been reset to default values",
+      });
+    }
+  };
+
   return (
     <div className="w-full">
       {suggestions && (
@@ -373,7 +404,34 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Suggestions</AlertTitle>
           <AlertDescription>
-            <div className="text-sm whitespace-pre-wrap">{suggestions}</div>
+            <div className="text-sm whitespace-pre-wrap max-h-16 overflow-y-auto">
+              {typeof suggestions === 'string' && suggestions.includes('[') && suggestions.includes(']') ? 
+                (() => {
+                  try {
+                    // Try to parse as JSON if it looks like JSON
+                    const suggestionsText = suggestions.substring(
+                      suggestions.indexOf('['),
+                      suggestions.lastIndexOf(']') + 1
+                    );
+                    const parsedSuggestions = JSON.parse(suggestionsText);
+                    // Show only the first two suggestions
+                    const limitedSuggestions = parsedSuggestions.slice(0, 2);
+                    
+                    return (
+                      <ul className="list-disc pl-5">
+                        {limitedSuggestions.map((suggestion: string, index: number) => (
+                          <li key={index}>{suggestion}</li>
+                        ))}
+                      </ul>
+                    );
+                  } catch (e) {
+                    // If parsing fails, show as regular text
+                    return suggestions;
+                  }
+                })() 
+                : suggestions
+              }
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -396,6 +454,17 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
       
       <div className="space-y-4">
         {renderField(schema, '', 'root')}
+      </div>
+      
+      {/* Form action buttons */}
+      <div className="flex justify-end space-x-4 mt-8">
+        <Button 
+          variant="outline" 
+          onClick={handleResetForm}
+          className="flex items-center gap-2"
+        >
+          Reset Form
+        </Button>
       </div>
     </div>
   );

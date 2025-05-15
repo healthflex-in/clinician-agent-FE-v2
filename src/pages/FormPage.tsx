@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import AudioRecorder from '@/components/audio/AudioRecorder';
 import TranscriptionBox from '@/components/audio/TranscriptionBox';
+import SuggestionBox from '@/components/ui/suggestion-box';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,10 +18,10 @@ import { AlertCircle, WifiOff, Save, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { graphqlRequest } from '@/utils/graphqlClient';
 import formSchemas from '@/schemas/formSchemas';
-import SuggestionBox from '@/components/ui/SuggestionBox';
 import PhysioFormRenderer from '@/components/forms/PhysioFormRenderer';
 import { TestValue, AgentReport } from '@/types/form';
 import { ThemeProvider } from '@/styles/theme-provider';
+import { themeColors } from '@/styles/theme';
 
 // Import global styles
 import '@/styles/globalStyles.css';
@@ -37,6 +38,7 @@ const FormPage = () => {
     patientId,
     appointmentId,
   } = useParams<FormPageParams>();
+  
   const [transcriptText, setTranscriptText] = useState('');
   const [formData, setFormData] = useState<TestValue[]>([{ 
     testName: '',
@@ -52,13 +54,13 @@ const FormPage = () => {
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  // Initialize schema based on formKey (we're focused on physio for now)
+  
+  // Initialize schema based on formKey
   const schema = formSchemas[formKey as keyof typeof formSchemas] || formSchemas.physio;
 
   // Create agent report on initial load
   useEffect(() => {
-    // Fetch patient details
+    // Fetch patient details as soon as the component mounts
     const fetchPatientName = async () => {
       if (!patientId) return;
       
@@ -74,20 +76,21 @@ const FormPage = () => {
         }
         
         // If not in localStorage, try to fetch from API
+        // Use the patient query based on your API structure
         const query = `
-          query GetPatient($id: ObjectID!) {
-            patient(id: $id) {
+          query GetPatientById($patientId: ObjectID!) {
+            getPatientById(patientId: $patientId) {
               _id
               name
             }
           }
         `;
         
-        const variables = { id: patientId };
+        const variables = { patientId };
         
         const result = await graphqlRequest(query, variables);
-        if (result && result.patient && result.patient.name) {
-          setPatientName(result.patient.name);
+        if (result && result.getPatientById && result.getPatientById.name) {
+          setPatientName(result.getPatientById.name);
         }
       } catch (error) {
         console.error('Error fetching patient name:', error);
@@ -118,7 +121,7 @@ const FormPage = () => {
           }
         }
         
-        // Creating the new report
+        // Creating a new report if none exists
         const mutation = `
           mutation CreateAgentReport($input: CreateAgentReportInput!) {
             createAgentReport(input: $input) {
@@ -203,7 +206,7 @@ const FormPage = () => {
           }
         `;
 
-        // Get center ID (you might need to adjust this based on your app's logic)
+        // Get center ID from localStorage or use default
         const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
 
         const variables = {
@@ -271,7 +274,7 @@ const FormPage = () => {
     setTranscription,
     setSuggestions,
   } = useWebSocket({
-    url: 'ws://localhost:8080/ws',
+    url: 'ws://localhost:8080/ws', // Updated WebSocket URL
     onOpen: () => {
       toast({
         title: 'Connected',
@@ -594,21 +597,41 @@ const FormPage = () => {
       return;
     }
 
-    // Prepare data for each assessment
+    // Prepare data based on selected sections or all data
     const physioFormData: any = {};
-    formData.forEach((form, index) => {
-      const assessmentKey = `assessment${index + 1}`;
-      physioFormData[assessmentKey] = {
-        Test_Name: form.testName,
-        Unit_Name: form.unitName,
-        Value: form.value,
-        Right_Value: form.rightValue,
-        Left_Value: form.leftValue,
-        comments: form.comments,
-      };
-    });
+    
+    if (selectedSections.length > 0) {
+      // Only include selected sections
+      selectedSections.forEach(sectionId => {
+        const index = parseInt(sectionId.split('-').pop() || '0', 10);
+        if (formData[index]) {
+          const assessmentKey = `assessment${index + 1}`;
+          physioFormData[assessmentKey] = {
+            Test_Name: formData[index].testName,
+            Unit_Name: formData[index].unitName,
+            Value: formData[index].value,
+            Right_Value: formData[index].rightValue,
+            Left_Value: formData[index].leftValue,
+            comments: formData[index].comments,
+          };
+        }
+      });
+    } else {
+      // Include all form data
+      formData.forEach((form, index) => {
+        const assessmentKey = `assessment${index + 1}`;
+        physioFormData[assessmentKey] = {
+          Test_Name: form.testName,
+          Unit_Name: form.unitName,
+          Value: form.value,
+          Right_Value: form.rightValue,
+          Left_Value: form.leftValue,
+          comments: form.comments,
+        };
+      });
+    }
 
-    // Send transcription with current form data
+    // Send transcription with form data
     const sent = processTranscription(transcriptText, physioFormData);
     
     if (!sent) {
@@ -666,6 +689,70 @@ const FormPage = () => {
       setSelectedSections(prev => [...prev, sectionId]);
     } else {
       setSelectedSections(prev => prev.filter(id => id !== sectionId));
+    }
+  };
+
+  // Handle section submission
+  const handleSectionSubmit = (sectionId: string) => {
+    if (!reportId) {
+      toast({
+        title: "Missing Information",
+        description: "Report ID is missing",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const sectionIndex = parseInt(sectionId.split('-').pop() || '0', 10);
+    if (sectionIndex < 0 || sectionIndex >= formData.length) {
+      toast({
+        title: "Invalid Section",
+        description: "Cannot find the section to submit",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Only submit this specific section
+    const sectionData = formData[sectionIndex];
+    if (!sectionData.testName.trim()) {
+      toast({
+        title: "Missing Data",
+        description: "Please fill in the test name before submitting",
+        variant: "warning"
+      });
+      return;
+    }
+    
+    toast({
+      title: "Section Submitted",
+      description: `Assessment ${sectionIndex + 1} has been saved`,
+    });
+  };
+
+  // Handle section reset
+  const handleSectionReset = (sectionId: string) => {
+    if (confirm("Are you sure you want to reset this section? All your data will be lost.")) {
+      const sectionIndex = parseInt(sectionId.split('-').pop() || '0', 10);
+      if (sectionIndex < 0 || sectionIndex >= formData.length) return;
+      
+      const newFormData = [...formData];
+      newFormData[sectionIndex] = {
+        testName: '',
+        unitName: '',
+        value: '',
+        rightValue: '',
+        leftValue: '',
+        comments: ''
+      };
+      
+      setFormData(newFormData);
+      updateLocalStorage(newFormData);
+      
+      toast({
+        title: "Section Reset",
+        description: `Assessment ${sectionIndex + 1} has been reset`,
+      });
     }
   };
 
@@ -891,29 +978,13 @@ const FormPage = () => {
                   isProcessing={isProcessing}
                   selectedSections={selectedSections}
                   onSectionSelect={handleSectionSelect}
+                  onSubmit={handleFormSubmit}
+                  onReset={handleFormReset}
+                  onSectionSubmit={handleSectionSubmit}
+                  onSectionReset={handleSectionReset}
                 />
               </div>
             </CardContent>
-            
-            <CardFooter className="flex justify-end space-x-4 p-6 pt-0">
-              <Button 
-                variant="outline" 
-                onClick={handleFormReset}
-                disabled={isSubmitting}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Reset
-              </Button>
-              <Button 
-                onClick={handleFormSubmit}
-                disabled={isSubmitting}
-                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-text-dark"
-              >
-                <Save className="h-4 w-4" />
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </Button>
-            </CardFooter>
           </Card>
         </div>
       </div>

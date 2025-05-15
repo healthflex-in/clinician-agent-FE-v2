@@ -1,5 +1,4 @@
 
-// Only modifying the section that controls scrolling behavior
 import React, { useReducer, useCallback, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { defaultStateFromSchema, deepUpdateObject, getNestedValue, findDifferences } from '@/utils/schemaUtils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MinusCircle, PlusCircle, AlertCircle } from 'lucide-react';
+import { MinusCircle, PlusCircle, AlertCircle, Save, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface FormRendererProps {
@@ -251,7 +250,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
   const renderField = (fieldSchema: any, path: string, fieldName: string, parentIsArray: boolean = false): JSX.Element => {
     // Skip "record" fields as requested
     if (fieldName === 'record') {
-      return <></>; // Return empty fragment to skip rendering
+      return <></>;
     }
     
     // Get current value from state
@@ -397,6 +396,15 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
     }
   };
 
+  // Submit form handler
+  const handleSubmitForm = () => {
+    // Implementation will be added by the parent component
+    toast({
+      title: "Form Submitted",
+      description: "Your form has been successfully submitted",
+    });
+  };
+
   return (
     <div className="w-full">
       {suggestions && (
@@ -463,7 +471,17 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
           onClick={handleResetForm}
           className="flex items-center gap-2"
         >
+          <RefreshCw className="h-4 w-4" />
           Reset Form
+        </Button>
+        
+        <Button 
+          variant="default"
+          onClick={handleSubmitForm}
+          className="flex items-center gap-2"
+        >
+          <Save className="h-4 w-4" />
+          Submit Form
         </Button>
       </div>
     </div>

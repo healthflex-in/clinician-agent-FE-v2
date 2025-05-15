@@ -1,13 +1,11 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { MinusCircle, PlusCircle } from 'lucide-react';
+import { MinusCircle, PlusCircle, Save, RefreshCw } from 'lucide-react';
 import FormSection from './FormSection';
 import { TestValue } from '@/types/form';
+import { useToast } from '@/hooks/use-toast';
+import { themeColors } from '@/styles/theme';
 
 interface PhysioFormRendererProps {
   formData: TestValue[];
@@ -17,6 +15,10 @@ interface PhysioFormRendererProps {
   isProcessing?: boolean;
   selectedSections: string[];
   onSectionSelect: (sectionId: string, selected: boolean) => void;
+  onSubmit?: () => void;
+  onReset?: () => void;
+  onSectionSubmit?: (sectionId: string) => void;
+  onSectionReset?: (sectionId: string) => void;
 }
 
 const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
@@ -26,8 +28,13 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
   onTranscriptProcess,
   isProcessing = false,
   selectedSections,
-  onSectionSelect
+  onSectionSelect,
+  onSubmit,
+  onReset,
+  onSectionSubmit,
+  onSectionReset
 }) => {
+  const { toast } = useToast();
   
   // Add a new test
   const handleAddTest = () => {
@@ -41,6 +48,10 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
     };
     
     onChange([...formData, newTest]);
+    toast({
+      title: "Assessment Added",
+      description: "New assessment has been added",
+    });
   };
 
   // Remove a test
@@ -48,6 +59,10 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
     const newData = [...formData];
     newData.splice(index, 1);
     onChange(newData);
+    toast({
+      title: "Assessment Removed",
+      description: "Assessment has been removed",
+    });
   };
 
   // Update a field in a test
@@ -74,12 +89,15 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
             selectable={formData.length > 1}
             selected={isSelected}
             onSelectChange={onSectionSelect}
+            onSectionSubmit={onSectionSubmit ? () => onSectionSubmit(sectionId) : undefined}
+            onSectionReset={onSectionReset ? () => onSectionReset(sectionId) : undefined}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="space-y-2">
-                <Label htmlFor={`testName-${index}`}>Test Name</Label>
-                <Input
+                <label htmlFor={`testName-${index}`} className="block text-sm font-medium">Test Name</label>
+                <input
                   id={`testName-${index}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   value={test.testName || ''}
                   onChange={(e) => handleUpdateField(index, 'testName', e.target.value)}
                   placeholder="Enter test name"
@@ -87,9 +105,10 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`unitName-${index}`}>Unit Name</Label>
-                <Input
+                <label htmlFor={`unitName-${index}`} className="block text-sm font-medium">Unit Name</label>
+                <input
                   id={`unitName-${index}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   value={test.unitName || ''}
                   onChange={(e) => handleUpdateField(index, 'unitName', e.target.value)}
                   placeholder="Enter unit of measurement"
@@ -99,10 +118,11 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="space-y-2">
-                <Label htmlFor={`value-${index}`}>Value</Label>
-                <Input
+                <label htmlFor={`value-${index}`} className="block text-sm font-medium">Value</label>
+                <input
                   id={`value-${index}`}
                   type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   value={test.value || ''}
                   onChange={(e) => handleUpdateField(index, 'value', e.target.value)}
                   placeholder="Enter value"
@@ -110,10 +130,11 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`leftValue-${index}`}>Left Value</Label>
-                <Input
+                <label htmlFor={`leftValue-${index}`} className="block text-sm font-medium">Left Value</label>
+                <input
                   id={`leftValue-${index}`}
                   type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   value={test.leftValue || ''}
                   onChange={(e) => handleUpdateField(index, 'leftValue', e.target.value)}
                   placeholder="Enter left value"
@@ -121,10 +142,11 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`rightValue-${index}`}>Right Value</Label>
-                <Input
+                <label htmlFor={`rightValue-${index}`} className="block text-sm font-medium">Right Value</label>
+                <input
                   id={`rightValue-${index}`}
                   type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   value={test.rightValue || ''}
                   onChange={(e) => handleUpdateField(index, 'rightValue', e.target.value)}
                   placeholder="Enter right value"
@@ -133,9 +155,10 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
             </div>
             
             <div className="space-y-2 mb-4">
-              <Label htmlFor={`comments-${index}`}>Comments</Label>
-              <Textarea
+              <label htmlFor={`comments-${index}`} className="block text-sm font-medium">Comments</label>
+              <textarea
                 id={`comments-${index}`}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                 value={test.comments || ''}
                 onChange={(e) => handleUpdateField(index, 'comments', e.target.value)}
                 placeholder="Enter any comments"
@@ -171,6 +194,33 @@ const PhysioFormRenderer: React.FC<PhysioFormRendererProps> = ({
           <span>Add Assessment</span>
         </Button>
       </div>
+
+      {/* Form action buttons */}
+      {(onSubmit || onReset) && (
+        <div className="flex justify-end space-x-4 mt-8">
+          {onReset && (
+            <Button 
+              variant="outline" 
+              onClick={onReset}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reset Form
+            </Button>
+          )}
+          
+          {onSubmit && (
+            <Button 
+              variant="default"
+              onClick={onSubmit}
+              className="flex items-center gap-2 bg-primary text-white hover:bg-primary-dark"
+            >
+              <Save className="h-4 w-4" />
+              Submit Form
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -1,9 +1,11 @@
 
 import React, { useState } from 'react';
-import AudioRecorder from '../audio/AudioRecorder';
-import TranscriptionBox from '../audio/TranscriptionBox';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import SectionAudioRecorder from '../audio/SectionAudioRecorder';
+import SectionTranscriptionBox from './SectionTranscriptionBox';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Save, RefreshCw } from 'lucide-react';
 
 interface FormSectionProps {
   title: string;
@@ -16,6 +18,8 @@ interface FormSectionProps {
   selected?: boolean;
   onSelectChange?: (sectionId: string, selected: boolean) => void;
   showAudioControls?: boolean;
+  onSectionSubmit?: (sectionId: string) => void;
+  onSectionReset?: (sectionId: string) => void;
 }
 
 const FormSection: React.FC<FormSectionProps> = ({
@@ -28,7 +32,9 @@ const FormSection: React.FC<FormSectionProps> = ({
   selectable = false,
   selected = false,
   onSelectChange,
-  showAudioControls = true
+  showAudioControls = true,
+  onSectionSubmit,
+  onSectionReset
 }) => {
   const [transcription, setTranscription] = useState('');
 
@@ -45,7 +51,7 @@ const FormSection: React.FC<FormSectionProps> = ({
   };
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-6 border border-border bg-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -56,17 +62,20 @@ const FormSection: React.FC<FormSectionProps> = ({
                   if (onSelectChange) onSelectChange(sectionId, checked === true);
                 }}
                 id={`section-checkbox-${sectionId}`}
+                className="h-4 w-4"
               />
             )}
-            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
           </div>
           
           {showAudioControls && (
             <div className="flex items-center gap-2">
-              <AudioRecorder 
+              <SectionAudioRecorder 
+                sectionId={sectionId}
                 onAudioEncoded={handleAudioEncoded}
                 isProcessing={isProcessing}
                 size="sm"
+                label={`Record for ${title}`}
               />
             </div>
           )}
@@ -76,12 +85,14 @@ const FormSection: React.FC<FormSectionProps> = ({
       <CardContent className="pt-2">
         {showAudioControls && (
           <div className="mb-4">
-            <TranscriptionBox
+            <SectionTranscriptionBox
               value={transcription}
               onChange={setTranscription}
               isProcessing={isProcessing}
-              autoProcess={handleTranscriptProcess}
+              onProcess={handleTranscriptProcess}
+              autoProcess={true}
               autoProcessDelay={5000}
+              sectionId={sectionId}
               label={`${title} Transcription`}
               placeholder={`Enter ${title.toLowerCase()} details here...`}
             />
@@ -92,6 +103,32 @@ const FormSection: React.FC<FormSectionProps> = ({
           {children}
         </div>
       </CardContent>
+
+      {(onSectionSubmit || onSectionReset) && (
+        <CardFooter className="flex justify-end space-x-2 py-2">
+          {onSectionReset && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onSectionReset(sectionId)}
+              className="flex items-center gap-1"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </Button>
+          )}
+          {onSectionSubmit && (
+            <Button 
+              size="sm" 
+              onClick={() => onSectionSubmit(sectionId)}
+              className="flex items-center gap-1"
+            >
+              <Save className="h-3.5 w-3.5" />
+              <span>Submit</span>
+            </Button>
+          )}
+        </CardFooter>
+      )}
     </Card>
   );
 };

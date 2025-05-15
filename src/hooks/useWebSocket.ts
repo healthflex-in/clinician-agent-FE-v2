@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { WebSocketMessage, ServerResponse } from '@/types/form';
 
 interface WebSocketOptions {
   url: string;
@@ -8,30 +9,6 @@ interface WebSocketOptions {
   onClose?: () => void;
   onError?: (error: Event) => void;
   onFormData?: (formData: any) => void;
-}
-
-interface WebSocketMessage {
-  payloadType: string;
-  audio?: string;
-  userId?: string;
-  appointmentId?: string;
-  formKey?: string;
-  operation_mode?: string;
-  text?: string;
-  formData?: any;
-  form_data?: any;
-  [key: string]: any;
-}
-
-interface ServerResponse {
-  transcription?: string;
-  form_data?: any;
-  formData?: any;
-  payloadType?: string;
-  suggestions?: string;
-  realTimeRecommendations?: string;
-  error?: string;
-  [key: string]: any;
 }
 
 export function useWebSocket(options: WebSocketOptions) {
@@ -47,7 +24,8 @@ export function useWebSocket(options: WebSocketOptions) {
   const { toast } = useToast();
   
   const wsRef = useRef<WebSocket | null>(null);
-  const autoProcessTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const maxReconnectAttempts = 20;
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) return;
@@ -55,12 +33,10 @@ export function useWebSocket(options: WebSocketOptions) {
     try {
       setIsConnecting(true);
       
-      // Use hardcoded WebSocket URL
-      const wsUrl = 'ws://localhost:8080/ws';
+      // Use WebSocket URL provided in options
+      const wsUrl = url;
       console.log('Attempting to connect to WebSocket at:', wsUrl);
       
-      // Add the API key as a header if possible
-      // Note: Custom headers aren't directly supported in native WebSocket
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
@@ -68,10 +44,10 @@ export function useWebSocket(options: WebSocketOptions) {
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
+        reconnectAttemptsRef.current = 0;
         if (onOpen) onOpen();
         
-        // Send an initial message with the API key
-        // This is a workaround since headers can't be sent directly
+        // Send initial authentication message
         if (wsRef.current) {
           wsRef.current.send(JSON.stringify({
             payloadType: 'authentication',
@@ -84,6 +60,16 @@ export function useWebSocket(options: WebSocketOptions) {
         console.log('WebSocket closed');
         setIsConnected(false);
         setIsConnecting(false);
+        
+        // Attempt to reconnect if not max attempts
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          const delay = Math.min(1000 * Math.pow(1.5, reconnectAttemptsRef.current), 10000);
+          setTimeout(() => connect(), delay);
+        } else {
+          console.log('Max reconnect attempts reached');
+        }
+        
         if (onClose) onClose();
       };
 
@@ -98,7 +84,7 @@ export function useWebSocket(options: WebSocketOptions) {
         try {
           console.log('Message received:', event.data);
           const data = JSON.parse(event.data) as ServerResponse;
-          console.log('data--> ', data);
+          console.log('WebSocket data:', data);
           
           // Handle different response types
           if (data.error) {
@@ -114,8 +100,6 @@ export function useWebSocket(options: WebSocketOptions) {
           
           if (data.transcription !== undefined) {
             setTranscription(data.transcription);
-            
-            // We'll let the component handle auto-processing, not here
             setIsProcessing(false);
           }
           
@@ -192,10 +176,6 @@ export function useWebSocket(options: WebSocketOptions) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    if (autoProcessTimeoutRef.current) {
-      clearTimeout(autoProcessTimeoutRef.current);
-      autoProcessTimeoutRef.current = null;
-    }
   }, []);
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
@@ -219,7 +199,7 @@ export function useWebSocket(options: WebSocketOptions) {
     // Get user ID and appointment ID from localStorage or route params
     const userId = localStorage.getItem('userId') || '';
     const appointmentId = localStorage.getItem('appointmentId') || '';
-    const formKey = localStorage.getItem('formKey') || 'snc';
+    const formKey = localStorage.getItem('formKey') || 'physio';
     
     // Make sure the audio is in the correct format (data URL)
     let audioData = base64Audio;
@@ -240,42 +220,7 @@ export function useWebSocket(options: WebSocketOptions) {
     
     // If form data is provided, include it
     if (currentFormData) {
-      // Format form data according to formKey
-      const formDataObj: any = {};
-      
-      if (formKey === 'physio') {
-        // For physio form, we need to structure it with assessment keys
-        const assessmentData = Array.isArray(currentFormData) ? 
-          currentFormData.reduce((acc, item, index) => {
-            acc[`assessment${index + 1}`] = {
-              Test_Name: item.testName || '',
-              Unit_Name: item.unitName || '',
-              Value: item.value || '',
-              Right_Value: item.rightValue || '',
-              Left_Value: item.leftValue || '',
-              comments: item.comments || '',
-            };
-            return acc;
-          }, {}) : 
-          { assessment1: currentFormData };
-          
-        payload.formData = assessmentData;
-        
-        // Also include form_data for backward compatibility
-        if (Array.isArray(currentFormData) && currentFormData[0]) {
-          payload.form_data = {
-            Test_Name: currentFormData[0].testName || '',
-            Unit_Name: currentFormData[0].unitName || '',
-            Value: currentFormData[0].value || '',
-            Right_Value: currentFormData[0].rightValue || '',
-            Left_Value: currentFormData[0].leftValue || '',
-            comments: currentFormData[0].comments || '',
-          };
-        }
-      } else {
-        // For other form types
-        payload.formData = currentFormData;
-      }
+      payload.formData = currentFormData;
     }
     
     console.log('Sending audio payload:', payload);
@@ -286,7 +231,7 @@ export function useWebSocket(options: WebSocketOptions) {
     // Get user ID and appointment ID from localStorage or route params
     const userId = localStorage.getItem('userId') || '';
     const appointmentId = localStorage.getItem('appointmentId') || '';
-    const formKey = localStorage.getItem('formKey') || 'snc';
+    const formKey = localStorage.getItem('formKey') || 'physio';
     
     // Payload for text + form data
     const payload: WebSocketMessage = {
@@ -300,40 +245,7 @@ export function useWebSocket(options: WebSocketOptions) {
     
     // Include form data if available
     if (currentFormData) {
-      // Format form data according to formKey
-      if (formKey === 'physio') {
-        // For physio form, we need to structure it with assessment keys
-        const assessmentData = Array.isArray(currentFormData) ? 
-          currentFormData.reduce((acc, item, index) => {
-            acc[`assessment${index + 1}`] = {
-              Test_Name: item.testName || '',
-              Unit_Name: item.unitName || '',
-              Value: item.value || '',
-              Right_Value: item.rightValue || '',
-              Left_Value: item.leftValue || '',
-              comments: item.comments || '',
-            };
-            return acc;
-          }, {}) : 
-          { assessment1: currentFormData };
-          
-        payload.formData = assessmentData;
-        
-        // Also include form_data for backward compatibility
-        if (Array.isArray(currentFormData) && currentFormData[0]) {
-          payload.form_data = {
-            Test_Name: currentFormData[0].testName || '',
-            Unit_Name: currentFormData[0].unitName || '',
-            Value: currentFormData[0].value || '',
-            Right_Value: currentFormData[0].rightValue || '',
-            Left_Value: currentFormData[0].leftValue || '',
-            comments: currentFormData[0].comments || '',
-          };
-        }
-      } else {
-        // For other form types
-        payload.formData = currentFormData;
-      }
+      payload.formData = currentFormData;
     }
     
     console.log('Processing transcription with payload:', payload);
@@ -344,9 +256,6 @@ export function useWebSocket(options: WebSocketOptions) {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
-      }
-      if (autoProcessTimeoutRef.current) {
-        clearTimeout(autoProcessTimeoutRef.current);
       }
     };
   }, []);

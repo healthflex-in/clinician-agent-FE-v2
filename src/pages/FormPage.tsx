@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Card,
@@ -8,16 +8,22 @@ import {
   CardTitle,
   CardFooter,
 } from '@/components/ui/card';
-import Recorder from '@/components/Recorder';
-import TranscriptBox from '@/components/TranscriptBox';
+import AudioRecorder from '@/components/audio/AudioRecorder';
+import TranscriptionBox from '@/components/audio/TranscriptionBox';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, WifiOff, Save, RefreshCw } from 'lucide-react';
-import FormRenderer, { FormRendererRef } from '@/components/FormRenderer';
-import formSchemas from '@/schemas/formSchemas';
 import { Button } from '@/components/ui/button';
 import { graphqlRequest } from '@/utils/graphqlClient';
+import formSchemas from '@/schemas/formSchemas';
+import SuggestionBox from '@/components/ui/SuggestionBox';
+import PhysioFormRenderer from '@/components/forms/PhysioFormRenderer';
+import { TestValue, AgentReport } from '@/types/form';
+import { ThemeProvider } from '@/styles/theme-provider';
+
+// Import global styles
+import '@/styles/globalStyles.css';
 
 type FormPageParams = {
   formKey: string;
@@ -27,23 +33,67 @@ type FormPageParams = {
 
 const FormPage = () => {
   const {
-    formKey = 'snc',
+    formKey = 'physio',
     patientId,
     appointmentId,
   } = useParams<FormPageParams>();
-  const formRendererRef = useRef<FormRendererRef>(null);
   const [transcriptText, setTranscriptText] = useState('');
-  const [formData, setFormData] = useState<any>(null);
+  const [formData, setFormData] = useState<TestValue[]>([{ 
+    testName: '',
+    unitName: '',
+    value: '',
+    rightValue: '',
+    leftValue: '',
+    comments: ''
+  }]);
   const [reportId, setReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [patientName, setPatientName] = useState<string>('Patient');
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialize form schema based on formKey
-  const schema =
-    formSchemas[formKey as keyof typeof formSchemas] || formSchemas.snc;
+  // Initialize schema based on formKey (we're focused on physio for now)
+  const schema = formSchemas[formKey as keyof typeof formSchemas] || formSchemas.physio;
 
   // Create agent report on initial load
   useEffect(() => {
+    // Fetch patient details
+    const fetchPatientName = async () => {
+      if (!patientId) return;
+      
+      try {
+        // Try to get from localStorage first
+        const storedPatient = localStorage.getItem('selectedPatient');
+        if (storedPatient) {
+          const patientData = JSON.parse(storedPatient);
+          if (patientData && patientData.name) {
+            setPatientName(patientData.name);
+            return;
+          }
+        }
+        
+        // If not in localStorage, try to fetch from API
+        const query = `
+          query GetPatient($id: ObjectID!) {
+            patient(id: $id) {
+              _id
+              name
+            }
+          }
+        `;
+        
+        const variables = { id: patientId };
+        
+        const result = await graphqlRequest(query, variables);
+        if (result && result.patient && result.patient.name) {
+          setPatientName(result.patient.name);
+        }
+      } catch (error) {
+        console.error('Error fetching patient name:', error);
+      }
+    };
+    
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
       
@@ -55,6 +105,12 @@ const FormPage = () => {
             const parsedReport = JSON.parse(existingReport);
             if (parsedReport._id) {
               setReportId(parsedReport._id);
+              
+              // Also set form data if it exists
+              if (formKey === 'physio' && parsedReport.physio) {
+                setFormData(Array.isArray(parsedReport.physio) ? parsedReport.physio : []);
+              }
+              
               return; // Report already exists
             }
           } catch (e) {
@@ -171,6 +227,14 @@ const FormPage = () => {
             title: "Report Created",
             description: "New report initialized successfully",
           });
+          
+          // Set initial form data if it exists
+          if (formKey === 'physio' && result.createAgentReport.physio) {
+            setFormData(Array.isArray(result.createAgentReport.physio) ? 
+              result.createAgentReport.physio : 
+              [result.createAgentReport.physio]
+            );
+          }
         }
       } catch (error) {
         console.error('Error creating initial report:', error);
@@ -182,8 +246,9 @@ const FormPage = () => {
       }
     };
 
+    fetchPatientName();
     createInitialReport();
-  }, [patientId, appointmentId, toast]);
+  }, [patientId, appointmentId, toast, formKey]);
 
   // Store formKey, patientId and appointmentId in localStorage for WebSocket access
   useEffect(() => {
@@ -191,33 +256,8 @@ const FormPage = () => {
     if (patientId) localStorage.setItem('userId', patientId);
     if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
   }, [formKey, patientId, appointmentId]);
-  
-  // Load saved form data from localStorage
-  useEffect(() => {
-    const savedReport = localStorage.getItem('agentReport');
-    if (savedReport) {
-      try {
-        const parsedReport = JSON.parse(savedReport);
-        if (parsedReport._id) {
-          setReportId(parsedReport._id);
-        }
-        
-        // Load form data based on formKey
-        if (formKey === 'snc' && parsedReport.snc) {
-          setFormData(parsedReport.snc);
-        } else if (formKey === 'physio' && parsedReport.physio) {
-          setFormData(parsedReport.physio);
-        } else if (formKey === 'firstAssessment' && parsedReport.firstAssessment) {
-          setFormData(parsedReport.firstAssessment);
-        } else if (formKey === 'assessment' && parsedReport.assessment) {
-          setFormData(parsedReport.assessment);
-        }
-      } catch (error) {
-        console.error('Error parsing saved report:', error);
-      }
-    }
-  }, [formKey]);
 
+  // WebSocket connection and handlers
   const {
     connect,
     isConnected,
@@ -253,25 +293,11 @@ const FormPage = () => {
       });
     },
     onFormData: (data) => {
-      // When we receive form data from the WebSocket, update our local state
-      // and update the FormRenderer via ref
-      setFormData(data);
-
-      if (formRendererRef.current) {
-        formRendererRef.current.updateFormWithLLMData(data);
-      }
-
-      // Save to localStorage
-      const reportData = {
-        formKey,
-        patientId,
-        appointmentId,
-        formData: data,
-      };
-      localStorage.setItem('agentReport', JSON.stringify(reportData));
+      handleIncomingFormData(data);
     },
   });
 
+  // Connect to WebSocket on component mount
   useEffect(() => {
     connect();
 
@@ -286,17 +312,198 @@ const FormPage = () => {
     return () => clearInterval(reconnectInterval);
   }, [connect, isConnected, isConnecting]);
 
+  // Update transcription when received from WebSocket
   useEffect(() => {
     if (transcription) {
       setTranscriptText(transcription);
-      
-      // Auto-process transcription if we have text
-      if (transcription.trim() && isConnected) {
-        processTranscription(transcription, formData);
-      }
     }
   }, [transcription]);
 
+  // Handle incoming form data from the WebSocket
+  const handleIncomingFormData = useCallback((data: any) => {
+    if (!data) return;
+    
+    try {
+      // Handle structured data format with multiple assessments
+      if (data.assessment1 || data.assessment2 || data.assessment3) {
+        // Count how many assessments we have
+        let assessmentsCount = 0;
+        const hasAssessment1 = !!data.assessment1;
+        const hasAssessment2 = !!data.assessment2;
+        const hasAssessment3 = !!data.assessment3;
+        
+        if (hasAssessment1) assessmentsCount++;
+        if (hasAssessment2) assessmentsCount++;
+        if (hasAssessment3) assessmentsCount++;
+        
+        // Create new form data array
+        const newFormData: TestValue[] = [...formData];
+        
+        // If we have selected sections, only update those
+        const sectionsToUpdate = selectedSections.length > 0 
+          ? selectedSections 
+          : currentSectionId 
+            ? [currentSectionId] 
+            : [];
+            
+        // Figure out which assessments to update
+        if (sectionsToUpdate.length > 0) {
+          // Update only selected sections
+          sectionsToUpdate.forEach(sectionId => {
+            const index = parseInt(sectionId.split('-').pop() || '0', 10);
+            let assessmentData = null;
+            
+            // Match section index to assessment data
+            if (index === 0 && hasAssessment1) {
+              assessmentData = data.assessment1;
+            } else if (index === 1 && hasAssessment2) {
+              assessmentData = data.assessment2;
+            } else if (index === 2 && hasAssessment3) {
+              assessmentData = data.assessment3;
+            }
+            
+            // Update if we have data
+            if (assessmentData && newFormData[index]) {
+              newFormData[index] = {
+                testName: assessmentData.Test_Name || '',
+                unitName: assessmentData.Unit_Name || '',
+                value: assessmentData.Value || '',
+                rightValue: assessmentData.Right_Value || '',
+                leftValue: assessmentData.Left_Value || '',
+                comments: assessmentData.comments || ''
+              };
+            }
+          });
+        } else {
+          // No sections selected, update all data
+          // Ensure we have enough items in the array
+          while (newFormData.length < assessmentsCount) {
+            newFormData.push({
+              testName: '',
+              unitName: '',
+              value: '',
+              rightValue: '',
+              leftValue: '',
+              comments: ''
+            });
+          }
+          
+          // Update assessment 1
+          if (hasAssessment1) {
+            newFormData[0] = {
+              testName: data.assessment1.Test_Name || '',
+              unitName: data.assessment1.Unit_Name || '',
+              value: data.assessment1.Value || '',
+              rightValue: data.assessment1.Right_Value || '',
+              leftValue: data.assessment1.Left_Value || '',
+              comments: data.assessment1.comments || ''
+            };
+          }
+          
+          // Update assessment 2
+          if (hasAssessment2 && newFormData.length >= 2) {
+            newFormData[1] = {
+              testName: data.assessment2.Test_Name || '',
+              unitName: data.assessment2.Unit_Name || '',
+              value: data.assessment2.Value || '',
+              rightValue: data.assessment2.Right_Value || '',
+              leftValue: data.assessment2.Left_Value || '',
+              comments: data.assessment2.comments || ''
+            };
+          }
+          
+          // Update assessment 3
+          if (hasAssessment3 && newFormData.length >= 3) {
+            newFormData[2] = {
+              testName: data.assessment3.Test_Name || '',
+              unitName: data.assessment3.Unit_Name || '',
+              value: data.assessment3.Value || '',
+              rightValue: data.assessment3.Right_Value || '',
+              leftValue: data.assessment3.Left_Value || '',
+              comments: data.assessment3.comments || ''
+            };
+          }
+        }
+        
+        // Update form data
+        setFormData(newFormData);
+        
+        // Save to localStorage
+        updateLocalStorage(newFormData);
+        
+        toast({
+          title: "Form Updated",
+          description: "Form data has been processed and updated",
+        });
+        
+      } else if (Array.isArray(data)) {
+        // Handle array format
+        setFormData(data);
+        updateLocalStorage(data);
+        
+      } else if (data.testName || data.Test_Name) {
+        // Handle single assessment format
+        const singleTest: TestValue = {
+          testName: data.testName || data.Test_Name || '',
+          unitName: data.unitName || data.Unit_Name || '',
+          value: data.value || data.Value || '',
+          rightValue: data.rightValue || data.Right_Value || '',
+          leftValue: data.leftValue || data.Left_Value || '',
+          comments: data.comments || data.comments || ''
+        };
+        
+        // Update only the current section if one is set
+        if (currentSectionId) {
+          const index = parseInt(currentSectionId.split('-').pop() || '0', 10);
+          const newFormData = [...formData];
+          if (newFormData[index]) {
+            newFormData[index] = singleTest;
+            setFormData(newFormData);
+            updateLocalStorage(newFormData);
+          }
+        } else if (selectedSections.length > 0) {
+          // Update only selected sections
+          const newFormData = [...formData];
+          selectedSections.forEach(sectionId => {
+            const index = parseInt(sectionId.split('-').pop() || '0', 10);
+            if (newFormData[index]) {
+              newFormData[index] = singleTest;
+            }
+          });
+          setFormData(newFormData);
+          updateLocalStorage(newFormData);
+        } else {
+          // No specific section, replace first item
+          const newFormData = [singleTest, ...formData.slice(1)];
+          setFormData(newFormData);
+          updateLocalStorage(newFormData);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing form data:', error);
+      toast({
+        title: "Processing Error",
+        description: "Failed to process form data",
+        variant: "destructive",
+      });
+    }
+  }, [formData, toast, selectedSections, currentSectionId]);
+
+  // Save updated form data to localStorage
+  const updateLocalStorage = (newFormData: TestValue[]) => {
+    try {
+      const savedReport = localStorage.getItem('agentReport');
+      if (savedReport) {
+        const reportData = JSON.parse(savedReport) as AgentReport;
+        reportData.physio = newFormData;
+        localStorage.setItem('agentReport', JSON.stringify(reportData));
+      }
+    } catch (error) {
+      console.error('Error updating localStorage:', error);
+    }
+  };
+
+  // Audio recording handlers
   const handleAudioEncoded = (base64Audio: string) => {
     if (!isConnected) {
       toast({
@@ -308,8 +515,23 @@ const FormPage = () => {
       return;
     }
 
-    // Include current form data with audio payload
-    const sent = sendAudio(base64Audio, formData);
+    // Prepare data for each assessment
+    const physioFormData: any = {};
+    formData.forEach((form, index) => {
+      const assessmentKey = `assessment${index + 1}`;
+      physioFormData[assessmentKey] = {
+        Test_Name: form.testName,
+        Unit_Name: form.unitName,
+        Value: form.value,
+        Right_Value: form.rightValue,
+        Left_Value: form.leftValue,
+        comments: form.comments,
+      };
+    });
+
+    // Send audio with current form data
+    const sent = sendAudio(base64Audio, physioFormData);
+    
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -319,6 +541,49 @@ const FormPage = () => {
     }
   };
 
+  // Handle section-specific audio recording
+  const handleSectionAudioEncoded = (base64Audio: string, sectionId: string) => {
+    if (!isConnected) {
+      toast({
+        title: 'Not connected',
+        description: 'Attempting to reconnect...',
+        variant: 'destructive',
+      });
+      connect();
+      return;
+    }
+
+    // Get the section index
+    const index = parseInt(sectionId.split('-').pop() || '0', 10);
+    setCurrentSectionId(sectionId);
+    
+    // Prepare data for this specific section
+    const physioFormData: any = {};
+    if (formData[index]) {
+      const assessmentKey = `assessment${index + 1}`;
+      physioFormData[assessmentKey] = {
+        Test_Name: formData[index].testName,
+        Unit_Name: formData[index].unitName,
+        Value: formData[index].value,
+        Right_Value: formData[index].rightValue,
+        Left_Value: formData[index].leftValue,
+        comments: formData[index].comments,
+      };
+    }
+
+    // Send audio with section form data
+    const sent = sendAudio(base64Audio, physioFormData);
+    
+    if (!sent) {
+      toast({
+        title: 'Failed to send audio',
+        description: 'Connection issues detected',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Process transcription text
   const handleProcessTranscription = () => {
     if (!transcriptText.trim()) {
       toast({
@@ -329,8 +594,23 @@ const FormPage = () => {
       return;
     }
 
-    // Include current form data with text payload
-    const sent = processTranscription(transcriptText, formData);
+    // Prepare data for each assessment
+    const physioFormData: any = {};
+    formData.forEach((form, index) => {
+      const assessmentKey = `assessment${index + 1}`;
+      physioFormData[assessmentKey] = {
+        Test_Name: form.testName,
+        Unit_Name: form.unitName,
+        Value: form.value,
+        Right_Value: form.rightValue,
+        Left_Value: form.leftValue,
+        comments: form.comments,
+      };
+    });
+
+    // Send transcription with current form data
+    const sent = processTranscription(transcriptText, physioFormData);
+    
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -340,31 +620,56 @@ const FormPage = () => {
     }
   };
 
-  const handleFormChange = (newFormData: any) => {
-    setFormData(newFormData);
+  // Process section-specific transcription
+  const handleSectionTranscriptProcess = (text: string, sectionId: string) => {
+    if (!text.trim()) return;
+    
+    // Get the section index
+    const index = parseInt(sectionId.split('-').pop() || '0', 10);
+    setCurrentSectionId(sectionId);
+    
+    // Prepare data for this specific section
+    const physioFormData: any = {};
+    if (formData[index]) {
+      const assessmentKey = `assessment${index + 1}`;
+      physioFormData[assessmentKey] = {
+        Test_Name: formData[index].testName,
+        Unit_Name: formData[index].unitName,
+        Value: formData[index].value,
+        Right_Value: formData[index].rightValue,
+        Left_Value: formData[index].leftValue,
+        comments: formData[index].comments,
+      };
+    }
 
-    // Save to localStorage, preserving other report data
-    try {
-      const savedReport = localStorage.getItem('agentReport');
-      let reportData = savedReport ? JSON.parse(savedReport) : {};
-      
-      // Update the appropriate section based on formKey
-      if (formKey === 'snc') {
-        reportData.snc = newFormData;
-      } else if (formKey === 'physio') {
-        reportData.physio = newFormData;
-      } else if (formKey === 'firstAssessment') {
-        reportData.firstAssessment = newFormData;
-      } else if (formKey === 'assessment') {
-        reportData.assessment = newFormData;
-      }
-      
-      localStorage.setItem('agentReport', JSON.stringify(reportData));
-    } catch (error) {
-      console.error('Error updating localStorage:', error);
+    // Send transcription with section form data
+    const sent = processTranscription(text, physioFormData);
+    
+    if (!sent) {
+      toast({
+        title: 'Failed to process transcription',
+        description: 'Connection issues detected',
+        variant: 'destructive',
+      });
     }
   };
-  
+
+  // Handle form data changes
+  const handleFormChange = (newFormData: TestValue[]) => {
+    setFormData(newFormData);
+    updateLocalStorage(newFormData);
+  };
+
+  // Handle section selection
+  const handleSectionSelect = (sectionId: string, selected: boolean) => {
+    if (selected) {
+      setSelectedSections(prev => [...prev, sectionId]);
+    } else {
+      setSelectedSections(prev => prev.filter(id => id !== sectionId));
+    }
+  };
+
+  // Submit form data
   const handleFormSubmit = async () => {
     if (!reportId || !appointmentId) {
       toast({
@@ -378,8 +683,7 @@ const FormPage = () => {
     setIsSubmitting(true);
     
     try {
-      // Prepare the mutation based on formKey
-      let mutation = `
+      const mutation = `
         mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
           updateAgentReport(appointmentId: $appointmentId, input: $input) {
             _id
@@ -388,22 +692,24 @@ const FormPage = () => {
             version
             isActive
             isFilledCompletely
+            physio {
+              testName
+              unitName
+              value
+              rightValue
+              leftValue
+              comments
+            }
           }
         }
       `;
       
-      // Prepare input variables based on formKey
-      let input: any = {};
+      // Filter out empty tests
+      const filteredData = formData.filter(test => test.testName.trim() !== '');
       
-      if (formKey === 'snc') {
-        input.snc = formData;
-      } else if (formKey === 'physio') {
-        input.physio = formData;
-      } else if (formKey === 'firstAssessment') {
-        input.firstAssessment = formData;
-      } else if (formKey === 'assessment') {
-        input.assessment = formData;
-      }
+      const input: any = {
+        physio: filteredData,
+      };
       
       // Add userId if patientId is available
       if (patientId) {
@@ -415,7 +721,6 @@ const FormPage = () => {
         input
       };
       
-      // Send the GraphQL mutation
       const result = await graphqlRequest(mutation, variables);
       
       if (result && result.updateAgentReport) {
@@ -428,20 +733,9 @@ const FormPage = () => {
         const savedReport = localStorage.getItem('agentReport');
         if (savedReport) {
           try {
-            const reportData = JSON.parse(savedReport);
+            const reportData = JSON.parse(savedReport) as AgentReport;
             
-            // Update the specific form data
-            if (formKey === 'snc') {
-              reportData.snc = formData;
-            } else if (formKey === 'physio') {
-              reportData.physio = formData;
-            } else if (formKey === 'firstAssessment') {
-              reportData.firstAssessment = formData;
-            } else if (formKey === 'assessment') {
-              reportData.assessment = formData;
-            }
-            
-            // Update other fields from the response
+            reportData.physio = filteredData;
             reportData.updatedAt = result.updateAgentReport.updatedAt;
             reportData.version = result.updateAgentReport.version;
             reportData.isActive = result.updateAgentReport.isActive;
@@ -465,16 +759,24 @@ const FormPage = () => {
     }
   };
 
+  // Reset form to initial state
   const handleFormReset = () => {
     if (confirm("Are you sure you want to reset this form? All your data will be lost.")) {
-      // Reset transcription and form data
-      setTranscriptText('');
-      setFormData(null);
+      // Reset to a single empty test
+      const initialData = [{
+        testName: '',
+        unitName: '',
+        value: '',
+        rightValue: '',
+        leftValue: '',
+        comments: ''
+      }];
       
-      // Update FormRenderer via ref
-      if (formRendererRef.current) {
-        formRendererRef.current.updateFormWithLLMData({});
-      }
+      setFormData(initialData);
+      setTranscriptText('');
+      setSelectedSections([]);
+      setCurrentSectionId(null);
+      updateLocalStorage(initialData);
       
       toast({
         title: "Form Reset",
@@ -483,179 +785,139 @@ const FormPage = () => {
     }
   };
 
-  // Automatically hide suggestions after 7 seconds
-  useEffect(() => {
-    if (suggestions) {
-      const timer = setTimeout(() => {
-        setSuggestions(null);
-      }, 7000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [suggestions, setSuggestions]);
-
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/10 to-background overflow-auto">
-      <div className="w-full max-w-4xl space-y-6 pb-16">
-        {/* Header with form info */}
-        <Card className="w-full bg-card">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl font-bold">
-              {formKey.toUpperCase()} -{' '}
-              {patientId ? `Patient ID: ${patientId}` : 'New Patient'}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+    <ThemeProvider>
+      <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/5 to-background">
+        <div className="w-full max-w-4xl space-y-6 pb-16">
+          {/* Header with patient info */}
+          <Card className="w-full bg-card">
+            <CardHeader>
+              <CardTitle className="text-center text-2xl font-bold">
+                {formKey.toUpperCase()} - {patientName || 'Patient'}
+              </CardTitle>
+            </CardHeader>
+          </Card>
 
-        {/* Audio recorder and transcription section */}
-        <Card className="w-full shadow-lg">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-center">Voice Recorder</CardTitle>
-          </CardHeader>
+          {/* Audio recorder and transcription section */}
+          <Card className="w-full shadow-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-center">Voice Recorder</CardTitle>
+            </CardHeader>
 
-          <CardContent className="space-y-6">
-            {!isConnected && !isConnecting && (
-              <Alert variant="destructive" className="bg-red-50 border-red-200">
-                <WifiOff className="h-4 w-4" />
-                <AlertTitle>WebSocket Disconnected</AlertTitle>
-                <AlertDescription>
-                  Cannot connect to the transcription service. Please check your
-                  network connection.
-                </AlertDescription>
-              </Alert>
-            )}
+            <CardContent className="space-y-6">
+              {!isConnected && !isConnecting && (
+                <Alert variant="destructive" className="bg-red-50 border-red-200">
+                  <WifiOff className="h-4 w-4" />
+                  <AlertDescription>
+                    Cannot connect to the transcription service. Please check your
+                    network connection.
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {suggestions && (
-              <Alert
-                variant="default"
-                className="bg-slate-900 text-white border-slate-800"
-              >
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Suggestions</AlertTitle>
-                <AlertDescription>
-                  <div className="text-sm whitespace-pre-wrap max-h-16 overflow-y-auto">
-                    {typeof suggestions === 'string' && suggestions.includes('[') && suggestions.includes(']') ? 
-                      (() => {
-                        try {
-                          // Try to parse as JSON if it looks like JSON
-                          const suggestionsText = suggestions.substring(
-                            suggestions.indexOf('['),
-                            suggestions.lastIndexOf(']') + 1
-                          );
-                          const parsedSuggestions = JSON.parse(suggestionsText);
-                          // Show only the first two suggestions
-                          const limitedSuggestions = parsedSuggestions.slice(0, 2);
-                          
-                          return (
-                            <ul className="list-disc pl-5">
-                              {limitedSuggestions.map((suggestion: string, index: number) => (
-                                <li key={index}>{suggestion}</li>
-                              ))}
-                            </ul>
-                          );
-                        } catch (e) {
-                          // If parsing fails, show as regular text
-                          return suggestions;
-                        }
-                      })() 
-                      : suggestions
-                    }
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
+              {suggestions && (
+                <SuggestionBox 
+                  suggestions={suggestions} 
+                  onClose={() => setSuggestions(null)} 
+                />
+              )}
 
-            <div className="flex justify-center py-4">
-              <Recorder
-                onAudioEncoded={handleAudioEncoded}
+              <div className="flex justify-center py-4">
+                <AudioRecorder
+                  onAudioEncoded={handleAudioEncoded}
+                  isProcessing={isProcessing}
+                  label="Record for all sections"
+                />
+              </div>
+
+              <TranscriptionBox
+                value={transcriptText}
+                onChange={setTranscription}
                 isProcessing={isProcessing}
+                className="mt-4"
+                autoProcess={handleProcessTranscription}
+                autoProcessDelay={5000}
               />
-            </div>
 
-            <TranscriptBox
-              value={transcriptText}
-              onChange={setTranscription}
-              isProcessing={isProcessing}
-              className="mt-4"
-              autoProcess={handleProcessTranscription}
-            />
-
-            <div className="flex justify-center pt-2">
-              <button
-                onClick={handleProcessTranscription}
-                disabled={
-                  isProcessing || !transcriptText.trim() || !isConnected
-                }
-                className={`px-4 py-2 rounded-md text-white font-medium 
-                  ${
+              <div className="flex justify-center pt-2">
+                <Button
+                  onClick={handleProcessTranscription}
+                  disabled={
                     isProcessing || !transcriptText.trim() || !isConnected
-                      ? 'bg-primary/40 cursor-not-allowed'
-                      : 'bg-primary hover:bg-primary/90'
-                  }`}
+                  }
+                  variant={
+                    isProcessing || !transcriptText.trim() || !isConnected
+                      ? "outline"
+                      : "default"
+                  }
+                  className="px-6"
+                >
+                  Process Transcription
+                </Button>
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex justify-center pt-0 pb-4">
+              <div className="text-sm text-center text-muted-foreground">
+                {isConnecting && 'Connecting to transcription service...'}
+                {error && 'Connection error. Please try again.'}
+                {!isConnecting &&
+                  isConnected &&
+                  !isProcessing &&
+                  'Ready to record'}
+                {!isConnecting &&
+                  isConnected &&
+                  isProcessing &&
+                  'Processing audio...'}
+              </div>
+            </CardFooter>
+          </Card>
+
+          {/* Form section */}
+          <Card className="w-full shadow-md">
+            <CardHeader>
+              <CardTitle className="text-center">
+                {formKey.toUpperCase()} Form
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              <div className="pb-6">
+                <PhysioFormRenderer
+                  formData={formData}
+                  onChange={handleFormChange}
+                  onAudioEncoded={handleSectionAudioEncoded}
+                  onTranscriptProcess={handleSectionTranscriptProcess}
+                  isProcessing={isProcessing}
+                  selectedSections={selectedSections}
+                  onSectionSelect={handleSectionSelect}
+                />
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex justify-end space-x-4 p-6 pt-0">
+              <Button 
+                variant="outline" 
+                onClick={handleFormReset}
+                disabled={isSubmitting}
+                className="flex items-center gap-2"
               >
-                Process Transcription
-              </button>
-            </div>
-          </CardContent>
-
-          <CardFooter className="flex justify-center pt-0 pb-4">
-            <div className="text-sm text-center text-muted-foreground">
-              {isConnecting && 'Connecting to transcription service...'}
-              {error && 'Connection error. Please try again.'}
-              {!isConnecting &&
-                isConnected &&
-                !isProcessing &&
-                'Ready to record'}
-              {!isConnecting &&
-                isConnected &&
-                isProcessing &&
-                'Processing audio...'}
-            </div>
-          </CardFooter>
-        </Card>
-
-        {/* Form section */}
-        <Card className="w-full shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-center">
-              {formKey.toUpperCase()} Form
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="pb-6">
-              <FormRenderer
-                ref={formRendererRef}
-                schema={schema}
-                formKey={formKey}
-                formData={formData}
-                onChange={handleFormChange}
-              />
-            </div>
-          </CardContent>
-          
-          <CardFooter className="flex justify-end space-x-4 p-6 pt-0">
-            <Button 
-              variant="outline" 
-              onClick={handleFormReset}
-              disabled={isSubmitting}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Reset
-            </Button>
-            <Button 
-              onClick={handleFormSubmit}
-              disabled={isSubmitting}
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {isSubmitting ? 'Submitting...' : 'Submit'}
-            </Button>
-          </CardFooter>
-        </Card>
+                <RefreshCw className="h-4 w-4" />
+                Reset
+              </Button>
+              <Button 
+                onClick={handleFormSubmit}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-text-dark"
+              >
+                <Save className="h-4 w-4" />
+                {isSubmitting ? 'Submitting...' : 'Submit'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
-    </div>
+    </ThemeProvider>
   );
 };
 

@@ -1,15 +1,30 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import formSchemas from '@/schemas/formSchemas';
-import { fetchCenters, searchUsers, fetchAppointments } from '@/utils/graphqlClient';
+import {
+  fetchCenters,
+  searchUsers,
+  fetchAppointments,
+} from '@/utils/graphqlClient';
 
 // Define interfaces for API data
 interface Center {
@@ -34,7 +49,7 @@ interface Appointment {
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   // Form state
   const [formKey, setFormKey] = useState<string>('snc');
   const [patientId, setPatientId] = useState<string>('');
@@ -42,29 +57,29 @@ const Index = () => {
   const [patientSearch, setPatientSearch] = useState<string>('');
   const [appointmentId, setAppointmentId] = useState<string>('');
   const [centerId, setCenterId] = useState<string>('');
-  
+
   // Data from APIs
   const [centers, setCenters] = useState<Center[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  
+
   // Loading states
   const [loadingCenters, setLoadingCenters] = useState(false);
   const [loadingPatients, setLoadingPatients] = useState(false);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
-  
+
   // Get previous values from localStorage
   useEffect(() => {
     const savedPatientId = localStorage.getItem('userId');
     const savedAppointmentId = localStorage.getItem('appointmentId');
     const savedFormKey = localStorage.getItem('formKey');
     const savedCenterId = localStorage.getItem('centerId');
-    
+
     if (savedPatientId) setPatientId(savedPatientId);
     if (savedAppointmentId) setAppointmentId(savedAppointmentId);
     if (savedFormKey) setFormKey(savedFormKey);
     if (savedCenterId) setCenterId(savedCenterId);
-    
+
     // Load centers on component mount
     loadCenters();
   }, []);
@@ -74,16 +89,16 @@ const Index = () => {
     try {
       setLoadingCenters(true);
       const response = await fetchCenters();
-      console.log("Centers response:", response);
+      console.log('Centers response:', response);
       if (response && response.centers) {
         setCenters(response.centers);
       }
     } catch (error) {
-      console.error("Error fetching centers:", error);
+      console.error('Error fetching centers:', error);
       toast({
-        title: "Error",
-        description: "Failed to load centers. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load centers. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoadingCenters(false);
@@ -96,7 +111,7 @@ const Index = () => {
       const delaySearch = setTimeout(() => {
         searchPatients(patientSearch);
       }, 500); // Debounce search
-      
+
       return () => clearTimeout(delaySearch);
     }
   }, [centerId, patientSearch]);
@@ -105,27 +120,27 @@ const Index = () => {
   const searchPatients = async (searchTerm: string) => {
     if (!centerId) {
       toast({
-        title: "Center Required",
-        description: "Please select a center first",
-        variant: "destructive",
+        title: 'Center Required',
+        description: 'Please select a center first',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     try {
       setLoadingPatients(true);
       const response = await searchUsers('PATIENT', [centerId], searchTerm);
-      console.log("Patient search response:", response);
-      
+      console.log('Patient search response:', response);
+
       if (response && response.users) {
         setPatients(response.users);
       }
     } catch (error) {
-      console.error("Error searching patients:", error);
+      console.error('Error searching patients:', error);
       toast({
-        title: "Error",
-        description: "Failed to search patients. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to search patients. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoadingPatients(false);
@@ -146,19 +161,19 @@ const Index = () => {
       const filter = {
         patientId: patientId,
       };
-      
+
       const response = await fetchAppointments(filter);
-      console.log("Appointments response:", response);
-      
+      console.log('Appointments response:', response);
+
       if (response && response.appointments) {
         setAppointments(response.appointments);
       }
     } catch (error) {
-      console.error("Error fetching appointments:", error);
+      console.error('Error fetching appointments:', error);
       toast({
-        title: "Error",
-        description: "Failed to load appointments. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to load appointments. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoadingAppointments(false);
@@ -168,35 +183,40 @@ const Index = () => {
   // Select a patient from search results
   const selectPatient = (patient: Patient) => {
     setPatientId(patient._id);
-    setPatientName(`${patient.profileData.firstName} ${patient.profileData.lastName}`);
+    setPatientName(
+      `${patient.profileData.firstName} ${patient.profileData.lastName}`
+    );
     setPatientSearch('');
     setPatients([]); // Clear search results after selection
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     // Validate form
     if (!formKey) {
       toast({
-        title: "Form Selection Required",
-        description: "Please select a form type",
-        variant: "destructive",
+        title: 'Form Selection Required',
+        description: 'Please select a form type',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     // Generate random IDs if not provided (for demo purposes)
-    const finalPatientId = patientId || `user-${Math.random().toString(36).substring(2, 9)}`;
-    const finalAppointmentId = appointmentId || `apt-${Math.random().toString(36).substring(2, 9)}`;
-    const finalCenterId = centerId || `center-${Math.random().toString(36).substring(2, 9)}`;
-    
+    const finalPatientId =
+      patientId || `user-${Math.random().toString(36).substring(2, 9)}`;
+    const finalAppointmentId =
+      appointmentId || `apt-${Math.random().toString(36).substring(2, 9)}`;
+    const finalCenterId =
+      centerId || `center-${Math.random().toString(36).substring(2, 9)}`;
+
     // Store in localStorage
     localStorage.setItem('userId', finalPatientId);
     localStorage.setItem('appointmentId', finalAppointmentId);
     localStorage.setItem('formKey', formKey);
     localStorage.setItem('centerId', finalCenterId);
-    
+
     // Navigate to form page
     navigate(`/${formKey}/${finalPatientId}/${finalAppointmentId}`);
   };
@@ -209,16 +229,13 @@ const Index = () => {
             Audio Transcription App
           </CardTitle>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleFormSubmit} className="space-y-6">
             {/* Center Selection */}
             <div className="space-y-2">
               <Label htmlFor="center">Select Center</Label>
-              <Select 
-                value={centerId} 
-                onValueChange={setCenterId}
-              >
+              <Select value={centerId} onValueChange={setCenterId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a center" />
                 </SelectTrigger>
@@ -238,7 +255,7 @@ const Index = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Patient Search */}
             <div className="space-y-2">
               <Label htmlFor="patientSearch">Patient Search</Label>
@@ -254,29 +271,30 @@ const Index = () => {
                   <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin" />
                 )}
               </div>
-              
+
               {/* Patient Search Results */}
               {patients.length > 0 && (
                 <div className="bg-white border rounded-md mt-1 max-h-40 overflow-y-auto">
                   {patients.map((patient) => (
-                    <div 
+                    <div
                       key={patient._id}
                       className="p-2 hover:bg-gray-100 cursor-pointer"
                       onClick={() => selectPatient(patient)}
                     >
-                      {patient.profileData.firstName} {patient.profileData.lastName}
+                      {patient.profileData.firstName}{' '}
+                      {patient.profileData.lastName}
                     </div>
                   ))}
                 </div>
               )}
-              
+
               {/* Selected Patient Display */}
               {patientId && patientName && (
                 <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded flex justify-between items-center">
                   <span>{patientName}</span>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
+                  <Button
+                    type="button"
+                    variant="ghost"
                     size="sm"
                     onClick={() => {
                       setPatientId('');
@@ -288,12 +306,12 @@ const Index = () => {
                 </div>
               )}
             </div>
-            
+
             {/* Appointment Selection */}
             <div className="space-y-2">
               <Label htmlFor="appointmentId">Appointment</Label>
-              <Select 
-                value={appointmentId} 
+              <Select
+                value={appointmentId}
                 onValueChange={setAppointmentId}
                 disabled={!patientId}
               >
@@ -309,21 +327,20 @@ const Index = () => {
                   ) : (
                     appointments.map((appointment) => (
                       <SelectItem key={appointment._id} value={appointment._id}>
-                        {`Appointment #${appointment.seqNo} (${new Date(appointment.createdAt).toLocaleDateString()})`}
+                        {`Appointment #${appointment.seqNo} (${new Date(
+                          appointment.createdAt
+                        ).toLocaleDateString()})`}
                       </SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Form Type Selection */}
             <div className="space-y-2">
               <Label htmlFor="formKey">Form Type</Label>
-              <Select 
-                value={formKey} 
-                onValueChange={setFormKey}
-              >
+              <Select value={formKey} onValueChange={setFormKey}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a form type" />
                 </SelectTrigger>
@@ -336,13 +353,16 @@ const Index = () => {
                 </SelectContent>
               </Select>
             </div>
-            
-            <Button type="submit" className="w-full bg-[#DDFE71] hover:bg-[#DDFE71]/90 text-black">
+
+            <Button
+              type="submit"
+              className="w-full bg-[#DDFE71] hover:bg-[#DDFE71]/90 text-black"
+            >
               Start Session
             </Button>
           </form>
         </CardContent>
-        
+
         <CardFooter className="flex-col gap-2">
           <p className="text-sm text-muted-foreground text-center">
             Select a center, patient, appointment and form type to continue.

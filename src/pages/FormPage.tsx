@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -38,6 +39,13 @@ const FormPage = () => {
   const schema =
     formSchemas[formKey as keyof typeof formSchemas] || formSchemas.snc;
 
+  // Store formKey, patientId and appointmentId in localStorage for WebSocket access
+  useEffect(() => {
+    if (formKey) localStorage.setItem('formKey', formKey);
+    if (patientId) localStorage.setItem('userId', patientId);
+    if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
+  }, [formKey, patientId, appointmentId]);
+  
   // Load saved form data from localStorage
   useEffect(() => {
     const savedReport = localStorage.getItem('agentReport');
@@ -110,10 +118,6 @@ const FormPage = () => {
   useEffect(() => {
     connect();
 
-    // Store user/appointment IDs in localStorage
-    if (patientId) localStorage.setItem('userId', patientId);
-    if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
-
     // Automatically try to reconnect every 5 seconds if connection fails
     const reconnectInterval = setInterval(() => {
       if (!isConnected && !isConnecting) {
@@ -123,7 +127,7 @@ const FormPage = () => {
     }, 5000);
 
     return () => clearInterval(reconnectInterval);
-  }, [connect, isConnected, isConnecting, patientId, appointmentId]);
+  }, [connect, isConnected, isConnecting]);
 
   useEffect(() => {
     if (transcription) {
@@ -256,6 +260,7 @@ const FormPage = () => {
               onChange={setTranscription}
               isProcessing={isProcessing}
               className="mt-4"
+              autoProcess={handleProcessTranscription}
             />
 
             <div className="flex justify-center pt-2">
@@ -301,7 +306,7 @@ const FormPage = () => {
           </CardHeader>
 
           <CardContent className="p-6">
-            <ScrollArea className="h-[calc(100vh-400px)] pr-4 overflow-y-auto">
+            <ScrollArea className="h-[calc(100vh-400px)] pr-4">
               <div className="pb-6">
                 <FormRenderer
                   ref={formRendererRef}

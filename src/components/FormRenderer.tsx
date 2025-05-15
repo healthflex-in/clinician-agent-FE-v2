@@ -1,3 +1,4 @@
+
 import React, { useReducer, useCallback, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { defaultStateFromSchema, deepUpdateObject, getNestedValue, findDifferences } from '@/utils/schemaUtils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { MinusCircle, PlusCircle } from 'lucide-react';
+import { MinusCircle, PlusCircle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface FormRendererProps {
   schema: any;
@@ -38,6 +40,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
 }, ref) => {
   // Track which fields were updated by LLM
   const [llmUpdatedFields, setLlmUpdatedFields] = useState<Set<string>>(new Set());
+  const [suggestions, setSuggestions] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Initialize form state from schema or provided formData
@@ -94,6 +97,16 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
 
   // Method for LLM to update form data
   const updateFormWithLLMData = useCallback((llmData: any) => {
+    // Check if there are suggestions in the data
+    if (llmData.suggestions) {
+      setSuggestions(llmData.suggestions);
+      
+      // Auto-hide suggestions after 7 seconds
+      setTimeout(() => {
+        setSuggestions(null);
+      }, 7000);
+    }
+    
     dispatch({ 
       type: 'MERGE_LLM_DATA', 
       data: llmData,
@@ -354,6 +367,16 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(({
 
   return (
     <div className="w-full">
+      {suggestions && (
+        <Alert variant="default" className="mb-6 bg-slate-900 text-white border-slate-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Suggestions</AlertTitle>
+          <AlertDescription>
+            <div className="text-sm whitespace-pre-wrap">{suggestions}</div>
+          </AlertDescription>
+        </Alert>
+      )}
+    
       {llmUpdatedFields.size > 0 && (
         <Card className="mb-6 bg-yellow-50 border-yellow-300">
           <CardContent className="p-4">

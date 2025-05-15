@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 interface WebSocketOptions {
   url: string;
@@ -43,8 +44,10 @@ export function useWebSocket(options: WebSocketOptions) {
   const [suggestions, setSuggestions] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
   
   const wsRef = useRef<WebSocket | null>(null);
+  const autoProcessTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) return;
@@ -100,12 +103,31 @@ export function useWebSocket(options: WebSocketOptions) {
           // Handle different response types
           if (data.error) {
             console.error('Server error:', data.error);
+            toast({
+              title: "Error from server",
+              description: data.error,
+              variant: "destructive",
+            });
             setIsProcessing(false);
             return;
           }
           
           if (data.transcription !== undefined) {
             setTranscription(data.transcription);
+            
+            // Auto-process transcription after receiving it
+            if (autoProcessTimeoutRef.current) {
+              clearTimeout(autoProcessTimeoutRef.current);
+            }
+            
+            // Set a small delay before auto-processing to allow the user to see the transcription
+            autoProcessTimeoutRef.current = setTimeout(() => {
+              if (data.transcription && data.transcription.trim() !== '') {
+                console.log('Auto-processing transcription:', data.transcription);
+                processTranscription(data.transcription, formData);
+              }
+            }, 800); // Small delay to see the transcription before processing
+            
             setIsProcessing(false);
           }
           
@@ -118,6 +140,11 @@ export function useWebSocket(options: WebSocketOptions) {
             if (onFormData) {
               onFormData(formDataResponse);
             }
+            
+            toast({
+              title: "Form Updated",
+              description: "Form data has been processed and updated",
+            });
           }
 
           // Handle structured data format with suggestions
@@ -130,6 +157,11 @@ export function useWebSocket(options: WebSocketOptions) {
               if (onFormData) {
                 onFormData(data.formData);
               }
+              
+              toast({
+                title: "Form Updated",
+                description: "Form data has been processed and updated",
+              });
             }
             
             if (data.suggestions) {
@@ -148,19 +180,33 @@ export function useWebSocket(options: WebSocketOptions) {
         } catch (e) {
           console.error('Error parsing WebSocket message:', e);
           setIsProcessing(false);
+          toast({
+            title: "Processing Error",
+            description: "Failed to parse server response",
+            variant: "destructive",
+          });
         }
       };
     } catch (e) {
       setIsConnecting(false);
       setError(e as any);
       console.error('WebSocket connection error:', e);
+      toast({
+        title: "Connection Error",
+        description: "Failed to establish WebSocket connection",
+        variant: "destructive",
+      });
     }
-  }, [url, isConnecting, onOpen, onClose, onError, onFormData]);
+  }, [url, isConnecting, onOpen, onClose, onError, onFormData, toast, formData]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+    }
+    if (autoProcessTimeoutRef.current) {
+      clearTimeout(autoProcessTimeoutRef.current);
+      autoProcessTimeoutRef.current = null;
     }
   }, []);
 
@@ -233,6 +279,9 @@ export function useWebSocket(options: WebSocketOptions) {
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
+      }
+      if (autoProcessTimeoutRef.current) {
+        clearTimeout(autoProcessTimeoutRef.current);
       }
     };
   }, []);

@@ -55,7 +55,7 @@ export function useWebSocket(options: WebSocketOptions) {
     try {
       setIsConnecting(true);
       
-      // Hardcoded WebSocket URL as requested
+      // Use hardcoded WebSocket URL
       const wsUrl = 'ws://localhost:8080/ws';
       console.log('Attempting to connect to WebSocket at:', wsUrl);
       

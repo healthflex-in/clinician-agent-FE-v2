@@ -1,4 +1,5 @@
 
+// Only modifying the section that controls scrolling behavior
 import React, { useReducer, useCallback, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import { defaultStateFromSchema, deepUpdateObject, getNestedValue, findDifferences } from '@/utils/schemaUtils';
 import { Card, CardContent } from '@/components/ui/card';

@@ -43,6 +43,8 @@
   }
 
   body {
-    @apply bg-background text-foreground h-screen overflow-hidden;
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    overflow-y: auto;
   }
 }

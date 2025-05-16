@@ -1,41 +1,70 @@
 
-// Theme configuration with customizable colors
+// Theme configuration
 export const themeColors = {
-  // Primary colors
-  primary: "#9b87f5",  
-  primaryLight: "#b2a1f8",
-  primaryDark: "#7e69ab",
-  
-  // Text colors
-  textDark: "#1A1F2C", 
-  textMuted: "#8E9196",
-  textLight: "#FFFFFF",
-  
-  // UI colors
-  background: "#F6F7F9",
-  backgroundDark: "#E5E7EB",
-  card: "#FFFFFF",
-  border: "#E2E8F0",
-  
-  // Feedback colors
-  success: "#10B981",
-  warning: "#F59E0B",
-  error: "#EF4444",
-  info: "#3B82F6",
-  
-  // Status colors
-  recording: "#EF4444", 
-  processing: "#F59E0B",
-  completed: "#10B981",
-  
-  // Misc
-  highlight: "#F8F0FF",
-  shadow: "rgba(0, 0, 0, 0.1)",
+  primary: {
+    DEFAULT: '#3b82f6', // blue-500
+    dark: '#2563eb',    // blue-600
+    light: '#60a5fa',   // blue-400
+  },
+  secondary: {
+    DEFAULT: '#6b7280', // gray-500
+    dark: '#4b5563',    // gray-600
+    light: '#9ca3af',   // gray-400
+  },
+  background: {
+    DEFAULT: '#f9fafb', // gray-50
+    dark: '#f3f4f6',    // gray-100
+  },
+  card: {
+    DEFAULT: '#ffffff',
+    dark: '#f9fafb',    // gray-50
+  },
+  text: {
+    DEFAULT: '#374151', // gray-700
+    dark: '#1f2937',    // gray-800
+    light: '#6b7280',   // gray-500
+  },
+  border: {
+    DEFAULT: '#e5e7eb', // gray-200
+    dark: '#d1d5db',    // gray-300
+  },
+  success: {
+    DEFAULT: '#10b981', // emerald-500
+    light: '#d1fae5',   // emerald-100
+  },
+  warning: {
+    DEFAULT: '#f59e0b', // amber-500
+    light: '#fef3c7',   // amber-100
+  },
+  danger: {
+    DEFAULT: '#ef4444', // red-500
+    light: '#fee2e2',   // red-100
+  },
+  info: {
+    DEFAULT: '#3b82f6', // blue-500
+    light: '#dbeafe',   // blue-100
+  },
 };
 
-// Typography settings
-export const typography = {
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+// Current theme
+export const currentTheme = {
+  colors: themeColors,
+  spacing: {
+    xs: '0.25rem',
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+    '2xl': '3rem',
+  },
+  borderRadius: {
+    sm: '0.125rem',
+    DEFAULT: '0.25rem',
+    md: '0.375rem',
+    lg: '0.5rem',
+    xl: '0.75rem',
+    full: '9999px',
+  },
   fontSizes: {
     xs: '0.75rem',
     sm: '0.875rem',
@@ -45,52 +74,21 @@ export const typography = {
     '2xl': '1.5rem',
     '3xl': '1.875rem',
     '4xl': '2.25rem',
-  }
+  },
+  fontWeights: {
+    light: 300,
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+  },
 };
 
-// Spacing values
-export const spacing = {
-  xs: '0.25rem',
-  sm: '0.5rem',
-  md: '1rem',
-  lg: '1.5rem',
-  xl: '2rem',
-  '2xl': '3rem',
-  '3xl': '4rem',
-};
-
-// Rounded corners
-export const borderRadius = {
-  none: '0',
-  sm: '0.125rem',
-  md: '0.375rem',
-  lg: '0.5rem',
-  xl: '0.75rem',
-  full: '9999px',
-};
-
-// Shadows
-export const shadows = {
-  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-};
-
-// Animation timing
-export const animation = {
-  fast: '0.15s',
-  normal: '0.3s',
-  slow: '0.5s',
-};
-
-// Export full theme
-const theme = {
-  colors: themeColors,
-  typography,
-  spacing,
-  borderRadius,
-  shadows,
-  animation
-};
-
-export default theme;
+// Type definition for theme config
+export interface ThemeConfig {
+  colors: typeof themeColors;
+  spacing: Record<string, string>;
+  borderRadius: Record<string, string>;
+  fontSizes: Record<string, string>;
+  fontWeights: Record<string, number>;
+}

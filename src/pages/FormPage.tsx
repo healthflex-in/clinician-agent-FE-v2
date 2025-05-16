@@ -719,7 +719,7 @@ const FormPage = () => {
       toast({
         title: "Missing Data",
         description: "Please fill in the test name before submitting",
-        variant: "warning"
+        variant: "destructive" // Changed from "warning" to "destructive" to fix type error
       });
       return;
     }

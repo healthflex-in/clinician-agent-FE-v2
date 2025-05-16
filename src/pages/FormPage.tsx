@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -871,6 +870,19 @@ const FormPage = () => {
       });
     }
   };
+  
+  // Check if the form schema exists
+  useEffect(() => {
+    // Validate that the requested form exists in our schemas
+    if (formKey && !(formKey in formSchemas)) {
+      toast({
+        title: "Invalid Form",
+        description: `Form type '${formKey}' does not exist`,
+        variant: "destructive",
+      });
+      console.error(`Invalid form key: ${formKey}`);
+    }
+  }, [formKey, toast]);
 
   return (
     <ThemeProvider>
@@ -880,7 +892,7 @@ const FormPage = () => {
           <Card className="w-full bg-card">
             <CardHeader>
               <CardTitle className="text-center text-2xl font-bold">
-                {formKey.toUpperCase()} - {patientName || 'Patient'}
+                {formKey.charAt(0).toUpperCase() + formKey.slice(1)} - {patientName || 'Patient'}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -964,7 +976,7 @@ const FormPage = () => {
           <Card className="w-full shadow-md">
             <CardHeader>
               <CardTitle className="text-center">
-                {formKey.toUpperCase()} Form
+                {formKey.charAt(0).toUpperCase() + formKey.slice(1)} Form
               </CardTitle>
             </CardHeader>
 

@@ -272,6 +272,7 @@ const Index = () => {
     localStorage.setItem('appointmentId', appointmentId);
     localStorage.setItem('formKey', formKey);
     localStorage.setItem('centerId', centerId);
+    localStorage.setItem('userName', patientName);
 
     // Navigate to form page
     navigate(`/${formKey}/${patientId}/${appointmentId}`);

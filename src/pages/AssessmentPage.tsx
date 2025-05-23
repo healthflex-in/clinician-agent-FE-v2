@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,7 +85,7 @@ type AssessmentPageParams = {
 
 const AssessmentPage = () => {
   const { patientId, appointmentId } = useParams<AssessmentPageParams>();
-  
+
   const [transcriptText, setTranscriptText] = useState('');
   const [reportId, setReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -94,81 +93,54 @@ const AssessmentPage = () => {
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const { toast } = useToast();
-  
+
   // Initial assessment state
   const [assessment, setAssessment] = useState<AssessmentType>({
     plan: {
       advice: '',
       record: '',
-      plans: [{
-        exercise: '',
-        comments: '',
-        set: { repetitions: '', load: '', unit: '' },
-        duration: { value: '', unit: '' }
-      }]
+      plans: [
+        {
+          exercise: '',
+          comments: '',
+          set: { repetitions: '', load: '', unit: '' },
+          duration: { value: '', unit: '' },
+        },
+      ],
     },
     subjectiveAssessment: {
       assessment: '',
-      record: ''
+      record: '',
     },
     objectiveAssessment: {
       record: '',
-      tests: [{
-        testName: '',
-        unitName: '',
-        value: '',
-        left: '',
-        right: '',
-        comments: ''
-      }]
+      tests: [
+        {
+          testName: '',
+          unitName: '',
+          value: '',
+          left: '',
+          right: '',
+          comments: '',
+        },
+      ],
     },
     rpe: {
       value: '',
-      record: ''
-    }
+      record: '',
+    },
   });
 
   // Create agent report on initial load
   useEffect(() => {
     // Fetch patient details as soon as the component mounts
     const fetchPatientName = async () => {
-      if (!patientId) return;
-      
-      try {
-        // Try to get from localStorage first
-        const storedPatient = localStorage.getItem('selectedPatient');
-        if (storedPatient) {
-          const patientData = JSON.parse(storedPatient);
-          if (patientData && patientData.name) {
-            setPatientName(patientData.name);
-            return;
-          }
-        }
-        
-        // If not in localStorage, try to fetch from API
-        const query = `
-          query GetPatientById($patientId: ObjectID!) {
-            getPatientById(patientId: $patientId) {
-              _id
-              name
-            }
-          }
-        `;
-        
-        const variables = { patientId };
-        
-        const result = await graphqlRequest(query, variables);
-        if (result && result.getPatientById && result.getPatientById.name) {
-          setPatientName(result.getPatientById.name);
-        }
-      } catch (error) {
-        console.error('Error fetching patient name:', error);
-      }
+      setPatientName(localStorage.getItem('userName'));
     };
-    
+
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
-      
+
       try {
         // Check if report already exists in localStorage
         const existingReport = localStorage.getItem('agentReport');
@@ -177,19 +149,19 @@ const AssessmentPage = () => {
             const parsedReport = JSON.parse(existingReport) as AgentReportType;
             if (parsedReport._id) {
               setReportId(parsedReport._id);
-              
+
               // Also set assessment data if it exists
               if (parsedReport.assessment) {
                 setAssessment(parsedReport.assessment);
               }
-              
+
               return; // Report already exists
             }
           } catch (e) {
             console.error('Error parsing existing report:', e);
           }
         }
-        
+
         // Creating a new report if none exists
         const mutation = `
           mutation CreateAgentReport($input: CreateAgentReportInput!) {
@@ -242,7 +214,8 @@ const AssessmentPage = () => {
         `;
 
         // Get center ID from localStorage or use default
-        const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
+        const centerId =
+          localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
 
         const variables = {
           input: {
@@ -253,19 +226,26 @@ const AssessmentPage = () => {
         };
 
         const result = await graphqlRequest(mutation, variables);
-        
-        if (result && result.createAgentReport && result.createAgentReport._id) {
+
+        if (
+          result &&
+          result.createAgentReport &&
+          result.createAgentReport._id
+        ) {
           // Save the report ID
           setReportId(result.createAgentReport._id);
-          
+
           // Save the full report in localStorage
-          localStorage.setItem('agentReport', JSON.stringify(result.createAgentReport));
-          
+          localStorage.setItem(
+            'agentReport',
+            JSON.stringify(result.createAgentReport)
+          );
+
           toast({
-            title: "Report Created",
-            description: "New report initialized successfully",
+            title: 'Report Created',
+            description: 'New report initialized successfully',
           });
-          
+
           // Set initial form data if it exists
           if (result.createAgentReport.assessment) {
             setAssessment(result.createAgentReport.assessment);
@@ -274,9 +254,9 @@ const AssessmentPage = () => {
       } catch (error) {
         console.error('Error creating initial report:', error);
         toast({
-          title: "Failed to Create Report",
-          description: "Could not initialize the form data",
-          variant: "destructive",
+          title: 'Failed to Create Report',
+          description: 'Could not initialize the form data',
+          variant: 'destructive',
         });
       }
     };
@@ -355,71 +335,80 @@ const AssessmentPage = () => {
   }, [transcription]);
 
   // Handle incoming form data from the WebSocket
-  const handleIncomingFormData = useCallback((data: any) => {
-    if (!data) return;
-    
-    try {
-      // If we have selected sections, only update those
-      const sectionsToUpdate = selectedSections.length > 0 
-        ? selectedSections 
-        : currentSectionId 
-          ? [currentSectionId] 
-          : [];
-          
-      // Update assessment based on sectionsToUpdate
-      let updatedAssessment = {...assessment};
-      
-      if (sectionsToUpdate.length > 0) {
-        // Only update selected sections
-        sectionsToUpdate.forEach(sectionId => {
-          const section = sectionId.split('.').pop() || '';
-          
-          if (data[section]) {
-            // Use path to set nested values
-            if (section === 'plan') {
-              updatedAssessment.plan = {...updatedAssessment.plan, ...data.plan};
-            } else if (section === 'subjectiveAssessment') {
-              updatedAssessment.subjectiveAssessment = {...updatedAssessment.subjectiveAssessment, ...data.subjectiveAssessment};
-            } else if (section === 'objectiveAssessment') {
-              updatedAssessment.objectiveAssessment = {...updatedAssessment.objectiveAssessment, ...data.objectiveAssessment};
-            } else if (section === 'rpe') {
-              updatedAssessment.rpe = {...updatedAssessment.rpe, ...data.rpe};
+  const handleIncomingFormData = useCallback(
+    (data: any) => {
+      if (!data) return;
+
+      try {
+        // If we have selected sections, only update those
+        const sectionsToUpdate =
+          selectedSections.length > 0
+            ? selectedSections
+            : currentSectionId
+            ? [currentSectionId]
+            : [];
+
+        // Update assessment based on sectionsToUpdate
+        let updatedAssessment = { ...assessment };
+
+        if (sectionsToUpdate.length > 0) {
+          // Only update selected sections
+          sectionsToUpdate.forEach((sectionId) => {
+            const section = sectionId.split('.').pop() || '';
+
+            if (data.formData[section]) {
+              // Use path to set nested values
+              if (section === 'plan') {
+                updatedAssessment.plan = {
+                  ...updatedAssessment.plan,
+                  ...data.formData.plan,
+                };
+              } else if (section === 'subjectiveAssessment') {
+                updatedAssessment.subjectiveAssessment = {
+                  ...updatedAssessment.subjectiveAssessment,
+                  ...data.formData.subjectiveAssessment,
+                };
+              } else if (section === 'objectiveAssessment') {
+                updatedAssessment.objectiveAssessment = {
+                  ...updatedAssessment.objectiveAssessment,
+                  ...data.formData.objectiveAssessment,
+                };
+              } else if (section === 'rpe') {
+                updatedAssessment.rpe = {
+                  ...updatedAssessment.rpe,
+                  ...data.formData.rpe,
+                };
+              }
             }
-          }
-        });
-      } else {
-        // No specific section selected, update all
-        if (data.assessment) {
-          // If we received a full assessment object
-          updatedAssessment = {...updatedAssessment, ...data.assessment};
+          });
         } else {
-          // If we received individual sections
-          if (data.plan) updatedAssessment.plan = {...updatedAssessment.plan, ...data.plan};
-          if (data.subjectiveAssessment) updatedAssessment.subjectiveAssessment = {...updatedAssessment.subjectiveAssessment, ...data.subjectiveAssessment};
-          if (data.objectiveAssessment) updatedAssessment.objectiveAssessment = {...updatedAssessment.objectiveAssessment, ...data.objectiveAssessment};
-          if (data.rpe) updatedAssessment.rpe = {...updatedAssessment.rpe, ...data.rpe};
+          // No specific section selected, update all
+          if (data.formData) {
+            // If we received a full assessment object
+            updatedAssessment = { ...updatedAssessment, ...data.formData };
+          }
         }
+
+        setAssessment(updatedAssessment);
+
+        // Save to localStorage
+        updateLocalStorage(updatedAssessment);
+
+        toast({
+          title: 'Form Updated',
+          description: 'Form data has been processed and updated',
+        });
+      } catch (error) {
+        console.error('Error processing form data:', error);
+        toast({
+          title: 'Processing Error',
+          description: 'Failed to process form data',
+          variant: 'destructive',
+        });
       }
-      
-      setAssessment(updatedAssessment);
-      
-      // Save to localStorage
-      updateLocalStorage(updatedAssessment);
-      
-      toast({
-        title: "Form Updated",
-        description: "Form data has been processed and updated",
-      });
-      
-    } catch (error) {
-      console.error('Error processing form data:', error);
-      toast({
-        title: "Processing Error",
-        description: "Failed to process form data",
-        variant: "destructive",
-      });
-    }
-  }, [assessment, toast, selectedSections, currentSectionId]);
+    },
+    [assessment, toast, selectedSections, currentSectionId]
+  );
 
   // Save updated form data to localStorage
   const updateLocalStorage = (updatedAssessment: AssessmentType) => {
@@ -449,7 +438,7 @@ const AssessmentPage = () => {
 
     // Send audio with current form data
     const sent = sendAudio(base64Audio, assessment);
-    
+
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -460,7 +449,10 @@ const AssessmentPage = () => {
   };
 
   // Handle section-specific audio recording
-  const handleSectionAudioEncoded = (base64Audio: string, sectionId: string) => {
+  const handleSectionAudioEncoded = (
+    base64Audio: string,
+    sectionId: string
+  ) => {
     if (!isConnected) {
       toast({
         title: 'Not connected',
@@ -472,11 +464,11 @@ const AssessmentPage = () => {
     }
 
     setCurrentSectionId(sectionId);
-    
+
     // Extract the section path
     const sectionPath = sectionId.split('.');
     const sectionName = sectionPath[sectionPath.length - 1];
-    
+
     // Get the section data
     const sectionData: any = {};
     if (sectionName === 'plan') {
@@ -491,7 +483,7 @@ const AssessmentPage = () => {
 
     // Send audio with section form data
     const sent = sendAudio(base64Audio, sectionData);
-    
+
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -514,13 +506,13 @@ const AssessmentPage = () => {
 
     // Prepare data based on selected sections or all data
     const formData: any = {};
-    
+
     if (selectedSections.length > 0) {
       // Only include selected sections
-      selectedSections.forEach(sectionId => {
+      selectedSections.forEach((sectionId) => {
         const sectionPath = sectionId.split('.');
         const sectionName = sectionPath[sectionPath.length - 1];
-        
+
         if (sectionName === 'plan') {
           formData.plan = assessment.plan;
         } else if (sectionName === 'subjectiveAssessment') {
@@ -538,7 +530,7 @@ const AssessmentPage = () => {
 
     // Send transcription with form data
     const sent = processTranscription(transcriptText, formData);
-    
+
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -551,13 +543,13 @@ const AssessmentPage = () => {
   // Process section-specific transcription
   const handleSectionTranscriptProcess = (text: string, sectionId: string) => {
     if (!text.trim()) return;
-    
+
     setCurrentSectionId(sectionId);
-    
+
     // Extract the section path
     const sectionPath = sectionId.split('.');
     const sectionName = sectionPath[sectionPath.length - 1];
-    
+
     // Get the section data
     const sectionData: any = {};
     if (sectionName === 'plan') {
@@ -572,7 +564,7 @@ const AssessmentPage = () => {
 
     // Send transcription with section form data
     const sent = processTranscription(text, sectionData);
-    
+
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -591,9 +583,9 @@ const AssessmentPage = () => {
   // Handle section selection
   const handleSectionSelect = (sectionId: string, selected: boolean) => {
     if (selected) {
-      setSelectedSections(prev => [...prev, sectionId]);
+      setSelectedSections((prev) => [...prev, sectionId]);
     } else {
-      setSelectedSections(prev => prev.filter(id => id !== sectionId));
+      setSelectedSections((prev) => prev.filter((id) => id !== sectionId));
     }
   };
 
@@ -601,22 +593,22 @@ const AssessmentPage = () => {
   const handleSectionSubmit = async (sectionId: string) => {
     if (!reportId || !appointmentId) {
       toast({
-        title: "Missing Information",
-        description: "Report ID or Appointment ID is missing",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Report ID or Appointment ID is missing',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     // Extract the section path
     const sectionPath = sectionId.split('.');
     const sectionName = sectionPath[sectionPath.length - 1];
-    
+
     // Section data to submit
     const input: any = {
-      assessment: {}
+      assessment: {},
     };
-    
+
     // Add the specific section to the input
     if (sectionName === 'plan') {
       input.assessment.plan = assessment.plan;
@@ -627,11 +619,11 @@ const AssessmentPage = () => {
     } else if (sectionName === 'rpe') {
       input.assessment.rpe = assessment.rpe;
     }
-    
+
     if (patientId) {
       input.userId = patientId;
     }
-    
+
     const mutation = `
       mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
         updateAgentReport(appointmentId: $appointmentId, input: $input) {
@@ -640,79 +632,87 @@ const AssessmentPage = () => {
         }
       }
     `;
-    
+
     try {
       const result = await graphqlRequest(mutation, {
         appointmentId,
-        input
+        input,
       });
-      
+
       if (result && result.updateAgentReport) {
         toast({
-          title: "Section Submitted",
+          title: 'Section Submitted',
           description: `${sectionName} section has been saved`,
         });
       }
     } catch (error) {
       console.error('Error submitting section:', error);
       toast({
-        title: "Submission Failed",
-        description: "There was an error submitting this section",
-        variant: "destructive"
+        title: 'Submission Failed',
+        description: 'There was an error submitting this section',
+        variant: 'destructive',
       });
     }
   };
 
   // Handle section reset
   const handleSectionReset = (sectionId: string) => {
-    if (confirm("Are you sure you want to reset this section? All your data will be lost.")) {
+    if (
+      confirm(
+        'Are you sure you want to reset this section? All your data will be lost.'
+      )
+    ) {
       // Extract the section path
       const sectionPath = sectionId.split('.');
       const sectionName = sectionPath[sectionPath.length - 1];
-      
+
       // Create a new assessment with the reset section
-      const updatedAssessment = {...assessment};
-      
+      const updatedAssessment = { ...assessment };
+
       if (sectionName === 'plan') {
         updatedAssessment.plan = {
           advice: '',
           record: '',
-          plans: [{
-            exercise: '',
-            comments: '',
-            set: { repetitions: '', load: '', unit: '' },
-            duration: { value: '', unit: '' }
-          }]
+          plans: [
+            {
+              exercise: '',
+              comments: '',
+              set: { repetitions: '', load: '', unit: '' },
+              duration: { value: '', unit: '' },
+            },
+          ],
         };
       } else if (sectionName === 'subjectiveAssessment') {
         updatedAssessment.subjectiveAssessment = {
           assessment: '',
-          record: ''
+          record: '',
         };
       } else if (sectionName === 'objectiveAssessment') {
         updatedAssessment.objectiveAssessment = {
           record: '',
-          tests: [{
-            testName: '',
-            unitName: '',
-            value: '',
-            left: '',
-            right: '',
-            comments: ''
-          }]
+          tests: [
+            {
+              testName: '',
+              unitName: '',
+              value: '',
+              left: '',
+              right: '',
+              comments: '',
+            },
+          ],
         };
       } else if (sectionName === 'rpe') {
         updatedAssessment.rpe = {
           value: '',
-          record: ''
+          record: '',
         };
       }
-      
+
       setAssessment(updatedAssessment);
       updateLocalStorage(updatedAssessment);
-      
+
       toast({
-        title: "Section Reset",
+        title: 'Section Reset',
         description: `${sectionName} section has been reset`,
       });
     }
@@ -722,15 +722,15 @@ const AssessmentPage = () => {
   const handleFormSubmit = async () => {
     if (!reportId || !appointmentId) {
       toast({
-        title: "Missing Information",
-        description: "Report ID or Appointment ID is missing",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Report ID or Appointment ID is missing',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const mutation = `
         mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
@@ -782,53 +782,57 @@ const AssessmentPage = () => {
           }
         }
       `;
-      
+
       const input: any = {
-        assessment: assessment
+        assessment: assessment,
       };
-      
+
       // Add userId if patientId is available
       if (patientId) {
         input.userId = patientId;
       }
-      
+
       const variables = {
         appointmentId,
-        input
+        input,
       };
-      
+
       const result = await graphqlRequest(mutation, variables);
-      
+
       if (result && result.updateAgentReport) {
         toast({
-          title: "Form Submitted",
-          description: "Your form has been successfully saved",
+          title: 'Form Submitted',
+          description: 'Your form has been successfully saved',
         });
-        
+
         // Update localStorage with the latest data
         const savedReport = localStorage.getItem('agentReport');
         if (savedReport) {
           try {
             const reportData = JSON.parse(savedReport) as AgentReportType;
-            
+
             reportData.assessment = assessment;
             reportData.updatedAt = result.updateAgentReport.updatedAt;
             reportData.version = result.updateAgentReport.version;
             reportData.isActive = result.updateAgentReport.isActive;
-            reportData.isFilledCompletely = result.updateAgentReport.isFilledCompletely;
-            
+            reportData.isFilledCompletely =
+              result.updateAgentReport.isFilledCompletely;
+
             localStorage.setItem('agentReport', JSON.stringify(reportData));
           } catch (error) {
-            console.error('Error updating localStorage after form submission:', error);
+            console.error(
+              'Error updating localStorage after form submission:',
+              error
+            );
           }
         }
       }
     } catch (error) {
       console.error('Error submitting form:', error);
       toast({
-        title: "Submission Failed",
-        description: "There was an error submitting your form",
-        variant: "destructive"
+        title: 'Submission Failed',
+        description: 'There was an error submitting your form',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -837,95 +841,111 @@ const AssessmentPage = () => {
 
   // Reset form to initial state
   const handleFormReset = () => {
-    if (confirm("Are you sure you want to reset this form? All your data will be lost.")) {
+    if (
+      confirm(
+        'Are you sure you want to reset this form? All your data will be lost.'
+      )
+    ) {
       // Reset to initial assessment
       const initialAssessment = {
         plan: {
           advice: '',
           record: '',
-          plans: [{
-            exercise: '',
-            comments: '',
-            set: { repetitions: '', load: '', unit: '' },
-            duration: { value: '', unit: '' }
-          }]
+          plans: [
+            {
+              exercise: '',
+              comments: '',
+              set: { repetitions: '', load: '', unit: '' },
+              duration: { value: '', unit: '' },
+            },
+          ],
         },
         subjectiveAssessment: {
           assessment: '',
-          record: ''
+          record: '',
         },
         objectiveAssessment: {
           record: '',
-          tests: [{
-            testName: '',
-            unitName: '',
-            value: '',
-            left: '',
-            right: '',
-            comments: ''
-          }]
+          tests: [
+            {
+              testName: '',
+              unitName: '',
+              value: '',
+              left: '',
+              right: '',
+              comments: '',
+            },
+          ],
         },
         rpe: {
           value: '',
-          record: ''
-        }
+          record: '',
+        },
       };
-      
+
       setAssessment(initialAssessment);
       setTranscriptText('');
       setSelectedSections([]);
       setCurrentSectionId(null);
       updateLocalStorage(initialAssessment);
-      
+
       toast({
-        title: "Form Reset",
-        description: "All form data has been reset",
+        title: 'Form Reset',
+        description: 'All form data has been reset',
       });
     }
   };
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen flex flex-col items-center p-4 bg-gradient-to-b from-primary/5 to-background">
-        <div className="w-full max-w-4xl space-y-6 pb-16">
+      <h2>Assement Page</h2>
+      <div className="min-h-screen bg-gradient-to-br from-primary to-secondary text-white py-8">
+        <div className="max-w-4xl mx-auto px-4 space-y-8">
           {/* Header with patient info */}
-          <Card className="w-full bg-card">
+          <Card className="bg-white/10 border border-white/20 shadow-lg">
             <CardHeader>
-              <CardTitle className="text-center text-2xl font-bold">
-                Assessment - {patientName || 'Patient'}
+              <CardTitle className="text-2xl font-bold text-center">
+                Assessment - {patientName}
               </CardTitle>
             </CardHeader>
           </Card>
 
           {/* Audio recorder and transcription section */}
-          <Card className="w-full shadow-md">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-center">Voice Recorder</CardTitle>
+          <Card className="bg-white/10 border border-white/20 shadow-lg">
+            <CardHeader className="border-b border-white/20">
+              <CardTitle className="text-xl font-semibold text-center">
+                Voice Recorder
+              </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-6">
               {!isConnected && !isConnecting && (
-                <Alert variant="destructive" className="bg-red-50 border-red-200">
-                  <WifiOff className="h-4 w-4" />
-                  <AlertDescription>
-                    Cannot connect to the transcription service. Please check your
-                    network connection.
+                <Alert
+                  variant="destructive"
+                  className="bg-red-500/20 border border-red-500/50"
+                >
+                  <WifiOff className="h-5 w-5 text-red-500" />
+                  <AlertDescription className="text-red-500">
+                    Cannot connect to the transcription service. Please check
+                    your network connection.
                   </AlertDescription>
                 </Alert>
               )}
 
               {suggestions && (
-                <SuggestionBox 
-                  suggestions={suggestions} 
-                  onClose={() => setSuggestions(null)} 
+                <SuggestionBox
+                  suggestions={suggestions}
+                  onClose={() => setSuggestions(null)}
+                  className="bg-white/10 border border-white/20"
                 />
               )}
 
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center py-6">
                 <AudioRecorder
                   onAudioEncoded={handleAudioEncoded}
                   isProcessing={isProcessing}
                   label="Record for all sections"
+                  className="bg-white/10 border border-white/20 text-white hover:bg-white/20"
                 />
               </div>
 
@@ -933,12 +953,12 @@ const AssessmentPage = () => {
                 value={transcriptText}
                 onChange={setTranscription}
                 isProcessing={isProcessing}
-                className="mt-4"
+                className="bg-white/5 border border-white/20 text-white"
                 autoProcess={handleProcessTranscription}
                 autoProcessDelay={5000}
               />
 
-              <div className="flex justify-center pt-2">
+              <div className="flex justify-center pt-4">
                 <Button
                   onClick={handleProcessTranscription}
                   disabled={
@@ -946,10 +966,10 @@ const AssessmentPage = () => {
                   }
                   variant={
                     isProcessing || !transcriptText.trim() || !isConnected
-                      ? "outline"
-                      : "default"
+                      ? 'outline'
+                      : 'default'
                   }
-                  className="px-6"
+                  className="bg-accent hover:bg-accent-dark text-white px-6 py-2 rounded-lg"
                 >
                   Process Transcription
                 </Button>
@@ -958,15 +978,15 @@ const AssessmentPage = () => {
           </Card>
 
           {/* Form section */}
-          <Card className="w-full shadow-md">
-            <CardHeader>
-              <CardTitle className="text-center">
+          <Card className="bg-white/10 border border-white/20 shadow-lg">
+            <CardHeader className="border-b border-white/20">
+              <CardTitle className="text-xl font-semibold text-center">
                 Assessment Form
               </CardTitle>
             </CardHeader>
 
             <CardContent className="p-6">
-              <div className="pb-6">
+              <div className="space-y-8">
                 <AssessmentForm
                   formData={assessment}
                   onChange={handleFormChange}
@@ -979,6 +999,10 @@ const AssessmentPage = () => {
                   onReset={handleFormReset}
                   onSectionSubmit={handleSectionSubmit}
                   onSectionReset={handleSectionReset}
+                  className="bg-white/5 border border-white/20 p-4 rounded-lg"
+                  labelClassName="text-white"
+                  inputClassName="bg-white/10 border border-white/20 text-white"
+                  buttonClassName="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg"
                 />
               </div>
             </CardContent>

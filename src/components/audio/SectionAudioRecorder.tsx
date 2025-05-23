@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Loader } from 'lucide-react';
@@ -23,9 +22,12 @@ const SectionAudioRecorder: React.FC<SectionAudioRecorderProps> = ({
 }) => {
   const { toast } = useToast();
 
-  const handleAudioEncoded = useCallback((base64Audio: string) => {
-    onAudioEncoded(base64Audio, sectionId);
-  }, [onAudioEncoded, sectionId]);
+  const handleAudioEncoded = useCallback(
+    (base64Audio: string) => {
+      onAudioEncoded(base64Audio, sectionId);
+    },
+    [onAudioEncoded, sectionId]
+  );
 
   return (
     <div className="flex flex-col items-center">

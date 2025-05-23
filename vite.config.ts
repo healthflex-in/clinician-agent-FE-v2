@@ -1,4 +1,3 @@
-
 // vite.config.ts with CORS proxy added to your existing configuration
 
 import { defineConfig } from 'vite';
@@ -9,7 +8,7 @@ import { componentTagger } from 'lovable-tagger';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    port: 8080,
+    port: 9090,
     proxy: {
       '/api/graphql': {
         target: 'https://devapi.stance.health',

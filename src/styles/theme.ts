@@ -1,48 +1,47 @@
-
 // Theme configuration
 export const themeColors = {
   primary: {
     DEFAULT: '#3b82f6', // blue-500
-    dark: '#2563eb',    // blue-600
-    light: '#60a5fa',   // blue-400
+    dark: '#2563eb', // blue-600
+    light: '#60a5fa', // blue-400
   },
   secondary: {
     DEFAULT: '#6b7280', // gray-500
-    dark: '#4b5563',    // gray-600
-    light: '#9ca3af',   // gray-400
+    dark: '#4b5563', // gray-600
+    light: '#9ca3af', // gray-400
   },
   background: {
     DEFAULT: '#f9fafb', // gray-50
-    dark: '#f3f4f6',    // gray-100
+    dark: '#f3f4f6', // gray-100
   },
   card: {
     DEFAULT: '#ffffff',
-    dark: '#f9fafb',    // gray-50
+    dark: '#f9fafb', // gray-50
   },
   text: {
     DEFAULT: '#374151', // gray-700
-    dark: '#1f2937',    // gray-800
-    light: '#6b7280',   // gray-500
+    dark: '#1f2937', // gray-800
+    light: '#6b7280', // gray-500
   },
   border: {
     DEFAULT: '#e5e7eb', // gray-200
-    dark: '#d1d5db',    // gray-300
+    dark: '#d1d5db', // gray-300
   },
   success: {
     DEFAULT: '#10b981', // emerald-500
-    light: '#d1fae5',   // emerald-100
+    light: '#d1fae5', // emerald-100
   },
   warning: {
     DEFAULT: '#f59e0b', // amber-500
-    light: '#fef3c7',   // amber-100
+    light: '#fef3c7', // amber-100
   },
   danger: {
     DEFAULT: '#ef4444', // red-500
-    light: '#fee2e2',   // red-100
+    light: '#fee2e2', // red-100
   },
   info: {
     DEFAULT: '#3b82f6', // blue-500
-    light: '#dbeafe',   // blue-100
+    light: '#dbeafe', // blue-100
   },
 };
 

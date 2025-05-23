@@ -1,4 +1,3 @@
-
 import React from 'react';
 import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -11,8 +10,10 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<IndexPage />} />
-        <Route path="/form/:formKey/:patientId/:appointmentId" element={<FormPage />} />
-        <Route path="/:formKey/:patientId/:appointmentId" element={<FormPage />} />
+        <Route
+          path="/:formKey/:patientId/:appointmentId"
+          element={<FormPage />}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>

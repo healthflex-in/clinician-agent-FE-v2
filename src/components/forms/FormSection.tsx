@@ -1,8 +1,13 @@
-
 import React, { useState } from 'react';
 import SectionAudioRecorder from '../audio/SectionAudioRecorder';
 import SectionTranscriptionBox from './SectionTranscriptionBox';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Save, RefreshCw } from 'lucide-react';
@@ -34,7 +39,7 @@ const FormSection: React.FC<FormSectionProps> = ({
   onSelectChange,
   showAudioControls = true,
   onSectionSubmit,
-  onSectionReset
+  onSectionReset,
 }) => {
   const [transcription, setTranscription] = useState('');
 
@@ -56,10 +61,11 @@ const FormSection: React.FC<FormSectionProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {selectable && (
-              <Checkbox 
+              <Checkbox
                 checked={selected}
                 onCheckedChange={(checked) => {
-                  if (onSelectChange) onSelectChange(sectionId, checked === true);
+                  if (onSelectChange)
+                    onSelectChange(sectionId, checked === true);
                 }}
                 id={`section-checkbox-${sectionId}`}
                 className="h-4 w-4"
@@ -67,10 +73,10 @@ const FormSection: React.FC<FormSectionProps> = ({
             )}
             <CardTitle className="text-lg font-semibold">{title}</CardTitle>
           </div>
-          
+
           {showAudioControls && (
             <div className="flex items-center gap-2">
-              <SectionAudioRecorder 
+              <SectionAudioRecorder
                 sectionId={sectionId}
                 onAudioEncoded={handleAudioEncoded}
                 isProcessing={isProcessing}
@@ -98,18 +104,16 @@ const FormSection: React.FC<FormSectionProps> = ({
             />
           </div>
         )}
-        
-        <div className="form-fields">
-          {children}
-        </div>
+
+        <div className="form-fields">{children}</div>
       </CardContent>
 
       {(onSectionSubmit || onSectionReset) && (
         <CardFooter className="flex justify-end space-x-2 py-2">
           {onSectionReset && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onSectionReset(sectionId)}
               className="flex items-center gap-1"
             >
@@ -118,8 +122,8 @@ const FormSection: React.FC<FormSectionProps> = ({
             </Button>
           )}
           {onSectionSubmit && (
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => onSectionSubmit(sectionId)}
               className="flex items-center gap-1"
             >

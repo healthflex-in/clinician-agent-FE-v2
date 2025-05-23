@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader } from 'lucide-react';
@@ -27,15 +26,15 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
   autoProcessDelay = 5000,
   sectionId,
   className = '',
-  placeholder = "Section transcription will appear here...",
-  label = "Transcription"
+  placeholder = 'Section transcription will appear here...',
+  label = 'Transcription',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   const [userEditing, setUserEditing] = useState(false);
   const lastEditTimestamp = useRef<number>(0);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Handle auto-resizing of textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -43,19 +42,19 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [value]);
-  
+
   // Track user activity and auto-process after inactivity
   useEffect(() => {
     // When value changes, note it as a potential edit
     if (value) {
       lastEditTimestamp.current = Date.now();
-      
+
       // Clear any existing timeout
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current);
         processingTimeoutRef.current = null;
       }
-      
+
       // Set a new timeout to check for inactivity
       if (autoProcess && !isProcessing && !isAutoProcessing) {
         processingTimeoutRef.current = setTimeout(() => {
@@ -65,7 +64,7 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
             setIsAutoProcessing(true);
             onProcess();
             setUserEditing(false);
-            
+
             setTimeout(() => {
               setIsAutoProcessing(false);
             }, 800);
@@ -73,14 +72,21 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
         }, autoProcessDelay);
       }
     }
-    
+
     return () => {
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current);
       }
     };
-  }, [value, autoProcess, isProcessing, isAutoProcessing, autoProcessDelay, onProcess]);
-  
+  }, [
+    value,
+    autoProcess,
+    isProcessing,
+    isAutoProcessing,
+    autoProcessDelay,
+    onProcess,
+  ]);
+
   // Handle user interaction with the textarea
   const handleUserInteraction = () => {
     setUserEditing(true);
@@ -90,17 +96,17 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
   return (
     <div className={`relative w-full ${className}`}>
       {label && (
-        <label 
+        <label
           htmlFor={`section-transcription-${sectionId}`}
           className="block text-sm font-medium text-text-dark mb-1"
         >
-          {label} {isAutoProcessing && "(Auto-processing...)"}
+          {label} {isAutoProcessing && '(Auto-processing...)'}
         </label>
       )}
       <Textarea
         id={`section-transcription-${sectionId}`}
         ref={textareaRef}
-        placeholder={isProcessing ? "Processing audio..." : placeholder}
+        placeholder={isProcessing ? 'Processing audio...' : placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleUserInteraction}
@@ -119,11 +125,11 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
           </div>
         </div>
       )}
-      
+
       <div className="flex justify-end mt-2">
-        <Button 
-          onClick={onProcess} 
-          size="sm" 
+        <Button
+          onClick={onProcess}
+          size="sm"
           variant="secondary"
           disabled={isProcessing || !value.trim()}
         >

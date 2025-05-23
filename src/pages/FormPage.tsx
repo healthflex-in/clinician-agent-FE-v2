@@ -161,17 +161,6 @@ const FormPage = () => {
     }
   };
 
-  // Handle continuing without microphone
-  const handleContinueWithoutMicrophone = () => {
-    setMicrophonePermission('denied');
-    setShowPermissionDialog(false);
-    toast({
-      title: 'Continuing without microphone',
-      description: 'Voice recording features will be disabled',
-      variant: 'destructive',
-    });
-  };
-
   // Create agent report on initial load - only after permission is checked
   useEffect(() => {
     // Only proceed if microphone permission has been resolved (either granted or denied)
@@ -821,13 +810,6 @@ const FormPage = () => {
                 className="w-full sm:w-auto"
               >
                 Allow Microphone Access
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleContinueWithoutMicrophone}
-                className="w-full sm:w-auto"
-              >
-                Continue Without Microphone
               </Button>
             </DialogFooter>
           </DialogContent>

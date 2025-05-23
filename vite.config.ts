@@ -8,7 +8,7 @@ import { componentTagger } from 'lovable-tagger';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    port: 9090,
+    port: 9000,
     proxy: {
       '/api/graphql': {
         target: 'https://devapi.stance.health',

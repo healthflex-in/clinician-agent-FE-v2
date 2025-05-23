@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader } from 'lucide-react';
@@ -9,6 +8,7 @@ interface TranscriptBoxProps {
   isProcessing: boolean;
   className?: string;
   autoProcess?: () => void;
+  autoProcessDelay?: number;
 }
 
 const TranscriptBox: React.FC<TranscriptBoxProps> = ({
@@ -16,11 +16,12 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
   onChange,
   isProcessing,
   className,
-  autoProcess
+  autoProcess,
+  autoProcessDelay = 800,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
-  
+
   // Handle auto-resizing of textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -28,39 +29,51 @@ const TranscriptBox: React.FC<TranscriptBoxProps> = ({
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [value]);
-  
+
   // Handle auto-processing of transcriptions
   useEffect(() => {
-    if (value && value.trim() !== '' && autoProcess && !isAutoProcessing && !isProcessing) {
+    if (
+      value &&
+      value.trim() !== '' &&
+      autoProcess &&
+      !isAutoProcessing &&
+      !isProcessing
+    ) {
       setIsAutoProcessing(true);
-      
+
       // Small delay to allow the user to see the transcription before auto-processing
       const timer = setTimeout(() => {
         autoProcess();
         setIsAutoProcessing(false);
-      }, 800);
-      
+      }, autoProcessDelay);
+
       return () => clearTimeout(timer);
     }
-  }, [value, autoProcess, isAutoProcessing, isProcessing]);
+  }, [value, autoProcess, isAutoProcessing, isProcessing, autoProcessDelay]);
 
   return (
     <div className={`relative w-full ${className}`}>
-      <label 
+      <label
         htmlFor="transcription"
         className="block text-sm font-medium text-[#DDFE71] mb-1"
       >
-        Transcription {isAutoProcessing && "(Auto-processing...)"}
+        Transcription {isAutoProcessing && '(Auto-processing...)'}
       </label>
       <Textarea
         id="transcription"
         ref={textareaRef}
-        placeholder={isProcessing ? "Processing audio..." : "Transcription will appear here..."}
+        placeholder={
+          isProcessing
+            ? 'Processing audio...'
+            : 'Transcription will appear here...'
+        }
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={`min-h-[120px] w-full p-4 bg-white border-[#DDFE71]/30 focus:border-[#DDFE71] 
                    rounded-lg shadow-sm resize-none transition-all duration-200 ease-in-out
-                   ${isProcessing || isAutoProcessing ? 'bg-secondary/50' : ''}`}
+                   ${
+                     isProcessing || isAutoProcessing ? 'bg-secondary/50' : ''
+                   }`}
       />
       {(isProcessing || isAutoProcessing) && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/30 rounded-lg backdrop-blur-[1px] mt-7">

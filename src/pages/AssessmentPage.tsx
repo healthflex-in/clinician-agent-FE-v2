@@ -286,7 +286,7 @@ const AssessmentPage = () => {
     setTranscription,
     setSuggestions,
   } = useWebSocket({
-    url: 'ws://localhost:8080/ws',
+    url: 'wss://agent.stance.health/ws',
     onOpen: () => {
       toast({
         title: 'Connected',

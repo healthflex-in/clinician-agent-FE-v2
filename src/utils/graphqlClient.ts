@@ -85,9 +85,6 @@ export async function graphqlRequest<T = any>(
   }
 }
 
-/**
- * Update agent report with form data
- */
 export async function updateAgentReport(input: {
   patientId: string;
   appointmentId: string;
@@ -95,15 +92,56 @@ export async function updateAgentReport(input: {
   formKey: string;
   formData: any;
 }) {
+  // Process the form data to remove record fields and fix types
+  const processData = (obj: any) => {
+    if (!obj || typeof obj !== 'object') return obj;
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => processData(item));
+    }
+
+    const result: any = {};
+    for (const key in obj) {
+      if (key === 'record') continue; // Skip record fields
+
+      if (key === 'load' && typeof obj[key] === 'number') {
+        result[key] = String(obj[key]);
+      } else if (typeof obj[key] === 'object') {
+        result[key] = processData(obj[key]);
+      } else {
+        result[key] = obj[key];
+      }
+    }
+    return result;
+  };
+
+  // Create the input object with the processed form data
+  const inputData: any = {};
+
+  // Set the form data under the formKey, after processing
+  inputData[input.formKey] = processData(input.formData);
+
+  // Use the correct mutation structure with appointmentId as a separate parameter
   const query = `
-    mutation updateAgentReport($input: UpdateAgentReportInput!) {
-      updateAgentReport(input: $input) {
+    mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
+      updateAgentReport(appointmentId: $appointmentId, input: $input) {
         _id
+        createdAt
+        updatedAt
+        version
+        isActive
+        isFilledCompletely
       }
     }
   `;
 
-  return graphqlRequest(query, { input });
+  // Set up variables with appointmentId separate from input
+  const variables = {
+    appointmentId: input.appointmentId,
+    input: inputData,
+  };
+
+  return graphqlRequest(query, variables);
 }
 
 /**

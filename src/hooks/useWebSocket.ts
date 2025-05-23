@@ -26,13 +26,48 @@ export function useWebSocket(options: WebSocketOptions) {
   const reconnectAttemptsRef = useRef<number>(0);
   const maxReconnectAttempts = 20;
 
+  // Heartbeat refs
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastServerPingRef = useRef<number>(0);
+  const pingInterval = 30000; // 30 seconds
+  const pingTimeout = 10000; // 10 seconds
+
+  // Clear heartbeat timer
+  const clearHeartbeatTimer = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  // Start heartbeat monitoring
+  const startHeartbeat = useCallback(() => {
+    clearHeartbeatTimer();
+    lastServerPingRef.current = Date.now();
+
+    // Monitor for server pings and check connection health
+    heartbeatIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastPing = now - lastServerPingRef.current;
+
+      // If we haven't received a server ping within the expected interval + timeout
+      if (timeSinceLastPing > pingInterval + pingTimeout) {
+        console.warn('Connection appears stale - no server ping received');
+
+        // Try to reconnect
+        if (wsRef.current) {
+          wsRef.current.close();
+        }
+      }
+    }, pingInterval);
+  }, [clearHeartbeatTimer, pingInterval, pingTimeout]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) return;
 
     try {
       setIsConnecting(true);
 
-      // Use WebSocket URL provided in options
       const wsUrl = url;
       console.log('Attempting to connect to WebSocket at:', wsUrl);
 
@@ -44,6 +79,10 @@ export function useWebSocket(options: WebSocketOptions) {
         setIsConnecting(false);
         setError(null);
         reconnectAttemptsRef.current = 0;
+
+        // Start heartbeat monitoring
+        startHeartbeat();
+
         if (onOpen) onOpen();
 
         // Send initial authentication message
@@ -55,6 +94,18 @@ export function useWebSocket(options: WebSocketOptions) {
                 '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
             })
           );
+
+          // Send initial ping to test connectivity
+          setTimeout(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: 'ping',
+                  timestamp: Date.now(),
+                })
+              );
+            }
+          }, 1000);
         }
       };
 
@@ -62,6 +113,7 @@ export function useWebSocket(options: WebSocketOptions) {
         console.log('WebSocket closed');
         setIsConnected(false);
         setIsConnecting(false);
+        clearHeartbeatTimer();
 
         // Attempt to reconnect if not max attempts
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
@@ -82,34 +134,63 @@ export function useWebSocket(options: WebSocketOptions) {
         console.error('WebSocket error:', event);
         setError(event);
         setIsConnecting(false);
+        clearHeartbeatTimer();
         if (onError) onError(event);
       };
 
       wsRef.current.onmessage = (event) => {
         try {
           console.log('Message received:', event.data);
-          const data = JSON.parse(event.data) as ServerResponse;
+          const data = JSON.parse(event.data);
           console.log('WebSocket data:', data);
 
+          // Handle heartbeat messages first
+          if (data.type === 'pong') {
+            console.debug('Received application pong');
+            return;
+          }
+
+          if (data.type === 'server_ping') {
+            console.debug('Received server ping:', data);
+            // Update last ping time
+            lastServerPingRef.current = Date.now();
+
+            // Respond with server_pong
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: 'server_pong',
+                  timestamp: Date.now(),
+                  ping_number: data.ping_number,
+                })
+              );
+            }
+            return;
+          }
+
+          // Handle regular server responses - cast back to ServerResponse
+          const serverResponse = data as ServerResponse;
+
           // Handle different response types
-          if (data.error) {
-            console.error('Server error:', data.error);
+          if (serverResponse.error) {
+            console.error('Server error:', serverResponse.error);
             toast({
               title: 'Error from server',
-              description: data.error,
+              description: serverResponse.error,
               variant: 'destructive',
             });
             setIsProcessing(false);
             return;
           }
 
-          if (data.transcription !== undefined) {
-            setTranscription(data.transcription);
+          if (serverResponse.transcription !== undefined) {
+            setTranscription(serverResponse.transcription);
             setIsProcessing(false);
           }
 
-          if (data.form_data || data.formData) {
-            const formDataResponse = data.form_data || data.formData;
+          if (serverResponse.form_data || serverResponse.formData) {
+            const formDataResponse =
+              serverResponse.form_data || serverResponse.formData;
             setFormData(formDataResponse);
             console.log('Form data received:', formDataResponse);
 
@@ -125,14 +206,17 @@ export function useWebSocket(options: WebSocketOptions) {
           }
 
           // Handle structured data format with suggestions
-          if (data.payloadType === 'structured') {
-            if (data.formData) {
-              setFormData(data.formData);
-              console.log('Structured form data received:', data.formData);
+          if (serverResponse.payloadType === 'structured') {
+            if (serverResponse.formData) {
+              setFormData(serverResponse.formData);
+              console.log(
+                'Structured form data received:',
+                serverResponse.formData
+              );
 
               // Forward form data to parent component if callback is provided
               if (onFormData) {
-                onFormData(data.formData);
+                onFormData(serverResponse.formData);
               }
 
               toast({
@@ -141,16 +225,16 @@ export function useWebSocket(options: WebSocketOptions) {
               });
             }
 
-            if (data.suggestions) {
-              setSuggestions(data.suggestions);
-              console.log('Suggestions received:', data.suggestions);
+            if (serverResponse.suggestions) {
+              setSuggestions(serverResponse.suggestions);
+              console.log('Suggestions received:', serverResponse.suggestions);
             }
 
-            if (data.realTimeRecommendations) {
-              setRecommendations(data.realTimeRecommendations);
+            if (serverResponse.realTimeRecommendations) {
+              setRecommendations(serverResponse.realTimeRecommendations);
               console.log(
                 'Recommendations received:',
-                data.realTimeRecommendations
+                serverResponse.realTimeRecommendations
               );
             }
           }
@@ -177,14 +261,25 @@ export function useWebSocket(options: WebSocketOptions) {
         variant: 'destructive',
       });
     }
-  }, [url, isConnecting, onOpen, onClose, onError, onFormData, toast]);
+  }, [
+    url,
+    isConnecting,
+    onOpen,
+    onClose,
+    onError,
+    onFormData,
+    toast,
+    startHeartbeat,
+    clearHeartbeatTimer,
+  ]);
 
   const disconnect = useCallback(() => {
+    clearHeartbeatTimer();
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-  }, []);
+  }, [clearHeartbeatTimer]);
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -271,11 +366,12 @@ export function useWebSocket(options: WebSocketOptions) {
 
   useEffect(() => {
     return () => {
+      clearHeartbeatTimer();
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, []);
+  }, [clearHeartbeatTimer]);
 
   return {
     isConnected,

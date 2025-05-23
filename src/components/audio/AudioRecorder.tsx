@@ -1,32 +1,32 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Mic, MicOff, Loader } from 'lucide-react';
+import {
+  encodeWAV,
+  blobToBase64,
+  detectSilence,
+  getUserMedia,
+  resampleAudio,
+} from '@/utils/audio';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { encodeWAV, getUserMedia, resampleAudio } from '@/utils/audio';
-import { useTheme } from '@/styles/theme-provider';
 
-interface AudioRecorderProps {
+interface RecorderProps {
   onAudioEncoded: (base64Audio: string) => void;
   isProcessing: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  label?: string;
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({
+type RecorderState = 'inactive' | 'recording' | 'paused';
+
+const Recorder: React.FC<RecorderProps> = ({
   onAudioEncoded,
   isProcessing,
-  size = 'md',
-  label,
 }) => {
-  const [state, setState] = useState<'inactive' | 'recording' | 'paused'>(
-    'inactive'
-  );
+  const [state, setState] = useState<RecorderState>('inactive');
   const [isPermissionGranted, setIsPermissionGranted] = useState<
     boolean | null
   >(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const { toast } = useToast();
-  const theme = useTheme();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -34,13 +34,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const silenceDetectorRef = useRef<(() => void) | null>(null);
-
-  // Determine button size based on prop
-  const buttonSize = {
-    sm: { width: '40px', height: '40px', fontSize: '0.875rem' },
-    md: { width: '54px', height: '54px', fontSize: '1rem' },
-    lg: { width: '64px', height: '64px', fontSize: '1.125rem' },
-  }[size];
 
   // Handle permission request
   const requestPermission = useCallback(async () => {
@@ -77,7 +70,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     }
   }, [toast]);
 
-  // Audio processing method
+  // Improved audio processing method based on the reference code
   const processAudioData = useCallback(async () => {
     if (chunksRef.current.length === 0) return;
 
@@ -157,7 +150,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     mediaRecorderRef.current = mediaRecorder;
 
     mediaRecorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) {
+      if (e.data.size > 0) {
         chunksRef.current.push(e.data);
       }
     };
@@ -170,15 +163,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       }
     };
 
-    // Start silence detector
+    // Start the silence detector - stop recording after 5 seconds of silence
     if (analyserRef.current) {
-      // Implementation of detectSilence is available in the audio.ts utility
-      // This will stop recording after 5 seconds of silence
-      // silenceDetectorRef.current = detectSilence(analyserRef.current, -45, () => {
-      //   if (mediaRecorderRef.current?.state === 'recording') {
-      //     pauseRecording();
-      //   }
-      // }, 5000);
+      silenceDetectorRef.current = detectSilence(
+        analyserRef.current,
+        -45, // Silence threshold in dB
+        () => {
+          // This will be called when silence is detected for 5 seconds
+          if (mediaRecorderRef.current?.state === 'recording') {
+            pauseRecording();
+          }
+        },
+        5000 // 5 seconds of silence
+      );
     }
 
     mediaRecorder.start();
@@ -210,6 +207,34 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       pauseRecording();
     }
   }, [state, startRecording, pauseRecording]);
+
+  // Initialize permission on mount
+  useEffect(() => {
+    // Check if the browser supports audio recording
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        variant: 'destructive',
+        title: 'Browser Not Supported',
+        description: "Your browser doesn't support audio recording.",
+      });
+      return;
+    }
+
+    // Generate and store userId and appointmentId if they don't exist
+    if (!localStorage.getItem('userId')) {
+      localStorage.setItem(
+        'userId',
+        `user-${Math.random().toString(36).substring(2, 9)}`
+      );
+    }
+
+    if (!localStorage.getItem('appointmentId')) {
+      localStorage.setItem(
+        'appointmentId',
+        `apt-${Math.random().toString(36).substring(2, 9)}`
+      );
+    }
+  }, [toast]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -244,62 +269,59 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         <Button
           onClick={requestPermission}
           disabled={isRequestingPermission}
-          className={`rounded-full bg-primary hover:bg-primary-dark text-dark`}
-          style={{ width: buttonSize.width, height: buttonSize.height }}
+          className="w-16 h-16 rounded-full bg-parrot-500 hover:bg-parrot-600 text-white"
         >
           {isRequestingPermission ? (
-            <Loader className="h-5 w-5 animate-spin" />
+            <Loader className="h-6 w-6 animate-spin" />
           ) : (
-            <Mic className="h-5 w-5" />
+            <Mic className="h-6 w-6" />
           )}
         </Button>
       ) : !isPermissionGranted ? (
         <Button
           onClick={requestPermission}
-          className={`rounded-full bg-destructive hover:bg-destructive/90 text-dark`}
-          style={{ width: buttonSize.width, height: buttonSize.height }}
+          className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 text-white"
         >
-          <MicOff className="h-5 w-5" />
+          <MicOff className="h-6 w-6" />
         </Button>
       ) : (
         <div className="relative">
           {state === 'recording' && (
-            <span className="absolute -inset-2 rounded-full bg-primary-light/20 animate-pulse-ring"></span>
+            <span className="absolute -inset-2 rounded-full bg-parrot-400/20 animate-pulse-ring"></span>
           )}
           <Button
             onClick={toggleRecording}
             disabled={isProcessing}
-            className={`rounded-full transition-all duration-300 ease-in-out
+            className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out
               ${
                 state === 'recording'
-                  ? 'bg-secondary hover:bg-secondary-dark animate-bounce-soft'
-                  : 'bg-primary hover:bg-primary-dark'
+                  ? 'bg-parrot-600 hover:bg-parrot-700 animate-bounce-soft'
+                  : 'bg-parrot-500 hover:bg-parrot-600'
               }`}
-            style={{ width: buttonSize.width, height: buttonSize.height }}
           >
             {isProcessing ? (
-              <Loader className="h-5 w-5 animate-spin" />
+              <Loader className="h-6 w-6 animate-spin" />
             ) : state === 'recording' ? (
-              <MicOff className="h-5 w-5" />
+              <MicOff className="h-6 w-6" />
             ) : (
-              <Mic className="h-5 w-5" />
+              <Mic className="h-6 w-6" />
             )}
           </Button>
         </div>
       )}
 
-      {label && (
-        <div className="text-sm mt-2 text-center font-medium">
-          {isRequestingPermission && 'Requesting mic access...'}
-          {isPermissionGranted === false && 'Microphone access denied'}
-          {state === 'inactive' && isPermissionGranted && label}
-          {state === 'recording' && 'Recording... (tap to stop)'}
-          {state === 'paused' && 'Paused (tap to resume)'}
-          {isProcessing && 'Processing audio...'}
-        </div>
-      )}
+      <div className="text-sm mt-2 text-center font-medium">
+        {isRequestingPermission && 'Requesting mic access...'}
+        {isPermissionGranted === false && 'Microphone access denied'}
+        {state === 'inactive' &&
+          isPermissionGranted &&
+          'Tap to start recording'}
+        {state === 'recording' && 'Recording... (tap to stop)'}
+        {state === 'paused' && 'Paused (tap to resume)'}
+        {isProcessing && 'Processing audio...'}
+      </div>
     </div>
   );
 };
 
-export default AudioRecorder;
+export default Recorder;

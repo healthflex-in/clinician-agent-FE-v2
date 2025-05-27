@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 interface RecorderProps {
   onAudioEncoded: (base64Audio: string) => void;
   isProcessing: boolean;
+  isDisabled?: boolean; // NEW: Accept disabled state from parent
 }
 
 type RecorderState = 'inactive' | 'recording' | 'paused';
@@ -20,12 +21,10 @@ type RecorderState = 'inactive' | 'recording' | 'paused';
 const Recorder: React.FC<RecorderProps> = ({
   onAudioEncoded,
   isProcessing,
+  isDisabled = false, // NEW: Default to enabled
 }) => {
   const [state, setState] = useState<RecorderState>('inactive');
-  const [isPermissionGranted, setIsPermissionGranted] = useState<
-    boolean | null
-  >(null);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  // REMOVED: Local permission management - parent handles this now
   const { toast } = useToast();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -35,9 +34,10 @@ const Recorder: React.FC<RecorderProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const silenceDetectorRef = useRef<(() => void) | null>(null);
 
-  // Handle permission request
-  const requestPermission = useCallback(async () => {
-    setIsRequestingPermission(true);
+  // Initialize audio stream when component mounts (if not disabled)
+  const initializeAudioStream = useCallback(async () => {
+    if (isDisabled) return;
+
     try {
       const stream = await getUserMedia();
       streamRef.current = stream;
@@ -56,25 +56,45 @@ const Recorder: React.FC<RecorderProps> = ({
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      setIsPermissionGranted(true);
+      console.log('Audio stream initialized successfully');
     } catch (err) {
-      console.error('Error getting audio permission:', err);
-      setIsPermissionGranted(false);
+      console.error('Error initializing audio stream:', err);
       toast({
         variant: 'destructive',
-        title: 'Microphone Access Denied',
-        description: 'Please allow microphone access to record audio.',
+        title: 'Microphone Access Error',
+        description: 'Unable to access microphone for recording.',
       });
-    } finally {
-      setIsRequestingPermission(false);
     }
-  }, [toast]);
+  }, [isDisabled, toast]);
 
-  // Improved audio processing method based on the reference code
+  // Initialize on mount or when disabled state changes
+  useEffect(() => {
+    if (!isDisabled) {
+      initializeAudioStream();
+    }
+
+    return () => {
+      // Clean up when disabled or unmounting
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== 'closed'
+      ) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+    };
+  }, [isDisabled, initializeAudioStream]);
+
+  // Improved audio processing method
   const processAudioData = useCallback(async () => {
     if (chunksRef.current.length === 0) return;
 
     try {
+      console.log('Processing audio data...');
       // Create a blob from the audio chunks
       const originalBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
       chunksRef.current = [];
@@ -118,6 +138,7 @@ const Recorder: React.FC<RecorderProps> = ({
               reader2.readAsDataURL(wavBlob);
             });
 
+            console.log('Audio processing completed, calling onAudioEncoded');
             // Send to the parent component
             onAudioEncoded(base64Audio);
             resolve();
@@ -142,7 +163,19 @@ const Recorder: React.FC<RecorderProps> = ({
 
   // Start recording
   const startRecording = useCallback(() => {
-    if (!streamRef.current || !analyserRef.current) return;
+    console.log('Starting recording...');
+    console.log('Stream available:', !!streamRef.current);
+    console.log('Analyser available:', !!analyserRef.current);
+
+    if (!streamRef.current || !analyserRef.current) {
+      console.error('Stream or analyser not available for recording');
+      toast({
+        variant: 'destructive',
+        title: 'Recording Error',
+        description: 'Microphone not ready. Please try again.',
+      });
+      return;
+    }
 
     chunksRef.current = [];
 
@@ -156,10 +189,13 @@ const Recorder: React.FC<RecorderProps> = ({
     };
 
     mediaRecorder.onstop = async () => {
+      console.log('Recording stopped, processing audio...');
       try {
         await processAudioData();
+        setState('paused'); // Set to paused after processing
       } catch (err) {
         console.error('Error handling recorded audio:', err);
+        setState('inactive'); // Reset to inactive on error
       }
     };
 
@@ -169,6 +205,7 @@ const Recorder: React.FC<RecorderProps> = ({
         analyserRef.current,
         -45, // Silence threshold in dB
         () => {
+          console.log('Silence detected, stopping recording');
           // This will be called when silence is detected for 5 seconds
           if (mediaRecorderRef.current?.state === 'recording') {
             pauseRecording();
@@ -180,10 +217,12 @@ const Recorder: React.FC<RecorderProps> = ({
 
     mediaRecorder.start();
     setState('recording');
-  }, [processAudioData]);
+    console.log('Recording started successfully');
+  }, [processAudioData, toast]);
 
   // Pause recording
   const pauseRecording = useCallback(() => {
+    console.log('Pausing recording...');
     if (!mediaRecorderRef.current) return;
 
     if (mediaRecorderRef.current.state === 'recording') {
@@ -196,19 +235,29 @@ const Recorder: React.FC<RecorderProps> = ({
       silenceDetectorRef.current = null;
     }
 
-    setState('paused');
+    // Note: setState('paused') is called in mediaRecorder.onstop
   }, []);
 
   // Toggle recording
   const toggleRecording = useCallback(() => {
+    console.log('Toggle recording clicked');
+    console.log('Current state:', state);
+    console.log('Is disabled:', isDisabled);
+    console.log('Is processing:', isProcessing);
+
+    if (isDisabled || isProcessing) {
+      console.log('Recording disabled or processing, ignoring click');
+      return;
+    }
+
     if (state === 'inactive' || state === 'paused') {
       startRecording();
     } else if (state === 'recording') {
       pauseRecording();
     }
-  }, [state, startRecording, pauseRecording]);
+  }, [state, startRecording, pauseRecording, isDisabled, isProcessing]);
 
-  // Initialize permission on mount
+  // Initialize localStorage IDs on mount
   useEffect(() => {
     // Check if the browser supports audio recording
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -263,59 +312,51 @@ const Recorder: React.FC<RecorderProps> = ({
     };
   }, []);
 
+  // Don't render anything if disabled
+  if (isDisabled) {
+    return (
+      <div className="flex flex-col items-center">
+        <Button
+          disabled
+          className="w-16 h-16 rounded-full bg-gray-400 text-white cursor-not-allowed"
+        >
+          <MicOff className="h-6 w-6" />
+        </Button>
+        <div className="text-sm mt-2 text-center font-medium text-gray-500">
+          Recording disabled
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center">
-      {isPermissionGranted === null ? (
+      <div className="relative">
+        {state === 'recording' && (
+          <span className="absolute -inset-2 rounded-full bg-parrot-400/20 animate-pulse-ring"></span>
+        )}
         <Button
-          onClick={requestPermission}
-          disabled={isRequestingPermission}
-          className="w-16 h-16 rounded-full bg-parrot-500 hover:bg-parrot-600 text-white"
+          onClick={toggleRecording}
+          disabled={isProcessing}
+          className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out
+            ${
+              state === 'recording'
+                ? 'bg-parrot-600 hover:bg-parrot-700 animate-bounce-soft'
+                : 'bg-parrot-500 hover:bg-parrot-600'
+            }`}
         >
-          {isRequestingPermission ? (
+          {isProcessing ? (
             <Loader className="h-6 w-6 animate-spin" />
+          ) : state === 'recording' ? (
+            <MicOff className="h-6 w-6" />
           ) : (
             <Mic className="h-6 w-6" />
           )}
         </Button>
-      ) : !isPermissionGranted ? (
-        <Button
-          onClick={requestPermission}
-          className="w-16 h-16 rounded-full bg-destructive hover:bg-destructive/90 text-white"
-        >
-          <MicOff className="h-6 w-6" />
-        </Button>
-      ) : (
-        <div className="relative">
-          {state === 'recording' && (
-            <span className="absolute -inset-2 rounded-full bg-parrot-400/20 animate-pulse-ring"></span>
-          )}
-          <Button
-            onClick={toggleRecording}
-            disabled={isProcessing}
-            className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out
-              ${
-                state === 'recording'
-                  ? 'bg-parrot-600 hover:bg-parrot-700 animate-bounce-soft'
-                  : 'bg-parrot-500 hover:bg-parrot-600'
-              }`}
-          >
-            {isProcessing ? (
-              <Loader className="h-6 w-6 animate-spin" />
-            ) : state === 'recording' ? (
-              <MicOff className="h-6 w-6" />
-            ) : (
-              <Mic className="h-6 w-6" />
-            )}
-          </Button>
-        </div>
-      )}
+      </div>
 
       <div className="text-sm mt-2 text-center font-medium">
-        {isRequestingPermission && 'Requesting mic access...'}
-        {isPermissionGranted === false && 'Microphone access denied'}
-        {state === 'inactive' &&
-          isPermissionGranted &&
-          'Tap to start recording'}
+        {state === 'inactive' && 'Tap to start recording'}
         {state === 'recording' && 'Recording... (tap to stop)'}
         {state === 'paused' && 'Paused (tap to resume)'}
         {isProcessing && 'Processing audio...'}

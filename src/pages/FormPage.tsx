@@ -1,3 +1,5 @@
+// FormPage.tsx - Complete fixed version with proper state management
+
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -44,12 +46,21 @@ const FormPage = () => {
     appointmentId,
   } = useParams<FormPageParams>();
 
+  // Add state for forcing audio recorder reset
+  const [audioRecorderKey, setAudioRecorderKey] = useState(0);
+
   const [transcriptText, setTranscriptText] = useState('');
+
+  // Debug transcriptText changes
+  useEffect(() => {
+    console.log('=== transcriptText state changed ===');
+    console.log('New transcriptText value:', transcriptText);
+    console.log('Length:', transcriptText.length);
+  }, [transcriptText]);
   const [formData, setFormData] = useState<any>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [patientName, setPatientName] = useState<string>('Patient');
-  const [transcriptionProcessed, setTranscriptionProcessed] = useState(false);
 
   // Microphone permission states
   const [microphonePermission, setMicrophonePermission] = useState<
@@ -58,11 +69,10 @@ const FormPage = () => {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [permissionError, setPermissionError] = useState<string>('');
 
-  // Add a state for tracking recording mode - could be 'idle', 'global', or 'section'
+  // Recording mode states - simplified
   const [recordingMode, setRecordingMode] = useState<
     'idle' | 'global' | 'section'
   >('idle');
-  // Add state to track active section
   const [activeSectionPath, setActiveSectionPath] = useState<string | null>(
     null
   );
@@ -88,9 +98,61 @@ const FormPage = () => {
           return;
         }
 
-        // Simply set to prompt state - let the user decide when to request permission
-        setMicrophonePermission('prompt');
-        setShowPermissionDialog(true);
+        // Check current permission state using the Permissions API
+        try {
+          const permissionStatus = await navigator.permissions.query({
+            name: 'microphone' as PermissionName,
+          });
+
+          if (permissionStatus.state === 'granted') {
+            // Permission already granted, try to get media stream to confirm
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+              });
+              stream.getTracks().forEach((track) => track.stop()); // Clean up immediately
+              setMicrophonePermission('granted');
+              setShowPermissionDialog(false);
+              return;
+            } catch (error) {
+              console.warn(
+                'Permission granted but unable to access microphone:',
+                error
+              );
+              // Fall through to prompt for permission
+            }
+          } else if (permissionStatus.state === 'denied') {
+            setMicrophonePermission('denied');
+            setPermissionError(
+              'Microphone access was previously denied. Please enable it in your browser settings.'
+            );
+            setShowPermissionDialog(true);
+            return;
+          }
+          // If state is 'prompt', we'll show the permission dialog
+        } catch (permissionError) {
+          console.warn(
+            'Permissions API not supported or failed:',
+            permissionError
+          );
+          // Fall through to manual check
+        }
+
+        // Fallback: Try to access media without requesting permission first
+        // This will only work if permission was previously granted
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          stream.getTracks().forEach((track) => track.stop());
+          setMicrophonePermission('granted');
+          setShowPermissionDialog(false);
+        } catch (error) {
+          // Permission not granted or microphone not available
+          // Show permission dialog to let user grant permission
+          setMicrophonePermission('prompt');
+          setShowPermissionDialog(true);
+        }
       } catch (error) {
         console.error('Error checking microphone availability:', error);
         setMicrophonePermission('prompt');
@@ -105,7 +167,6 @@ const FormPage = () => {
   const handleRequestPermission = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // If successful, close the stream and set permission as granted
       stream.getTracks().forEach((track) => track.stop());
       setMicrophonePermission('granted');
       setShowPermissionDialog(false);
@@ -161,17 +222,14 @@ const FormPage = () => {
     }
   };
 
-  // Create agent report on initial load - only after permission is checked
+  // Create agent report on initial load
   useEffect(() => {
-    // Only proceed if microphone permission has been resolved (either granted or denied)
     if (microphonePermission === 'checking') return;
 
-    // Fetch patient details as soon as the component mounts
     const fetchPatientName = async () => {
       if (!patientId) return;
 
       try {
-        // Try to get from localStorage first
         const storedPatient = localStorage.getItem('selectedPatient');
         if (storedPatient) {
           const patientData = JSON.parse(storedPatient);
@@ -181,8 +239,6 @@ const FormPage = () => {
           }
         }
 
-        // If not in localStorage, try to fetch from API
-        // Use the patient query based on your API structure
         const query = `
           query GetPatientById($patientId: ObjectID!) {
             getPatientById(patientId: $patientId) {
@@ -193,7 +249,6 @@ const FormPage = () => {
         `;
 
         const variables = { patientId };
-
         const result = await graphqlRequest(query, variables);
         if (result && result.getPatientById && result.getPatientById.name) {
           setPatientName(result.getPatientById.name);
@@ -207,27 +262,22 @@ const FormPage = () => {
       if (!patientId || !appointmentId) return;
 
       try {
-        // Check if report already exists in localStorage
         const existingReport = localStorage.getItem('agentReport');
         if (existingReport) {
           try {
             const parsedReport = JSON.parse(existingReport);
             if (parsedReport._id) {
               setReportId(parsedReport._id);
-
-              // Set form data if it exists for this form type
               if (parsedReport[formKey]) {
                 setFormData(parsedReport[formKey]);
               }
-
-              return; // Report already exists
+              return;
             }
           } catch (e) {
             console.error('Error parsing existing report:', e);
           }
         }
 
-        // Creating a new report if none exists
         const mutation = `
           mutation CreateAgentReport($input: CreateAgentReportInput!) {
             createAgentReport(input: $input) {
@@ -240,7 +290,6 @@ const FormPage = () => {
           }
         `;
 
-        // Get center ID from localStorage or use default
         const centerId =
           localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
 
@@ -259,10 +308,7 @@ const FormPage = () => {
           result.createAgentReport &&
           result.createAgentReport._id
         ) {
-          // Save the report ID
           setReportId(result.createAgentReport._id);
-
-          // Save the full report in localStorage
           localStorage.setItem(
             'agentReport',
             JSON.stringify(result.createAgentReport)
@@ -273,7 +319,6 @@ const FormPage = () => {
             description: 'New report initialized successfully',
           });
 
-          // Set initial form data if it exists
           if (result.createAgentReport[formKey]) {
             setFormData(result.createAgentReport[formKey]);
           }
@@ -299,32 +344,63 @@ const FormPage = () => {
     if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
   }, [formKey, patientId, appointmentId]);
 
-  // Function to prepare for a new recording
-  const prepareNewRecording = (
-    mode: 'global' | 'section',
-    sectionPath: string | null = null
-  ) => {
-    // Clear any existing state
-    setTranscriptionProcessed(false);
+  // Handle incoming form data from WebSocket - SIMPLIFIED
+  const handleIncomingFormData = useCallback(
+    (data: any) => {
+      console.log('=== handleIncomingFormData called ===');
+      console.log('Data:', data);
+      console.log('Current recording mode:', recordingMode);
 
-    if (mode === 'global') {
-      // Reset global state
-      setTranscriptText('');
-      setTranscription('');
-      setActiveSectionPath(null);
-    } else if (mode === 'section' && sectionPath) {
-      // Reset section state
-      if (formRendererRef.current) {
-        formRendererRef.current.clearSectionTranscription(sectionPath);
+      if (!data) return;
+
+      try {
+        if (formRendererRef.current) {
+          formRendererRef.current.updateFormWithLLMData(data);
+
+          if (data.formData) {
+            setFormData(data.formData);
+
+            // CLEAR GLOBAL TRANSCRIPTION AFTER ANY FORM DATA UPDATE
+            if (recordingMode === 'global') {
+              console.log(
+                'Clearing global transcription after form data update'
+              );
+              setTranscriptText('');
+              setTranscription('');
+              setRecordingMode('idle');
+
+              // Force re-render of audio recorder by resetting key
+              setAudioRecorderKey((prev) => prev + 1);
+            }
+
+            // RESET TO IDLE MODE AFTER SECTION PROCESSING TO ALLOW OTHER SECTIONS
+            if (recordingMode === 'section') {
+              console.log(
+                'Resetting section mode to idle after form data update'
+              );
+              setRecordingMode('idle');
+              setActiveSectionPath(null);
+            }
+          }
+
+          toast({
+            title: 'Form Updated',
+            description: 'Form data has been processed and updated',
+          });
+        }
+      } catch (error) {
+        console.error('Error processing form data:', error);
+        toast({
+          title: 'Processing Error',
+          description: 'Failed to process form data',
+          variant: 'destructive',
+        });
       }
-      setActiveSectionPath(sectionPath);
-    }
+    },
+    [toast, recordingMode]
+  );
 
-    // Set the recording mode
-    setRecordingMode(mode);
-  };
-
-  // WebSocket connection and handlers - only connect if microphone permission is granted
+  // WebSocket connection and handlers
   const {
     connect,
     isConnected,
@@ -360,22 +436,40 @@ const FormPage = () => {
       });
     },
     onFormData: (data) => {
-      // Check for structured payload - the signal that form is filled
+      console.log('=== FormPage onFormData called ===');
+      console.log('Data received:', data);
+      console.log('Current recording mode:', recordingMode);
+      console.log('Current transcriptText before clearing:', transcriptText);
+
+      // Handle structured payload (complete form filling)
       if (data && data.payloadType === 'structured') {
-        console.log('Received structured form data - stopping all processing');
+        console.log('Received structured form data - form is complete');
 
-        // IMMEDIATELY stop all processing and recording
+        // ALWAYS clear global transcription for structured payloads
+        console.log('Clearing global transcription for structured payload');
+        console.log('transcriptText before clearing:', transcriptText);
+
+        setTranscriptText('');
+        setTranscription('');
+
+        // Force re-render by updating key
+        setAudioRecorderKey((prev) => {
+          const newKey = prev + 1;
+          console.log('Resetting audio recorder key to:', newKey);
+          return newKey;
+        });
+
+        // Reset recording mode
         setRecordingMode('idle');
-        setTranscriptionProcessed(true);
+        setActiveSectionPath(null);
 
-        // Update the form with the received data
+        console.log('Global transcription cleared - should be empty now');
+
         if (formRendererRef.current && data.formData) {
           formRendererRef.current.updateFormWithLLMData({
             payloadType: 'structured',
             formData: data.formData,
           });
-
-          // Also update parent state
           setFormData(data.formData);
         }
 
@@ -384,22 +478,22 @@ const FormPage = () => {
           description: 'Form has been filled with transcription data',
         });
 
-        return; // Exit early after processing structured data
+        // IMPORTANT: Don't call handleIncomingFormData for structured payloads
+        // to avoid any conflicting state updates
+        return;
       }
 
-      // Handle regular form data updates (fallback)
+      // Handle regular form data updates
       handleIncomingFormData(data);
     },
   });
 
-  // Connect to WebSocket on component mount - only if microphone permission is granted
+  // Connect to WebSocket
   useEffect(() => {
-    // Only connect if microphone permission is granted
     if (microphonePermission !== 'granted') return;
 
     connect();
 
-    // Automatically try to reconnect every 5 seconds if connection fails
     const reconnectInterval = setInterval(() => {
       if (!isConnected && !isConnecting) {
         console.log('Attempting to reconnect WebSocket...');
@@ -412,19 +506,15 @@ const FormPage = () => {
 
   // Update transcription when received from WebSocket
   useEffect(() => {
-    // If there's no transcription or we're in idle mode (processing complete), do nothing
-    if (!transcription || recordingMode === 'idle') return;
+    if (!transcription) return;
 
-    // Route transcription based on current recording mode
     if (recordingMode === 'global') {
-      // Only update global transcription in global mode
       setTranscriptText(transcription);
     } else if (
       recordingMode === 'section' &&
       activeSectionPath &&
       formRendererRef.current
     ) {
-      // Only update section transcription in section mode
       formRendererRef.current.updateSectionTranscription(
         activeSectionPath,
         transcription
@@ -432,40 +522,7 @@ const FormPage = () => {
     }
   }, [transcription, recordingMode, activeSectionPath]);
 
-  // Handle incoming form data from the WebSocket
-  const handleIncomingFormData = useCallback(
-    (data: any) => {
-      if (!data) return;
-
-      try {
-        // Use the form renderer ref to update the data from LLM
-        // FormRenderer will filter data based on selected sections
-        if (formRendererRef.current) {
-          formRendererRef.current.updateFormWithLLMData(data);
-
-          // Also update parent state if there's formData
-          if (data.formData) {
-            setFormData(data.formData);
-          }
-
-          toast({
-            title: 'Form Updated',
-            description: 'Form data has been processed and updated',
-          });
-        }
-      } catch (error) {
-        console.error('Error processing form data:', error);
-        toast({
-          title: 'Processing Error',
-          description: 'Failed to process form data',
-          variant: 'destructive',
-        });
-      }
-    },
-    [toast]
-  );
-
-  // Audio recording handlers for GLOBAL recording
+  // GLOBAL AUDIO RECORDING
   const handleAudioEncoded = (base64Audio: string) => {
     if (!isConnected) {
       toast({
@@ -477,10 +534,15 @@ const FormPage = () => {
       return;
     }
 
-    // Prepare for a new global recording
-    prepareNewRecording('global');
+    console.log('Global audio recording completed');
 
-    // Send audio with current context
+    // Set to global mode and clear previous state
+    setRecordingMode('global');
+    setActiveSectionPath(null);
+
+    // DON'T clear transcriptText here - let the user see what was transcribed
+    // The clearing will happen after processing
+
     const context = {
       formKey,
       formData: formData || {},
@@ -498,7 +560,7 @@ const FormPage = () => {
     }
   };
 
-  // Process transcription text
+  // PROCESS GLOBAL TRANSCRIPTION
   const handleProcessTranscription = () => {
     if (!transcriptText.trim()) {
       toast({
@@ -509,18 +571,15 @@ const FormPage = () => {
       return;
     }
 
-    // Skip if already processed or not in global mode
-    if (transcriptionProcessed || recordingMode !== 'global') {
-      console.log(
-        'Transcription already processed or not in global mode, skipping'
-      );
+    if (!isConnected) {
+      toast({
+        title: 'Not connected',
+        description: 'Please wait for connection',
+        variant: 'destructive',
+      });
       return;
     }
 
-    // Mark as processed BEFORE sending to prevent race conditions
-    setTranscriptionProcessed(true);
-
-    // Send transcription with current context
     const context = {
       formKey,
       formData: formData || {},
@@ -534,36 +593,14 @@ const FormPage = () => {
         description: 'Connection issues detected',
         variant: 'destructive',
       });
-      // Reset processed flag if send failed
-      setTranscriptionProcessed(false);
     }
   };
 
-  // Auto-process function that respects processing state
+  // AUTO-PROCESS HANDLER - SIMPLIFIED
   const handleAutoProcess = () => {
-    // Only auto-process if:
-    // 1. In global mode
-    // 2. Not already processed
-    // 3. Has text content
-    // 4. Not already in idle mode (indicating processing is complete)
-    if (
-      recordingMode === 'global' &&
-      !transcriptionProcessed &&
-      transcriptText.trim()
-    ) {
+    if (transcriptText.trim() && isConnected) {
       console.log('Auto-processing global transcription');
       handleProcessTranscription();
-    } else {
-      console.log(
-        'Skipping auto-process:',
-        recordingMode !== 'global'
-          ? 'not in global mode'
-          : transcriptionProcessed
-          ? 'already processed'
-          : !transcriptText.trim()
-          ? 'no text'
-          : 'already idle'
-      );
     }
   };
 
@@ -571,7 +608,6 @@ const FormPage = () => {
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
 
-    // Update the form data in localStorage
     try {
       const savedReport = localStorage.getItem('agentReport');
       if (savedReport) {
@@ -611,10 +647,8 @@ const FormPage = () => {
       }
     `;
 
-      // Deep clone form data to avoid modifying original
       const formDataCopy = JSON.parse(JSON.stringify(formData));
 
-      // Remove record fields and fix types
       const processData = (obj) => {
         if (!obj || typeof obj !== 'object') return obj;
 
@@ -624,7 +658,7 @@ const FormPage = () => {
 
         const result = {};
         for (const key in obj) {
-          if (key === 'record') continue; // Skip record fields
+          if (key === 'record') continue;
 
           if (key === 'load' && typeof obj[key] === 'number') {
             result[key] = String(obj[key]);
@@ -647,15 +681,24 @@ const FormPage = () => {
 
       const result = await graphqlRequest(mutation, variables);
 
-      // Rest of the function remains the same...
+      // Handle success...
+      toast({
+        title: 'Form Submitted',
+        description: 'Your form has been successfully submitted',
+      });
     } catch (error) {
-      // Error handling...
+      console.error('Error submitting form:', error);
+      toast({
+        title: 'Submission Failed',
+        description: 'There was an error submitting your form',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Handle field-specific audio recording - UPDATED
+  // SECTION AUDIO RECORDING
   const handleFieldAudioEncoded = (base64Audio: string, context: any) => {
     if (!isConnected) {
       toast({
@@ -667,12 +710,12 @@ const FormPage = () => {
       return;
     }
 
-    // Prepare for a new section recording
+    // Set to section mode
     if (context.sectionPath) {
-      prepareNewRecording('section', context.sectionPath);
+      setRecordingMode('section');
+      setActiveSectionPath(context.sectionPath);
     }
 
-    // Send audio with context
     const sent = sendAudio(base64Audio, context);
 
     if (!sent) {
@@ -686,7 +729,7 @@ const FormPage = () => {
     }
   };
 
-  // Handle field transcription processing - UPDATED
+  // SECTION TRANSCRIPTION PROCESSING
   const handleFieldTranscriptionProcess = (
     transcription: string,
     context: any
@@ -701,16 +744,6 @@ const FormPage = () => {
       return;
     }
 
-    // Only process if in section mode and the context matches the active section
-    if (
-      recordingMode !== 'section' ||
-      context.sectionPath !== activeSectionPath
-    ) {
-      console.log('Not processing - wrong mode or section mismatch');
-      return;
-    }
-
-    // The context already contains selectedSections from the FormRenderer
     const sent = processTranscription(transcription, context);
 
     if (!sent) {
@@ -720,10 +753,9 @@ const FormPage = () => {
         variant: 'destructive',
       });
     }
-    // DO NOT reset recording mode here - wait for form data to arrive
   };
 
-  // Reset form to initial state
+  // Reset form
   const handleFormReset = () => {
     if (
       confirm(
@@ -732,11 +764,9 @@ const FormPage = () => {
     ) {
       setFormData(null);
       setTranscriptText('');
-      setTranscriptionProcessed(false);
       setActiveSectionPath(null);
       setRecordingMode('idle');
 
-      // Update localStorage
       try {
         const savedReport = localStorage.getItem('agentReport');
         if (savedReport) {
@@ -755,9 +785,8 @@ const FormPage = () => {
     }
   };
 
-  // Check if the form schema exists
+  // Validate form schema
   useEffect(() => {
-    // Validate that the requested form exists in our schemas
     if (formKey && !(formKey in formSchemas)) {
       toast({
         title: 'Invalid Form',
@@ -768,7 +797,7 @@ const FormPage = () => {
     }
   }, [formKey, toast]);
 
-  // Show loading state while checking permissions
+  // Show loading state
   if (microphonePermission === 'checking') {
     return (
       <ThemeProvider>
@@ -787,10 +816,15 @@ const FormPage = () => {
   return (
     <ThemeProvider>
       <div className="min-h-screen flex flex-col items-center bg-gradient-to-b from-primary/5 to-background">
-        {/* Microphone Permission Dialog */}
+        {/* Microphone Permission Dialog - only show when permission is needed */}
         <Dialog
           open={showPermissionDialog}
-          onOpenChange={setShowPermissionDialog}
+          onOpenChange={(open) => {
+            // Only allow closing if permission is granted or denied, not if it's still prompt
+            if (!open && microphonePermission !== 'prompt') {
+              setShowPermissionDialog(false);
+            }
+          }}
         >
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -799,24 +833,40 @@ const FormPage = () => {
                 Microphone Access Required
               </DialogTitle>
               <DialogDescription>
-                This application needs access to your microphone to provide
-                voice recording and transcription features. Please allow
-                microphone access when prompted by your browser.
+                {microphonePermission === 'denied'
+                  ? 'Microphone access was denied. Please enable it in your browser settings to use voice recording features.'
+                  : 'This application needs access to your microphone to provide voice recording and transcription features. Please allow microphone access when prompted by your browser.'}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button
-                onClick={handleRequestPermission}
-                className="w-full sm:w-auto"
-              >
-                Allow Microphone Access
-              </Button>
+              {microphonePermission === 'denied' ? (
+                <Button
+                  onClick={() => {
+                    toast({
+                      title: 'Enable Microphone',
+                      description:
+                        'Please check your browser settings to enable microphone access, then refresh the page.',
+                    });
+                  }}
+                  className="w-full sm:w-auto"
+                  variant="outline"
+                >
+                  Check Browser Settings
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleRequestPermission}
+                  className="w-full sm:w-auto"
+                >
+                  Allow Microphone Access
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <div className="w-full space-y-6 pb-16">
-          {/* Header with patient info */}
+          {/* Header */}
           <Card className="w-full bg-card">
             <CardHeader>
               <CardTitle className="text-center text-1xl font-bold">
@@ -884,26 +934,35 @@ const FormPage = () => {
 
               <div className="flex justify-center py-2">
                 <AudioRecorder
+                  key={audioRecorderKey} // Force reset when key changes
                   onAudioEncoded={handleAudioEncoded}
                   isProcessing={isProcessing}
                   label="Record for form"
                   isDisabled={
-                    recordingMode === 'section' ||
-                    microphonePermission !== 'granted'
-                  } // Disable when in section mode or no mic permission
+                    microphonePermission !== 'granted' ||
+                    !isConnected ||
+                    isProcessing
+                  }
                 />
               </div>
 
-              {/* Only show global transcription box when not in section mode */}
+              {/* Global transcription box - only show when not in section mode */}
               {recordingMode !== 'section' && (
                 <TranscriptionBox
+                  key={`global-transcription-${audioRecorderKey}`} // Force re-render when audio recorder resets
                   value={transcriptText}
                   onChange={(text) => {
+                    console.log('=== Global TranscriptionBox onChange ===');
+                    console.log('Previous transcriptText:', transcriptText);
+                    console.log('New text from TranscriptionBox:', text);
+                    console.log('Current recording mode:', recordingMode);
+
                     setTranscription(text);
                     setTranscriptText(text);
-                    // Reset processed flag if text changes in idle mode
-                    if (text !== transcriptText && recordingMode === 'idle') {
-                      setTranscriptionProcessed(false);
+
+                    // Switch to global mode when user starts typing
+                    if (text.trim().length > 0 && recordingMode === 'idle') {
+                      console.log('Switching to global mode due to text input');
                       setRecordingMode('global');
                     }
                   }}
@@ -921,15 +980,13 @@ const FormPage = () => {
                     isProcessing ||
                     !transcriptText.trim() ||
                     !isConnected ||
-                    recordingMode === 'section' || // Disable in section mode
-                    transcriptionProcessed || // Disable if already processed
-                    microphonePermission !== 'granted' // Disable if no mic permission
+                    recordingMode === 'section' ||
+                    microphonePermission !== 'granted'
                   }
                   variant={
                     isProcessing ||
                     !transcriptText.trim() ||
                     !isConnected ||
-                    transcriptionProcessed ||
                     microphonePermission !== 'granted'
                       ? 'outline'
                       : 'default'

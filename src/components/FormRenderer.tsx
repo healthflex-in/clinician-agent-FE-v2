@@ -131,17 +131,25 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
     const { toast } = useToast();
 
+    // Add state for forcing audio recorder reset in sections
+    const [sectionRecorderKeys, setSectionRecorderKeys] = useState<
+      Record<string, number>
+    >({});
+
     // Initialize section transcriptions with empty strings for all sections
     useEffect(() => {
       const sections =
         FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
       const initialTranscriptions: Record<string, string> = {};
+      const initialRecorderKeys: Record<string, number> = {};
 
       sections.forEach((section) => {
         initialTranscriptions[section] = '';
+        initialRecorderKeys[section] = 0;
       });
 
       setSectionTranscriptions(initialTranscriptions);
+      setSectionRecorderKeys(initialRecorderKeys);
       // Reset processed sections when form key changes
       setProcessedSections(new Set());
     }, [formKey]);
@@ -268,112 +276,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       return false;
     };
 
-    // Method for LLM to update form data
-    const updateFormWithLLMData = useCallback(
-      (llmData: any) => {
-        console.log('Updating form with LLM data:', llmData);
-
-        // Check if there's a structured payload - indicates form is filled
-        if (llmData.payloadType === 'structured' && llmData.formData) {
-          console.log(
-            'Received structured form data - stopping all processing'
-          );
-
-          // Mark ALL sections as processed
-          const allSections =
-            FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
-          setProcessedSections(new Set(allSections));
-
-          // Clear all timeouts
-          Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
-            clearTimeout(timeoutId);
-          });
-          autoProcessTimeoutsRef.current = {};
-
-          // Use the incoming form data
-          llmData = { formData: llmData.formData };
-        }
-
-        // Process suggestions
-        if (llmData.suggestions) {
-          setSuggestions(llmData.suggestions);
-
-          // Auto-hide suggestions after 7 seconds
-          setTimeout(() => {
-            setSuggestions(null);
-          }, 7000);
-        }
-
-        // Process the formData if it exists
-        if (llmData.formData) {
-          // If no sections are selected, update all sections
-          if (selectedSections.size === 0) {
-            // Just use the complete formData as is
-            dispatch({
-              type: 'MERGE_LLM_DATA',
-              data: llmData.formData,
-              source: 'llm',
-            });
-
-            // Notify parent component about LLM update
-            if (onLLMUpdate) onLLMUpdate(llmData.formData);
-          } else {
-            // Only update selected sections
-            const selectedSectionsData: any = {};
-
-            // Start with a copy of the original data
-            Object.keys(llmData.formData).forEach((key) => {
-              // Only include keys that are in the selectedSections set
-              if (selectedSections.has(key)) {
-                selectedSectionsData[key] = llmData.formData[key];
-              }
-            });
-
-            // Only dispatch if we have data for selected sections
-            if (Object.keys(selectedSectionsData).length > 0) {
-              dispatch({
-                type: 'MERGE_LLM_DATA',
-                data: selectedSectionsData,
-                source: 'llm',
-              });
-
-              // Notify parent component about LLM update
-              if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
-            } else {
-              toast({
-                title: 'No Updates for Selected Sections',
-                description:
-                  'The AI did not provide data for your selected sections',
-              });
-            }
-          }
-
-          // Mark the active section as processed
-          if (activeSectionTranscription) {
-            setProcessedSections((prev) => {
-              const newSet = new Set(prev);
-              newSet.add(activeSectionTranscription);
-              return newSet;
-            });
-          }
-
-          // Clear all auto-processing timeouts
-          Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
-            clearTimeout(timeoutId);
-          });
-          autoProcessTimeoutsRef.current = {};
-        }
-      },
-      [
-        onLLMUpdate,
-        selectedSections,
-        toast,
-        activeSectionTranscription,
-        formKey,
-      ]
-    );
-
-    // Update section transcription
+    // CRITICAL FIX 1: Update the updateSectionTranscription function
     const updateSectionTranscription = useCallback(
       (sectionPath: string, text: string) => {
         console.log(
@@ -386,65 +289,42 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           return;
         }
 
-        // Only update if this is the active section in section mode
-        if (recordingMode !== 'section' || activeSectionPath !== sectionPath) {
-          console.log(
-            `Ignoring update for ${sectionPath} - not the active section or wrong mode`
-          );
-          return;
-        }
-
-        // Update the transcription text
-        setSectionTranscriptions((prev) => ({
-          ...prev,
-          [sectionPath]: text,
-        }));
-        setActiveSectionTranscription(sectionPath);
-
-        // Set up auto-processing after 5 seconds of inactivity
-        // Clear any existing timeout for this section
-        if (autoProcessTimeoutsRef.current[sectionPath]) {
-          clearTimeout(autoProcessTimeoutsRef.current[sectionPath]);
-        }
-
-        // Only set up auto-processing if we're in section mode and this section isn't processed
+        // Allow updates in these cases:
+        // 1. Section mode and this is the active section
+        // 2. Idle mode (manual editing)
+        // 3. No active section (first interaction)
         if (
-          recordingMode === 'section' &&
-          !processedSections.has(sectionPath)
+          (recordingMode === 'section' && activeSectionPath === sectionPath) ||
+          recordingMode === 'idle' ||
+          !activeSectionPath
         ) {
-          autoProcessTimeoutsRef.current[sectionPath] = setTimeout(() => {
-            // Double-check we're still in the right mode and section before processing
-            // and that the section hasn't been processed yet
-            if (
-              recordingMode === 'section' &&
-              activeSectionPath === sectionPath &&
-              !processedSections.has(sectionPath)
-            ) {
-              console.log(
-                `Auto-processing section ${sectionPath} after inactivity`
-              );
-              handleSectionTranscriptionProcess(sectionPath);
-            } else {
-              console.log(
-                `Skipping auto-process for ${sectionPath}:`,
-                recordingMode !== 'section'
-                  ? 'not in section mode'
-                  : activeSectionPath !== sectionPath
-                  ? 'not active section'
-                  : 'already processed'
-              );
-            }
-            // Clear the timeout reference
-            delete autoProcessTimeoutsRef.current[sectionPath];
-          }, 5000);
+          // Update the transcription text
+          setSectionTranscriptions((prev) => ({
+            ...prev,
+            [sectionPath]: text,
+          }));
+          setActiveSectionTranscription(sectionPath);
+
+          // Clear any existing timeout for this section
+          if (autoProcessTimeoutsRef.current[sectionPath]) {
+            clearTimeout(autoProcessTimeoutsRef.current[sectionPath]);
+          }
+
+          // Set up auto-processing only if we have text and section isn't processed
+          if (text.trim() && !processedSections.has(sectionPath)) {
+            autoProcessTimeoutsRef.current[sectionPath] = setTimeout(() => {
+              if (!processedSections.has(sectionPath)) {
+                console.log(
+                  `Auto-processing section ${sectionPath} after inactivity`
+                );
+                handleSectionTranscriptionProcess(sectionPath);
+              }
+              delete autoProcessTimeoutsRef.current[sectionPath];
+            }, 5000);
+          }
         }
       },
-      [
-        sectionTranscriptions,
-        processedSections,
-        recordingMode,
-        activeSectionPath,
-      ]
+      [processedSections, recordingMode, activeSectionPath]
     );
 
     // Clear section transcription
@@ -471,39 +351,28 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       }
     }, []);
 
-    // Process section transcription
+    // CRITICAL FIX 2: Update the handleSectionTranscriptionProcess function
     const handleSectionTranscriptionProcess = useCallback(
       (sectionPath: string) => {
         if (!onTranscriptionProcess) return;
 
-        // Detailed log for debugging
-        console.log(
-          `Processing request for section ${sectionPath}:`,
-          `Mode: ${recordingMode}`,
-          `Active section: ${activeSectionPath}`,
-          `Already processed: ${processedSections.has(sectionPath)}`
-        );
+        console.log(`Processing request for section ${sectionPath}`);
 
-        // Skip processing if:
-        // 1. Not in section mode, or
-        // 2. This is not the active section, or
-        // 3. This section has already been processed
-        if (
-          recordingMode !== 'section' ||
-          activeSectionPath !== sectionPath ||
-          processedSections.has(sectionPath)
-        ) {
-          console.log(`Skipping process for section ${sectionPath}`);
-          return;
-        }
-
+        // Allow processing if section has text and isn't already processed
         const transcription = sectionTranscriptions[sectionPath] || '';
-        if (!transcription || !transcription.trim()) {
+        const isAlreadyProcessed = processedSections.has(sectionPath);
+
+        if (!transcription.trim()) {
           toast({
             title: 'Empty transcription',
             description: 'Please record audio or enter text to process',
             variant: 'destructive',
           });
+          return;
+        }
+
+        if (isAlreadyProcessed) {
+          console.log(`Section ${sectionPath} already processed, skipping`);
           return;
         }
 
@@ -517,7 +386,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
         console.log(`Processing transcription for section: ${sectionPath}`);
 
-        // Mark this section as processed BEFORE sending to prevent any race conditions
+        // Mark this section as processed BEFORE sending
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
           newSet.add(sectionPath);
@@ -530,7 +399,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           delete autoProcessTimeoutsRef.current[sectionPath];
         }
 
-        // Now send the transcription
+        // Send the transcription
         onTranscriptionProcess(transcription, context);
       },
       [
@@ -541,8 +410,6 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         toast,
         selectedSections,
         processedSections,
-        recordingMode,
-        activeSectionPath,
       ]
     );
 
@@ -551,8 +418,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       (sectionPath: string) => {
         if (
           !processedSections.has(sectionPath) &&
-          recordingMode === 'section' &&
-          activeSectionPath === sectionPath
+          sectionTranscriptions[sectionPath]?.trim()
         ) {
           handleSectionTranscriptionProcess(sectionPath);
         }
@@ -560,43 +426,45 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       [
         handleSectionTranscriptionProcess,
         processedSections,
-        recordingMode,
-        activeSectionPath,
+        sectionTranscriptions,
       ]
     );
 
-    // Update transcription for a section - MANUAL user typing
+    // CRITICAL FIX 3: Update the handleTranscriptionChange function
     const handleTranscriptionChange = useCallback(
       (sectionPath: string, text: string) => {
-        // Only allow changes if:
-        // 1. In idle mode (manual editing), or
-        // 2. In section mode and this is the active section
-        if (
-          recordingMode === 'idle' ||
-          (recordingMode === 'section' && activeSectionPath === sectionPath)
-        ) {
-          setSectionTranscriptions((prev) => ({
-            ...prev,
-            [sectionPath]: text,
-          }));
+        console.log(
+          `Manual transcription change for ${sectionPath}: "${text}"`
+        );
 
-          // If we have text and we're in idle mode, transition to section mode
-          if (text.trim().length > 0 && recordingMode === 'idle') {
-            // This is handled by the parent component, but we set the active section
-            setActiveSectionTranscription(sectionPath);
-          }
+        // Always allow manual text changes
+        setSectionTranscriptions((prev) => ({
+          ...prev,
+          [sectionPath]: text,
+        }));
 
-          // Reset processed status when text changes
-          if (text !== sectionTranscriptions[sectionPath]) {
-            setProcessedSections((prev) => {
-              const newSet = new Set(prev);
-              newSet.delete(sectionPath);
-              return newSet;
-            });
-          }
+        // Reset processed status when text changes manually (important for reprocessing)
+        setProcessedSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(sectionPath);
+          console.log(
+            `Removed ${sectionPath} from processed sections. New set:`,
+            Array.from(newSet)
+          );
+          return newSet;
+        });
+
+        // Clear any existing timeout
+        if (autoProcessTimeoutsRef.current[sectionPath]) {
+          clearTimeout(autoProcessTimeoutsRef.current[sectionPath]);
+          delete autoProcessTimeoutsRef.current[sectionPath];
         }
+
+        // Set active section for transcription
+        setActiveSectionTranscription(sectionPath);
+        console.log(`Set active section transcription to: ${sectionPath}`);
       },
-      [sectionTranscriptions, recordingMode, activeSectionPath]
+      []
     );
 
     // Handle field reset
@@ -637,6 +505,224 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         }
       },
       [toast, sectionTranscriptions]
+    );
+
+    // CRITICAL FIX 4: Update the updateFormWithLLMData function
+    const updateFormWithLLMData = useCallback(
+      (llmData: any) => {
+        console.log('=== Updating form with LLM data ===');
+        console.log('LLM Data:', llmData);
+        console.log(
+          'Active section transcription:',
+          activeSectionTranscription
+        );
+        console.log('Selected sections:', Array.from(selectedSections));
+        console.log('Current transcriptions:', sectionTranscriptions);
+
+        // Handle structured payload
+        if (llmData.payloadType === 'structured' && llmData.formData) {
+          console.log(
+            'Received structured form data - stopping all processing'
+          );
+
+          // Mark ALL sections as processed and clear all transcriptions
+          const allSections =
+            FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
+          setProcessedSections(new Set(allSections));
+
+          // Clear all section transcriptions
+          const clearedTranscriptions: Record<string, string> = {};
+          const resetRecorderKeys: Record<string, number> = {};
+          allSections.forEach((section) => {
+            clearedTranscriptions[section] = '';
+            resetRecorderKeys[section] =
+              (sectionRecorderKeys[section] || 0) + 1;
+          });
+          setSectionTranscriptions(clearedTranscriptions);
+          setSectionRecorderKeys(resetRecorderKeys);
+
+          // Clear all timeouts
+          Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
+            clearTimeout(timeoutId);
+          });
+          autoProcessTimeoutsRef.current = {};
+
+          llmData = { formData: llmData.formData };
+        }
+
+        // Process suggestions
+        if (llmData.suggestions) {
+          setSuggestions(llmData.suggestions);
+          setTimeout(() => setSuggestions(null), 7000);
+        }
+
+        // Process form data
+        if (llmData.formData) {
+          if (selectedSections.size === 0) {
+            // Update all sections
+            dispatch({
+              type: 'MERGE_LLM_DATA',
+              data: llmData.formData,
+              source: 'llm',
+            });
+            if (onLLMUpdate) onLLMUpdate(llmData.formData);
+
+            // Clear transcription for active section when updating all sections
+            if (activeSectionTranscription) {
+              const sectionToProcess = activeSectionTranscription;
+              console.log(
+                `Clearing transcription for section: ${sectionToProcess}`
+              );
+
+              // Clear the transcription for the processed section
+              setSectionTranscriptions((prev) => {
+                console.log(`Previous transcriptions:`, prev);
+                const newTranscriptions = {
+                  ...prev,
+                  [sectionToProcess]: '',
+                };
+                console.log(`New transcriptions:`, newTranscriptions);
+                return newTranscriptions;
+              });
+
+              // Force reset of section audio recorder
+              setSectionRecorderKeys((prev) => ({
+                ...prev,
+                [sectionToProcess]: (prev[sectionToProcess] || 0) + 1,
+              }));
+
+              // Mark section as processed
+              setProcessedSections((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(sectionToProcess);
+                return newSet;
+              });
+
+              // Clear timeout for processed section
+              if (autoProcessTimeoutsRef.current[sectionToProcess]) {
+                clearTimeout(autoProcessTimeoutsRef.current[sectionToProcess]);
+                delete autoProcessTimeoutsRef.current[sectionToProcess];
+              }
+
+              // Reset active section transcription
+              setActiveSectionTranscription(null);
+            } else {
+              // FALLBACK: If no active section but we have form data, check if any section has text
+              // This handles cases where processing happens but activeSectionTranscription is null
+              console.log(
+                'No active section, checking for sections with transcription text'
+              );
+              const sectionsWithText = Object.entries(
+                sectionTranscriptions
+              ).filter(([_, text]) => text.trim());
+              console.log('Sections with text:', sectionsWithText);
+
+              if (sectionsWithText.length > 0) {
+                // Clear the first section with text (or all sections with text)
+                setSectionTranscriptions((prev) => {
+                  const newTranscriptions = { ...prev };
+                  sectionsWithText.forEach(([sectionPath, _]) => {
+                    console.log(
+                      `Clearing transcription for section (fallback): ${sectionPath}`
+                    );
+                    newTranscriptions[sectionPath] = '';
+
+                    // Also reset the recorder for this section
+                    setSectionRecorderKeys((prevKeys) => ({
+                      ...prevKeys,
+                      [sectionPath]: (prevKeys[sectionPath] || 0) + 1,
+                    }));
+
+                    // Mark as processed
+                    setProcessedSections((prevProcessed) => {
+                      const newSet = new Set(prevProcessed);
+                      newSet.add(sectionPath);
+                      return newSet;
+                    });
+                  });
+                  return newTranscriptions;
+                });
+              }
+            }
+          } else {
+            // Only update selected sections
+            const selectedSectionsData: any = {};
+            Object.keys(llmData.formData).forEach((key) => {
+              if (selectedSections.has(key)) {
+                selectedSectionsData[key] = llmData.formData[key];
+              }
+            });
+
+            if (Object.keys(selectedSectionsData).length > 0) {
+              dispatch({
+                type: 'MERGE_LLM_DATA',
+                data: selectedSectionsData,
+                source: 'llm',
+              });
+              if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
+
+              // Clear transcription for the active section if it was updated
+              if (
+                activeSectionTranscription &&
+                selectedSections.has(activeSectionTranscription)
+              ) {
+                const sectionToProcess = activeSectionTranscription;
+                console.log(
+                  `Clearing transcription for selected section: ${sectionToProcess}`
+                );
+
+                // Clear the transcription for the processed section
+                setSectionTranscriptions((prev) => {
+                  console.log(`Previous transcriptions:`, prev);
+                  const newTranscriptions = {
+                    ...prev,
+                    [sectionToProcess]: '',
+                  };
+                  console.log(`New transcriptions:`, newTranscriptions);
+                  return newTranscriptions;
+                });
+
+                // Force reset of section audio recorder
+                setSectionRecorderKeys((prev) => ({
+                  ...prev,
+                  [sectionToProcess]: (prev[sectionToProcess] || 0) + 1,
+                }));
+
+                // Mark section as processed
+                setProcessedSections((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(sectionToProcess);
+                  return newSet;
+                });
+
+                // Clear timeout for processed section
+                if (autoProcessTimeoutsRef.current[sectionToProcess]) {
+                  clearTimeout(
+                    autoProcessTimeoutsRef.current[sectionToProcess]
+                  );
+                  delete autoProcessTimeoutsRef.current[sectionToProcess];
+                }
+
+                // Reset active section transcription
+                setActiveSectionTranscription(null);
+              }
+            } else {
+              toast({
+                title: 'No Updates for Selected Sections',
+                description:
+                  'The AI did not provide data for your selected sections',
+              });
+            }
+          }
+        }
+      },
+      [
+        onLLMUpdate,
+        selectedSections,
+        toast,
+        activeSectionTranscription,
+        formKey,
+      ]
     );
 
     // IMPORTANT: Expose methods to the parent via ref
@@ -700,7 +786,26 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       });
     }, []);
 
-    // Render section transcription box
+    // Handle section audio recording
+    const handleSectionAudioRecorded = useCallback(
+      (base64Audio: string, sectionPath: string) => {
+        if (!onAudioRecorded) return;
+
+        // Send audio with section-specific context
+        const context = {
+          formKey,
+          formData: state,
+          sectionPath,
+          selectedSections: Array.from(selectedSections),
+        };
+
+        console.log(`Recording audio for section: ${sectionPath}`);
+        onAudioRecorded(base64Audio, context);
+      },
+      [formKey, state, onAudioRecorded, selectedSections]
+    );
+
+    // CRITICAL FIX 5: Update the renderSectionTranscriptionBox function
     const renderSectionTranscriptionBox = (sectionPath: string) => {
       const transcription = sectionTranscriptions[sectionPath] || '';
       const isActiveSection = activeSectionPath === sectionPath;
@@ -728,6 +833,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                 </label>
               </div>
               <FieldAudioRecorder
+                key={`${sectionPath}-${sectionRecorderKeys[sectionPath] || 0}`} // Force reset when key changes
                 onAudioRecorded={(base64Audio) =>
                   handleSectionAudioRecorded(base64Audio, sectionPath)
                 }
@@ -735,9 +841,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                 isDisabled={
                   !isWebSocketConnected ||
                   isProcessing ||
-                  recordingMode === 'global' || // Disable section recording when in global mode
-                  (recordingMode === 'section' &&
-                    activeSectionPath !== sectionPath) // Only allow recording for active section
+                  recordingMode === 'global'
+                  // REMOVED: || (recordingMode === 'section' && activeSectionPath !== sectionPath)
+                  // This was preventing other sections from being active after one section was processed
                 }
               />
             </div>
@@ -751,10 +857,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                 isProcessing ||
                 !transcription.trim() ||
                 !isWebSocketConnected ||
-                isAlreadyProcessed ||
-                (recordingMode !== 'idle' &&
-                  (recordingMode !== 'section' ||
-                    activeSectionPath !== sectionPath))
+                isAlreadyProcessed
               }
             >
               <SendHorizonal className="h-4 w-4" />
@@ -765,33 +868,14 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             value={transcription}
             onChange={(text) => handleTranscriptionChange(sectionPath, text)}
             isProcessing={isProcessing && isActiveSection}
-            autoProcess={() => {}} // Disable auto-processing in TranscriptionBox
-            autoProcessDelay={0} // We manage timeouts ourselves
+            autoProcess={() => handleSectionAutoProcess(sectionPath)}
+            autoProcessDelay={5000}
             className="min-h-12 text-sm"
             placeholder={`Speak or type to enter information for this section...`}
           />
         </div>
       );
     };
-
-    // Handle section audio recording
-    const handleSectionAudioRecorded = useCallback(
-      (base64Audio: string, sectionPath: string) => {
-        if (!onAudioRecorded) return;
-
-        // Send audio with section-specific context
-        const context = {
-          formKey,
-          formData: state,
-          sectionPath,
-          selectedSections: Array.from(selectedSections),
-        };
-
-        console.log(`Recording audio for section: ${sectionPath}`);
-        onAudioRecorded(base64Audio, context);
-      },
-      [formKey, state, onAudioRecorded, selectedSections]
-    );
 
     // Determine the appropriate input field type based on the data type
     const renderInputForType = (

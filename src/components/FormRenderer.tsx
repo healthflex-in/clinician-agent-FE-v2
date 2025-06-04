@@ -83,6 +83,21 @@ const FORM_SECTIONS = {
   snc: ['plans', 'advice'],
 };
 
+// Check if a path represents a plan item that should have audio recording
+const isPlanPath = (path: string, formKey: string): boolean => {
+  // For SNC forms: plans.0, plans.1, etc.
+  if (formKey === 'snc') {
+    return /^plans\.\d+$/.test(path);
+  }
+
+  // For Assessment forms: plan.plans.0, plan.plans.1, etc.
+  if (formKey === 'assessment') {
+    return /^plan\.plans\.\d+$/.test(path);
+  }
+
+  return false;
+};
+
 // Important: Use React.forwardRef here
 const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
   (
@@ -111,8 +126,20 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     const [sectionTranscriptions, setSectionTranscriptions] = useState<
       Record<string, string>
     >({});
+
+    // NEW: Add plan-level transcriptions
+    const [planTranscriptions, setPlanTranscriptions] = useState<
+      Record<string, string>
+    >({});
+
     const [activeSectionTranscription, setActiveSectionTranscription] =
       useState<string | null>(null);
+
+    // NEW: Track active plan transcription
+    const [activePlanTranscription, setActivePlanTranscription] = useState<
+      string | null
+    >(null);
+
     // New state for selected sections - starts with empty set (none selected)
     const [selectedSections, setSelectedSections] = useState<Set<string>>(
       new Set()
@@ -121,6 +148,12 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     const [processedSections, setProcessedSections] = useState<Set<string>>(
       new Set()
     );
+
+    // NEW: Track processed plans
+    const [processedPlans, setProcessedPlans] = useState<Set<string>>(
+      new Set()
+    );
+
     // Add state for form submission
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -129,10 +162,20 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       {}
     );
 
+    // NEW: Track auto-processing timeouts for each plan
+    const planAutoProcessTimeoutsRef = useRef<{
+      [key: string]: NodeJS.Timeout;
+    }>({});
+
     const { toast } = useToast();
 
     // Add state for forcing audio recorder reset in sections
     const [sectionRecorderKeys, setSectionRecorderKeys] = useState<
+      Record<string, number>
+    >({});
+
+    // NEW: Add state for forcing audio recorder reset in plans
+    const [planRecorderKeys, setPlanRecorderKeys] = useState<
       Record<string, number>
     >({});
 
@@ -152,21 +195,37 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       setSectionRecorderKeys(initialRecorderKeys);
       // Reset processed sections when form key changes
       setProcessedSections(new Set());
+
+      // NEW: Reset plan-related state
+      setPlanTranscriptions({});
+      setPlanRecorderKeys({});
+      setProcessedPlans(new Set());
     }, [formKey]);
 
     // Clean up timeouts when component unmounts or recording mode changes
     useEffect(() => {
-      // Clear all timeouts when recording mode changes
+      // Clear all section timeouts when recording mode changes
       Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
         clearTimeout(timeoutId);
       });
       autoProcessTimeoutsRef.current = {};
+
+      // NEW: Clear all plan timeouts
+      Object.values(planAutoProcessTimeoutsRef.current).forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      planAutoProcessTimeoutsRef.current = {};
 
       return () => {
         // Clean up on unmount
         Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
           clearTimeout(timeoutId);
         });
+        Object.values(planAutoProcessTimeoutsRef.current).forEach(
+          (timeoutId) => {
+            clearTimeout(timeoutId);
+          }
+        );
       };
     }, [recordingMode]);
 
@@ -275,6 +334,168 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
       return false;
     };
+
+    // NEW: Plan transcription update function
+    const updatePlanTranscription = useCallback(
+      (planPath: string, text: string) => {
+        console.log(
+          `Updating plan transcription for ${planPath} with text: ${text}`
+        );
+
+        // Skip if plan is already processed
+        if (processedPlans.has(planPath)) {
+          console.log(`Ignoring update for ${planPath} - already processed`);
+          return;
+        }
+
+        // Update the transcription text
+        setPlanTranscriptions((prev) => ({
+          ...prev,
+          [planPath]: text,
+        }));
+        setActivePlanTranscription(planPath);
+
+        // Clear any existing timeout for this plan
+        if (planAutoProcessTimeoutsRef.current[planPath]) {
+          clearTimeout(planAutoProcessTimeoutsRef.current[planPath]);
+        }
+
+        // Set up auto-processing only if we have text and plan isn't processed
+        if (text.trim() && !processedPlans.has(planPath)) {
+          planAutoProcessTimeoutsRef.current[planPath] = setTimeout(() => {
+            if (!processedPlans.has(planPath)) {
+              console.log(`Auto-processing plan ${planPath} after inactivity`);
+              handlePlanTranscriptionProcess(planPath);
+            }
+            delete planAutoProcessTimeoutsRef.current[planPath];
+          }, 5000);
+        }
+      },
+      [processedPlans]
+    );
+
+    // NEW: Clear plan transcription
+    const clearPlanTranscription = useCallback((planPath: string) => {
+      // Clear the transcription text
+      setPlanTranscriptions((prev) => ({
+        ...prev,
+        [planPath]: '',
+      }));
+
+      // Reset processed status
+      setProcessedPlans((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(planPath);
+        return newSet;
+      });
+
+      setActivePlanTranscription(planPath);
+
+      // Clear any existing timeout
+      if (planAutoProcessTimeoutsRef.current[planPath]) {
+        clearTimeout(planAutoProcessTimeoutsRef.current[planPath]);
+        delete planAutoProcessTimeoutsRef.current[planPath];
+      }
+    }, []);
+
+    // NEW: Plan transcription processing
+    const handlePlanTranscriptionProcess = useCallback(
+      (planPath: string) => {
+        if (!onTranscriptionProcess) return;
+
+        console.log(`Processing request for plan ${planPath}`);
+
+        // Allow processing if plan has text and isn't already processed
+        const transcription = planTranscriptions[planPath] || '';
+        const isAlreadyProcessed = processedPlans.has(planPath);
+
+        if (!transcription.trim()) {
+          toast({
+            title: 'Empty transcription',
+            description: 'Please record audio or enter text to process',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (isAlreadyProcessed) {
+          console.log(`Plan ${planPath} already processed, skipping`);
+          return;
+        }
+
+        // Send transcription with plan-specific context
+        const context = {
+          formKey,
+          formData: state,
+          planPath, // This is the specific plan path like "plans.0" or "plan.plans.1"
+          selectedSections: Array.from(selectedSections),
+        };
+
+        console.log(`Processing transcription for plan: ${planPath}`);
+
+        // Mark this plan as processed BEFORE sending
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(planPath);
+          return newSet;
+        });
+
+        // Clear any timeout for this plan
+        if (planAutoProcessTimeoutsRef.current[planPath]) {
+          clearTimeout(planAutoProcessTimeoutsRef.current[planPath]);
+          delete planAutoProcessTimeoutsRef.current[planPath];
+        }
+
+        // Send the transcription
+        onTranscriptionProcess(transcription, context);
+      },
+      [
+        formKey,
+        state,
+        planTranscriptions,
+        onTranscriptionProcess,
+        toast,
+        selectedSections,
+        processedPlans,
+      ]
+    );
+
+    // NEW: Handle plan transcription manual changes
+    const handlePlanTranscriptionChange = useCallback(
+      (planPath: string, text: string) => {
+        console.log(
+          `Manual plan transcription change for ${planPath}: "${text}"`
+        );
+
+        // Always allow manual text changes
+        setPlanTranscriptions((prev) => ({
+          ...prev,
+          [planPath]: text,
+        }));
+
+        // Reset processed status when text changes manually
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(planPath);
+          console.log(
+            `Removed ${planPath} from processed plans. New set:`,
+            Array.from(newSet)
+          );
+          return newSet;
+        });
+
+        // Clear any existing timeout
+        if (planAutoProcessTimeoutsRef.current[planPath]) {
+          clearTimeout(planAutoProcessTimeoutsRef.current[planPath]);
+          delete planAutoProcessTimeoutsRef.current[planPath];
+        }
+
+        // Set active plan for transcription
+        setActivePlanTranscription(planPath);
+        console.log(`Set active plan transcription to: ${planPath}`);
+      },
+      []
+    );
 
     // CRITICAL FIX 1: Update the updateSectionTranscription function
     const updateSectionTranscription = useCallback(
@@ -430,6 +651,19 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       ]
     );
 
+    // NEW: Create wrapper for plan auto-processing
+    const handlePlanAutoProcess = useCallback(
+      (planPath: string) => {
+        if (
+          !processedPlans.has(planPath) &&
+          planTranscriptions[planPath]?.trim()
+        ) {
+          handlePlanTranscriptionProcess(planPath);
+        }
+      },
+      [handlePlanTranscriptionProcess, processedPlans, planTranscriptions]
+    );
+
     // CRITICAL FIX 3: Update the handleTranscriptionChange function
     const handleTranscriptionChange = useCallback(
       (sectionPath: string, text: string) => {
@@ -498,13 +732,34 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             }
           }
 
+          // NEW: Also clear plan transcription if it's a plan path
+          if (isPlanPath(path, formKey)) {
+            setPlanTranscriptions((prev) => ({
+              ...prev,
+              [path]: '',
+            }));
+
+            // Remove from processed plans
+            setProcessedPlans((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(path);
+              return newSet;
+            });
+
+            // Clear any timeout for this plan
+            if (planAutoProcessTimeoutsRef.current[path]) {
+              clearTimeout(planAutoProcessTimeoutsRef.current[path]);
+              delete planAutoProcessTimeoutsRef.current[path];
+            }
+          }
+
           toast({
             title: 'Field Reset',
             description: 'Field has been reset to default value',
           });
         }
       },
-      [toast, sectionTranscriptions]
+      [toast, sectionTranscriptions, formKey]
     );
 
     // CRITICAL FIX 4: Update the updateFormWithLLMData function
@@ -516,8 +771,10 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           'Active section transcription:',
           activeSectionTranscription
         );
+        console.log('Active plan transcription:', activePlanTranscription);
         console.log('Selected sections:', Array.from(selectedSections));
         console.log('Current transcriptions:', sectionTranscriptions);
+        console.log('Current plan transcriptions:', planTranscriptions);
 
         // Handle structured payload
         if (llmData.payloadType === 'structured' && llmData.formData) {
@@ -541,11 +798,23 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           setSectionTranscriptions(clearedTranscriptions);
           setSectionRecorderKeys(resetRecorderKeys);
 
+          // NEW: Clear all plan transcriptions
+          setPlanTranscriptions({});
+          setPlanRecorderKeys({});
+          setProcessedPlans(new Set());
+
           // Clear all timeouts
           Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
             clearTimeout(timeoutId);
           });
           autoProcessTimeoutsRef.current = {};
+
+          Object.values(planAutoProcessTimeoutsRef.current).forEach(
+            (timeoutId) => {
+              clearTimeout(timeoutId);
+            }
+          );
+          planAutoProcessTimeoutsRef.current = {};
 
           llmData = { formData: llmData.formData };
         }
@@ -606,9 +875,85 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
               // Reset active section transcription
               setActiveSectionTranscription(null);
+            }
+
+            // NEW: Clear transcription for active plan when updating
+            if (activePlanTranscription) {
+              const planToProcess = activePlanTranscription;
+              console.log(`Clearing transcription for plan: ${planToProcess}`);
+
+              // Clear the transcription for the processed plan
+              setPlanTranscriptions((prev) => {
+                console.log(`Previous plan transcriptions:`, prev);
+                const newTranscriptions = {
+                  ...prev,
+                  [planToProcess]: '',
+                };
+                console.log(`New plan transcriptions:`, newTranscriptions);
+                return newTranscriptions;
+              });
+
+              // Force reset of plan audio recorder
+              setPlanRecorderKeys((prev) => ({
+                ...prev,
+                [planToProcess]: (prev[planToProcess] || 0) + 1,
+              }));
+
+              // Mark plan as processed
+              setProcessedPlans((prev) => {
+                const newSet = new Set(prev);
+                newSet.add(planToProcess);
+                return newSet;
+              });
+
+              // Clear timeout for processed plan
+              if (planAutoProcessTimeoutsRef.current[planToProcess]) {
+                clearTimeout(planAutoProcessTimeoutsRef.current[planToProcess]);
+                delete planAutoProcessTimeoutsRef.current[planToProcess];
+              }
+
+              // Reset active plan transcription
+              setActivePlanTranscription(null);
             } else {
-              // FALLBACK: If no active section but we have form data, check if any section has text
-              // This handles cases where processing happens but activeSectionTranscription is null
+              // FALLBACK: If no active plan but we have form data, check if any plan has text
+              console.log(
+                'No active plan, checking for plans with transcription text'
+              );
+              const plansWithText = Object.entries(planTranscriptions).filter(
+                ([_, text]) => text.trim()
+              );
+              console.log('Plans with text:', plansWithText);
+
+              if (plansWithText.length > 0) {
+                // Clear the first plan with text (or all plans with text)
+                setPlanTranscriptions((prev) => {
+                  const newTranscriptions = { ...prev };
+                  plansWithText.forEach(([planPath, _]) => {
+                    console.log(
+                      `Clearing transcription for plan (fallback): ${planPath}`
+                    );
+                    newTranscriptions[planPath] = '';
+
+                    // Also reset the recorder for this plan
+                    setPlanRecorderKeys((prevKeys) => ({
+                      ...prevKeys,
+                      [planPath]: (prevKeys[planPath] || 0) + 1,
+                    }));
+
+                    // Mark as processed
+                    setProcessedPlans((prevProcessed) => {
+                      const newSet = new Set(prevProcessed);
+                      newSet.add(planPath);
+                      return newSet;
+                    });
+                  });
+                  return newTranscriptions;
+                });
+              }
+            }
+
+            // Also handle section fallback as before
+            if (!activeSectionTranscription) {
               console.log(
                 'No active section, checking for sections with transcription text'
               );
@@ -706,6 +1051,49 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                 // Reset active section transcription
                 setActiveSectionTranscription(null);
               }
+
+              // NEW: Clear transcription for the active plan if it was updated
+              if (activePlanTranscription) {
+                const planToProcess = activePlanTranscription;
+                console.log(
+                  `Clearing transcription for selected plan: ${planToProcess}`
+                );
+
+                // Clear the transcription for the processed plan
+                setPlanTranscriptions((prev) => {
+                  console.log(`Previous plan transcriptions:`, prev);
+                  const newTranscriptions = {
+                    ...prev,
+                    [planToProcess]: '',
+                  };
+                  console.log(`New plan transcriptions:`, newTranscriptions);
+                  return newTranscriptions;
+                });
+
+                // Force reset of plan audio recorder
+                setPlanRecorderKeys((prev) => ({
+                  ...prev,
+                  [planToProcess]: (prev[planToProcess] || 0) + 1,
+                }));
+
+                // Mark plan as processed
+                setProcessedPlans((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(planToProcess);
+                  return newSet;
+                });
+
+                // Clear timeout for processed plan
+                if (planAutoProcessTimeoutsRef.current[planToProcess]) {
+                  clearTimeout(
+                    planAutoProcessTimeoutsRef.current[planToProcess]
+                  );
+                  delete planAutoProcessTimeoutsRef.current[planToProcess];
+                }
+
+                // Reset active plan transcription
+                setActivePlanTranscription(null);
+              }
             } else {
               toast({
                 title: 'No Updates for Selected Sections',
@@ -721,6 +1109,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         selectedSections,
         toast,
         activeSectionTranscription,
+        activePlanTranscription,
         formKey,
       ]
     );
@@ -805,6 +1194,25 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       [formKey, state, onAudioRecorded, selectedSections]
     );
 
+    // NEW: Handle plan audio recording
+    const handlePlanAudioRecorded = useCallback(
+      (base64Audio: string, planPath: string) => {
+        if (!onAudioRecorded) return;
+
+        // Send audio with plan-specific context
+        const context = {
+          formKey,
+          formData: state,
+          planPath, // This is the specific plan path like "plans.0" or "plan.plans.1"
+          selectedSections: Array.from(selectedSections),
+        };
+
+        console.log(`Recording audio for plan: ${planPath}`);
+        onAudioRecorded(base64Audio, context);
+      },
+      [formKey, state, onAudioRecorded, selectedSections]
+    );
+
     // CRITICAL FIX 5: Update the renderSectionTranscriptionBox function
     const renderSectionTranscriptionBox = (sectionPath: string) => {
       const transcription = sectionTranscriptions[sectionPath] || '';
@@ -842,8 +1250,6 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                   !isWebSocketConnected ||
                   isProcessing ||
                   recordingMode === 'global'
-                  // REMOVED: || (recordingMode === 'section' && activeSectionPath !== sectionPath)
-                  // This was preventing other sections from being active after one section was processed
                 }
               />
             </div>
@@ -872,6 +1278,61 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             autoProcessDelay={5000}
             className="min-h-12 text-sm"
             placeholder={`Speak or type to enter information for this section...`}
+          />
+        </div>
+      );
+    };
+
+    // NEW: Render plan transcription box
+    const renderPlanTranscriptionBox = (planPath: string) => {
+      const transcription = planTranscriptions[planPath] || '';
+      const isAlreadyProcessed = processedPlans.has(planPath);
+
+      return (
+        <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-blue-50">
+          <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs font-medium text-blue-700">
+                Plan Audio:
+              </span>
+              <FieldAudioRecorder
+                key={`${planPath}-${planRecorderKeys[planPath] || 0}`} // Force reset when key changes
+                onAudioRecorded={(base64Audio) =>
+                  handlePlanAudioRecorded(base64Audio, planPath)
+                }
+                fieldPath={planPath}
+                isDisabled={
+                  !isWebSocketConnected ||
+                  isProcessing ||
+                  recordingMode === 'global'
+                }
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+              onClick={() => handlePlanTranscriptionProcess(planPath)}
+              disabled={
+                isProcessing ||
+                !transcription.trim() ||
+                !isWebSocketConnected ||
+                isAlreadyProcessed
+              }
+            >
+              <SendHorizonal className="h-4 w-4" />
+              <span>{isAlreadyProcessed ? 'Processed' : 'Process'}</span>
+            </Button>
+          </div>
+          <TranscriptionBox
+            value={transcription}
+            onChange={(text) => handlePlanTranscriptionChange(planPath, text)}
+            isProcessing={isProcessing}
+            autoProcess={() => handlePlanAutoProcess(planPath)}
+            autoProcessDelay={5000}
+            className="min-h-12 text-sm"
+            placeholder={`Speak or type to enter information for this specific plan...`}
           />
         </div>
       );
@@ -976,6 +1437,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       // Check if this section should have audio recording
       const isTopLevelSection = shouldHaveAudioRecording(path);
 
+      // NEW: Check if this is a plan that should have audio recording
+      const isPlan = isPlanPath(path, formKey);
+
       // Skip rendering the "root" field label
       if (fieldName === 'root') {
         return (
@@ -1049,43 +1513,51 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             {isTopLevelSection && renderSectionTranscriptionBox(path)}
 
             <div className="space-y-3">
-              {value?.map((item: any, index: number) => (
-                <Card key={index} className="overflow-hidden">
-                  <CardContent className="p-2 form-card-content">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium text-xs">
-                        {arrayPlaceholder} {index + 1}
-                      </h3>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 form-button touch-manipulation"
-                        onClick={() => handleRemoveArrayItem(path, index)}
-                      >
-                        <MinusCircle className="h-4 w-4" />
-                        <span className="sr-only">Remove</span>
-                      </Button>
-                    </div>
+              {value?.map((item: any, index: number) => {
+                const itemPath = `${path}.${index}`;
+                const isItemPlan = isPlanPath(itemPath, formKey);
 
-                    {/* Render each field in the array item */}
-                    <div className="space-y-2">
-                      {Object.entries(fieldSchema[0] || {}).map(
-                        ([key, subSchema]) => (
-                          <div key={key} className="mb-2">
-                            {renderField(
-                              subSchema,
-                              `${path}.${index}.${key}`,
-                              key,
-                              true
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                return (
+                  <Card key={index} className="overflow-hidden">
+                    <CardContent className="p-2 form-card-content">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium text-xs">
+                          {arrayPlaceholder} {index + 1}
+                        </h3>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 form-button touch-manipulation"
+                          onClick={() => handleRemoveArrayItem(path, index)}
+                        >
+                          <MinusCircle className="h-4 w-4" />
+                          <span className="sr-only">Remove</span>
+                        </Button>
+                      </div>
+
+                      {/* NEW: Add transcription box for individual plans */}
+                      {isItemPlan && renderPlanTranscriptionBox(itemPath)}
+
+                      {/* Render each field in the array item */}
+                      <div className="space-y-2">
+                        {Object.entries(fieldSchema[0] || {}).map(
+                          ([key, subSchema]) => (
+                            <div key={key} className="mb-2">
+                              {renderField(
+                                subSchema,
+                                `${path}.${index}.${key}`,
+                                key,
+                                true
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
               {(!value || value.length === 0) && (
                 <div className="text-center py-2 text-muted-foreground text-xs">
@@ -1214,11 +1686,23 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         // Reset processed sections
         setProcessedSections(new Set());
 
+        // NEW: Reset all plan transcriptions
+        setPlanTranscriptions({});
+        setPlanRecorderKeys({});
+        setProcessedPlans(new Set());
+
         // Clear all timeouts
         Object.values(autoProcessTimeoutsRef.current).forEach((timeoutId) => {
           clearTimeout(timeoutId);
         });
         autoProcessTimeoutsRef.current = {};
+
+        Object.values(planAutoProcessTimeoutsRef.current).forEach(
+          (timeoutId) => {
+            clearTimeout(timeoutId);
+          }
+        );
+        planAutoProcessTimeoutsRef.current = {};
 
         toast({
           title: 'Form Reset',

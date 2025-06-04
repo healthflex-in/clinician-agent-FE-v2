@@ -49,11 +49,10 @@ const formSchemas = {
       {
         exercise: '',
         comments: '',
-        // Change set to sets and make it an array of objects
         sets: [
           {
             repetitions: 0,
-            load: '', // Use string instead of number
+            load: '',
             unit: '',
           },
         ],

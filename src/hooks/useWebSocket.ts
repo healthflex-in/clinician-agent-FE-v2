@@ -26,11 +26,12 @@ export function useWebSocket(options: WebSocketOptions) {
   const reconnectAttemptsRef = useRef<number>(0);
   const maxReconnectAttempts = 20;
 
-  // Heartbeat refs
+  // Heartbeat refs with updated timeout values
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastServerPingRef = useRef<number>(0);
-  const pingInterval = 30000; // 30 seconds
-  const pingTimeout = 10000; // 10 seconds
+  const PING_INTERVAL = 60000; // 60 seconds (updated from 30)
+  const CONNECTION_TIMEOUT = 80000; // 80 seconds (updated from 40)
+  const KEEP_ALIVE = 600000; // 10 minutes (new)
 
   // Clear heartbeat timer
   const clearHeartbeatTimer = useCallback(() => {
@@ -51,7 +52,7 @@ export function useWebSocket(options: WebSocketOptions) {
       const timeSinceLastPing = now - lastServerPingRef.current;
 
       // If we haven't received a server ping within the expected interval + timeout
-      if (timeSinceLastPing > pingInterval + pingTimeout) {
+      if (timeSinceLastPing > CONNECTION_TIMEOUT) {
         console.warn('Connection appears stale - no server ping received');
 
         // Try to reconnect
@@ -59,8 +60,8 @@ export function useWebSocket(options: WebSocketOptions) {
           wsRef.current.close();
         }
       }
-    }, pingInterval);
-  }, [clearHeartbeatTimer, pingInterval, pingTimeout]);
+    }, PING_INTERVAL);
+  }, [clearHeartbeatTimer, PING_INTERVAL, CONNECTION_TIMEOUT]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) return;
@@ -150,6 +151,7 @@ export function useWebSocket(options: WebSocketOptions) {
             return;
           }
 
+          // Handle server ping (already implemented correctly)
           if (data.type === 'server_ping') {
             console.debug('Received server ping:', data);
             // Update last ping time

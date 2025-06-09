@@ -10,6 +10,7 @@ import {
   QUEUE_RETRY_DELAY,
   NEXT_QUEUE_DELAY,
 } from '../constants/FormRenderer.constants';
+import { isPlanPath, isTestPath } from '../utils/FormRenderer.utils';
 
 export const useFormRenderer = (
   schema: any,
@@ -240,15 +241,15 @@ export const useFormRenderer = (
       }
 
       const isSection = Object.keys(sectionTranscriptions).includes(path);
-      const isPlan = Object.keys(planTranscriptions).includes(path);
+      const isPlanOrTest = Object.keys(planTranscriptions).includes(path);
 
       if (isSection && processedSections.has(path)) {
         console.log(`Section ${path} already processed, not queueing`);
         return;
       }
 
-      if (isPlan && processedPlans.has(path)) {
-        console.log(`Plan ${path} already processed, not queueing`);
+      if (isPlanOrTest && processedPlans.has(path)) {
+        console.log(`Plan/Test ${path} already processed, not queueing`);
         return;
       }
 
@@ -274,7 +275,7 @@ export const useFormRenderer = (
 
         const queueItem: ProcessingQueueItem = {
           path,
-          type: isSection ? 'section' : 'plan',
+          type: isSection ? 'section' : 'plan', // Both plans and tests use 'plan' type
           transcription: transcriptionText,
           timestamp: Date.now(),
         };

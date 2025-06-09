@@ -6,6 +6,7 @@ import { FormAction } from '../types/FormRenderer.types';
 import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
 import {
   isPlanPath,
+  isTestPath,
   processFormDataForSubmission,
   updateLocalStorageAfterSubmission,
 } from '../utils/FormRenderer.utils';
@@ -148,6 +149,7 @@ export const useFormHandlers = (
       const context = {
         formKey,
         formData: state,
+        // Use planPath for both plans and tests for compatibility
         planPath,
         selectedSections: Array.from(selectedSections),
       };
@@ -402,7 +404,7 @@ export const useFormHandlers = (
           });
         }
 
-        if (isPlanPath(path, formKey)) {
+        if (isPlanPath(path, formKey) || isTestPath(path, formKey)) {
           setPlanTranscriptions((prev) => ({
             ...prev,
             [path]: '',

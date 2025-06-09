@@ -16,14 +16,30 @@ export const isPlanPath = (path: string, formKey: string): boolean => {
   return false;
 };
 
+// Check if a path represents a test item that should have audio recording (for Physio forms)
+export const isTestPath = (path: string, formKey: string): boolean => {
+  // For Physio forms: tests.0, tests.1, etc.
+  if (formKey === 'physio') {
+    return /^tests\.\d+$/.test(path);
+  }
+
+  return false;
+};
+
 // Check if a section should have audio recording
 export const shouldHaveAudioRecording = (
   path: string,
   formKey: string
 ): boolean => {
+  // SNC and Physio forms don't need section audio recording
+  // They use global + individual plan/test audio instead
+  if (formKey === 'snc' || formKey === 'physio') {
+    return false;
+  }
+
   const sections = FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
 
-  // For root level sections
+  // For root level sections in other form types
   if (path && !path.includes('.')) {
     return sections.includes(path);
   }

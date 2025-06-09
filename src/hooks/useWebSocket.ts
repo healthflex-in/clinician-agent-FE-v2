@@ -29,8 +29,8 @@ export function useWebSocket(options: WebSocketOptions) {
   // Heartbeat refs with updated timeout values
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastServerPingRef = useRef<number>(0);
-  const PING_INTERVAL = 60000; // 60 seconds (updated from 30)
-  const CONNECTION_TIMEOUT = 80000; // 80 seconds (updated from 40)
+  const PING_INTERVAL = 300000; // 300 seconds
+  const CONNECTION_TIMEOUT = 80000; // 80 seconds
   const KEEP_ALIVE = 600000; // 10 minutes (new)
 
   // Clear heartbeat timer

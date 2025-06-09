@@ -10,7 +10,14 @@ import { getNestedValue } from '@/utils/schemaUtils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { MinusCircle, PlusCircle, RefreshCw } from 'lucide-react';
+import {
+  MinusCircle,
+  PlusCircle,
+  RefreshCw,
+  SendHorizonal,
+} from 'lucide-react';
+import FieldAudioRecorder from './FieldAudioRecorder';
+import TranscriptionBox from '@/components/audio/TranscriptionBox';
 
 // Import modular components
 import {
@@ -20,6 +27,7 @@ import {
 import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
 import {
   isPlanPath,
+  isTestPath,
   shouldHaveAudioRecording,
 } from '../utils/FormRenderer.utils';
 import { useFormRenderer } from '../hooks/useFormRenderer';
@@ -32,7 +40,7 @@ import {
   PlanTranscriptionBox,
   InputField,
   FormActionButtons,
-} from '../components/FormRenderer.components';
+} from './FormRenderer.components';
 
 // Important: Use React.forwardRef here
 const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
@@ -177,6 +185,144 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         });
       },
       []
+    );
+
+    // Handle test audio recording (for Physio forms)
+    const handleTestAudioRecorded = useCallback(
+      (base64Audio: string, testPath: string) => {
+        if (!onAudioRecorded) return;
+
+        const context = {
+          formKey,
+          formData: state,
+          testPath, // Use testPath for tests
+          selectedSections: Array.from(selectedSections),
+        };
+
+        console.log(`Recording audio for test: ${testPath}`);
+        onAudioRecorded(base64Audio, context);
+      },
+      [formKey, state, onAudioRecorded, selectedSections]
+    );
+
+    // Handle test transcription changes (for Physio forms)
+    const handleTestTranscriptionChange = useCallback(
+      (testPath: string, text: string) => {
+        console.log(
+          `Manual test transcription change for ${testPath}: "${text}"`
+        );
+
+        if (recordingMode === 'global') {
+          console.log(
+            `Ignoring test transcription change - global mode active`
+          );
+          return;
+        }
+
+        setPlanTranscriptions((prev) => ({
+          ...prev,
+          [testPath]: text,
+        }));
+
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(testPath);
+          return newSet;
+        });
+
+        setActivePlanTranscription(testPath);
+        addToProcessingQueue(testPath, text);
+      },
+      [
+        recordingMode,
+        setPlanTranscriptions,
+        setProcessedPlans,
+        setActivePlanTranscription,
+        addToProcessingQueue,
+      ]
+    );
+
+    // Handle test transcription processing (for Physio forms)
+    const handleTestTranscriptionProcess = useCallback(
+      (testPath: string) => {
+        if (
+          !onTranscriptionProcess ||
+          isProcessing ||
+          isAutoProcessing ||
+          recordingMode === 'global'
+        )
+          return;
+
+        console.log(`Manual processing request for test ${testPath}`);
+
+        // Remove from queue if it exists
+        processingQueueRef.current = processingQueueRef.current.filter(
+          (item) => item.path !== testPath
+        );
+        setProcessingQueue([...processingQueueRef.current]);
+
+        // Clear timeout
+        const existingTimeout = pathTimeoutsRef.current.get(testPath);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          pathTimeoutsRef.current.delete(testPath);
+        }
+
+        const transcription = planTranscriptions[testPath] || '';
+        const isAlreadyProcessed = processedPlans.has(testPath);
+
+        if (!transcription.trim()) {
+          toast({
+            title: 'Empty transcription',
+            description: 'Please record audio or enter text to process',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (isAlreadyProcessed) {
+          console.log(`Test ${testPath} already processed, skipping`);
+          return;
+        }
+
+        setIsAutoProcessing(true);
+        setCurrentlyProcessingPath(testPath);
+
+        const context = {
+          formKey,
+          formData: state,
+          testPath, // Use testPath for tests
+          selectedSections: Array.from(selectedSections),
+        };
+
+        console.log(`Processing transcription for test: ${testPath}`);
+
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(testPath);
+          return newSet;
+        });
+
+        onTranscriptionProcess(transcription, context);
+      },
+      [
+        formKey,
+        state,
+        planTranscriptions,
+        onTranscriptionProcess,
+        toast,
+        selectedSections,
+        processedPlans,
+        isProcessing,
+        isAutoProcessing,
+        recordingMode,
+        setIsAutoProcessing,
+        setCurrentlyProcessingPath,
+        setProcessedPlans,
+        setProcessingQueue,
+        pathTimeoutsRef,
+        processingQueueRef,
+      ]
     );
 
     // Plan transcription update function
@@ -619,6 +765,83 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       );
     };
 
+    // Render test transcription box (for Physio forms)
+    const renderTestTranscriptionBox = (testPath: string) => {
+      const transcription = planTranscriptions[testPath] || '';
+      const isAlreadyProcessed = processedPlans.has(testPath);
+      const isCurrentlyProcessing = currentlyProcessingPath === testPath;
+      const isInQueue = processingQueue.some((item) => item.path === testPath);
+
+      return (
+        <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-green-50">
+          <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs font-medium text-green-700">
+                Test Audio:
+              </span>
+              <FieldAudioRecorder
+                key={`${testPath}-${planRecorderKeys[testPath] || 0}`}
+                onAudioRecorded={(base64Audio) =>
+                  handleTestAudioRecorded(base64Audio, testPath)
+                }
+                fieldPath={testPath}
+                isDisabled={
+                  !isWebSocketConnected ||
+                  isProcessing ||
+                  isAutoProcessing ||
+                  (recordingMode === 'global' && transcription.trim() !== '')
+                }
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+              onClick={() => handleTestTranscriptionProcess(testPath)}
+              disabled={
+                isProcessing ||
+                isAutoProcessing ||
+                !transcription.trim() ||
+                !isWebSocketConnected ||
+                isAlreadyProcessed ||
+                (recordingMode === 'global' && transcription.trim() !== '')
+              }
+            >
+              <SendHorizonal className="h-4 w-4" />
+              <span>
+                {isCurrentlyProcessing
+                  ? 'Processing...'
+                  : isInQueue
+                  ? 'Queued'
+                  : isAlreadyProcessed
+                  ? 'Processed'
+                  : recordingMode === 'global' && transcription.trim() !== ''
+                  ? 'Global Mode'
+                  : 'Process'}
+              </span>
+            </Button>
+          </div>
+          <TranscriptionBox
+            value={transcription}
+            onChange={(text) => handleTestTranscriptionChange(testPath, text)}
+            isProcessing={
+              isCurrentlyProcessing && (isProcessing || isAutoProcessing)
+            }
+            autoProcess={() => {}}
+            autoProcessDelay={5000}
+            className="min-h-12 text-sm"
+            placeholder={
+              recordingMode === 'global' && transcription.trim() !== ''
+                ? 'Global recording mode - test audio temporarily disabled'
+                : 'Speak or type to enter information for this specific test...'
+            }
+            disabled={recordingMode === 'global' && transcription.trim() !== ''}
+          />
+        </div>
+      );
+    };
+
     // Determine the appropriate input field type based on the data type
     const renderInputForType = (
       type: string,
@@ -663,6 +886,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
       // Check if this is a plan that should have audio recording
       const isPlan = isPlanPath(path, formKey);
+
+      // Check if this is a test that should have audio recording (for Physio forms)
+      const isTest = isTestPath(path, formKey);
 
       // Skip rendering the "root" field label
       if (fieldName === 'root') {
@@ -740,6 +966,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
               {value?.map((item: any, index: number) => {
                 const itemPath = `${path}.${index}`;
                 const isItemPlan = isPlanPath(itemPath, formKey);
+                const isItemTest = isTestPath(itemPath, formKey);
 
                 return (
                   <Card key={index} className="overflow-hidden">
@@ -762,6 +989,9 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
 
                       {/* Add transcription box for individual plans */}
                       {isItemPlan && renderPlanTranscriptionBox(itemPath)}
+
+                      {/* Add transcription box for individual tests (Physio forms) */}
+                      {isItemTest && renderTestTranscriptionBox(itemPath)}
 
                       {/* Render each field in the array item */}
                       <div className="space-y-2">

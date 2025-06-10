@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { WebSocketMessage, ServerResponse } from '@/types/form';
 
@@ -42,7 +42,7 @@ export function useWebSocket(options: WebSocketOptions) {
   }, []);
 
   // Start heartbeat monitoring
-  const startHeartbeat = useCallback(() => {
+  const startHeartbeat = React.useCallback(() => {
     clearHeartbeatTimer();
     lastServerPingRef.current = Date.now();
 
@@ -174,6 +174,7 @@ export function useWebSocket(options: WebSocketOptions) {
           const serverResponse = data as ServerResponse;
 
           // Handle different response types
+          console.log('@@ serverResponse: ', serverResponse);
           if (serverResponse.error) {
             console.error('Server error:', serverResponse.error);
             toast({

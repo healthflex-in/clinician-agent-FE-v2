@@ -593,6 +593,10 @@ const FormPage = () => {
         description: 'Connection issues detected',
         variant: 'destructive',
       });
+    } else {
+      // Clear the transcription fields after processing
+      setTranscriptText('');
+      setTranscription('');
     }
   };
 

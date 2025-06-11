@@ -211,30 +211,35 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         console.log(
           `Manual test transcription change for ${testPath}: "${text}"`
         );
-
+    
         if (recordingMode === 'global') {
           console.log(
             `Ignoring test transcription change - global mode active`
           );
           return;
         }
-
+    
+        // Allow override - remove from processed state if it exists
+        if (processedPlans.has(testPath)) {
+          console.log(`Test ${testPath} was already processed, but allowing override`);
+          setProcessedPlans((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(testPath);
+            return newSet;
+          });
+        }
+    
         setPlanTranscriptions((prev) => ({
           ...prev,
           [testPath]: text,
         }));
-
-        setProcessedPlans((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(testPath);
-          return newSet;
-        });
-
+    
         setActivePlanTranscription(testPath);
         addToProcessingQueue(testPath, text);
       },
       [
         recordingMode,
+        processedPlans,
         setPlanTranscriptions,
         setProcessedPlans,
         setActivePlanTranscription,
@@ -252,25 +257,24 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           recordingMode === 'global'
         )
           return;
-
+    
         console.log(`Manual processing request for test ${testPath}`);
-
+    
         // Remove from queue if it exists
         processingQueueRef.current = processingQueueRef.current.filter(
           (item) => item.path !== testPath
         );
         setProcessingQueue([...processingQueueRef.current]);
-
+    
         // Clear timeout
         const existingTimeout = pathTimeoutsRef.current.get(testPath);
         if (existingTimeout) {
           clearTimeout(existingTimeout);
           pathTimeoutsRef.current.delete(testPath);
         }
-
+    
         const transcription = planTranscriptions[testPath] || '';
-        const isAlreadyProcessed = processedPlans.has(testPath);
-
+    
         if (!transcription.trim()) {
           toast({
             title: 'Empty transcription',
@@ -279,30 +283,30 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
           });
           return;
         }
-
-        if (isAlreadyProcessed) {
-          console.log(`Test ${testPath} already processed, skipping`);
-          return;
+    
+        // ALLOW REPROCESSING: Don't check if already processed
+        // If it was already processed, remove it from processed state
+        if (processedPlans.has(testPath)) {
+          console.log(`Test ${testPath} was already processed, allowing reprocessing`);
+          setProcessedPlans((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(testPath);
+            return newSet;
+          });
         }
-
+    
         setIsAutoProcessing(true);
         setCurrentlyProcessingPath(testPath);
-
+    
         const context = {
           formKey,
           formData: state,
           testPath, // Use testPath for tests
           selectedSections: Array.from(selectedSections),
         };
-
+    
         console.log(`Processing transcription for test: ${testPath}`);
-
-        setProcessedPlans((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(testPath);
-          return newSet;
-        });
-
+    
         onTranscriptionProcess(transcription, context);
       },
       [
@@ -331,12 +335,24 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         console.log(
           `Updating plan transcription for ${planPath} with text: ${text}`
         );
-
+    
+        // REMOVED: Don't block updates for already processed plans
+        // This allows users to override/correct specific sections
+        // if (processedPlans.has(planPath)) {
+        //   console.log(`Ignoring update for ${planPath} - already processed`);
+        //   return;
+        // }
+    
+        // Allow override - remove from processed state if it exists
         if (processedPlans.has(planPath)) {
-          console.log(`Ignoring update for ${planPath} - already processed`);
-          return;
+          console.log(`Plan ${planPath} was already processed, but allowing override`);
+          setProcessedPlans((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(planPath);
+            return newSet;
+          });
         }
-
+    
         setPlanTranscriptions((prev) => ({
           ...prev,
           [planPath]: text,
@@ -349,6 +365,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         setPlanTranscriptions,
         setActivePlanTranscription,
         addToProcessingQueue,
+        setProcessedPlans, // Add this dependency
       ]
     );
 
@@ -395,12 +412,25 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         console.log(
           `Updating section transcription for ${sectionPath} with text: ${text}`
         );
-
+    
+        // REMOVED: Don't block updates for already processed sections
+        // This allows users to override/correct specific sections
+        // if (processedSections.has(sectionPath)) {
+        //   console.log(`Ignoring update for ${sectionPath} - already processed`);
+        //   return;
+        // }
+    
+        // Allow override - remove from processed state if it exists
         if (processedSections.has(sectionPath)) {
-          console.log(`Ignoring update for ${sectionPath} - already processed`);
-          return;
+          console.log(`Section ${sectionPath} was already processed, but allowing override`);
+          setProcessedSections((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(sectionPath);
+            return newSet;
+          });
         }
-
+    
+        // Check if this update is appropriate based on recording mode
         if (
           (recordingMode === 'section' && activeSectionPath === sectionPath) ||
           recordingMode === 'idle' ||
@@ -421,6 +451,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         setSectionTranscriptions,
         setActiveSectionTranscription,
         addToProcessingQueue,
+        setProcessedSections, // Add this dependency
       ]
     );
 
@@ -468,42 +499,40 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         console.log('LLM Data:', llmData);
         console.log('Currently processing path:', currentlyProcessingPath);
         console.log('Recording mode:', recordingMode);
-
+        console.log('Selected sections:', Array.from(selectedSections));
+        console.log('Data recordingType:', llmData.recordingType);
+        console.log('Data isGlobalRecording:', llmData.isGlobalRecording);
+    
         // Handle structured payload (global processing)
         if (llmData.payloadType === 'structured' && llmData.formData) {
-          console.log(
-            'Received structured form data - stopping all processing and resetting for section mode'
-          );
-
+          console.log('Received structured form data - complete form filling');
+    
           // Clear all timeouts and processing state
           pathTimeoutsRef.current.forEach((timeout) => {
             clearTimeout(timeout);
           });
           pathTimeoutsRef.current.clear();
-
+    
           processingQueueRef.current = [];
           setProcessingQueue([]);
           setIsAutoProcessing(false);
           setCurrentlyProcessingPath(null);
-
-          // CRITICAL: Reset processed sections to allow new recording
-          // Don't mark all sections as processed for global mode
+    
+          // Reset processed sections to allow new recording
           setProcessedSections(new Set());
           setProcessedPlans(new Set());
-
-          // Clear all transcriptions and reset recorder keys to enable fresh recording
-          const allSections =
-            FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
+    
+          // Clear all transcriptions and reset recorder keys
+          const allSections = FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
           const clearedTranscriptions: Record<string, string> = {};
           const resetRecorderKeys: Record<string, number> = {};
           allSections.forEach((section) => {
             clearedTranscriptions[section] = '';
-            resetRecorderKeys[section] =
-              (sectionRecorderKeys[section] || 0) + 1;
+            resetRecorderKeys[section] = (sectionRecorderKeys[section] || 0) + 1;
           });
           setSectionTranscriptions(clearedTranscriptions);
           setSectionRecorderKeys(resetRecorderKeys);
-
+    
           // Clear all plan transcriptions and reset their recorder keys
           setPlanTranscriptions({});
           setPlanRecorderKeys((prev) => {
@@ -513,147 +542,183 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             });
             return resetKeys;
           });
-
+    
           llmData = { formData: llmData.formData };
         }
-
+    
         // Process suggestions
         if (llmData.suggestions) {
           setSuggestions(llmData.suggestions);
           setTimeout(() => setSuggestions(null), 7000);
         }
-
+    
         // Process form data
         if (llmData.formData) {
-          if (selectedSections.size === 0) {
-            dispatch({
-              type: 'MERGE_LLM_DATA',
-              data: llmData.formData,
-              source: 'llm',
-            });
-            if (onLLMUpdate) onLLMUpdate(llmData.formData);
-
-            if (currentlyProcessingPath) {
-              console.log(
-                `Clearing transcription for currently processing: ${currentlyProcessingPath}`
-              );
-
-              const isSection = Object.keys(sectionTranscriptions).includes(
-                currentlyProcessingPath
-              );
-
-              if (isSection) {
-                setSectionTranscriptions((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]: '',
-                }));
-
-                setSectionRecorderKeys((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]:
-                    (prev[currentlyProcessingPath] || 0) + 1,
-                }));
-
-                setProcessedSections((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(currentlyProcessingPath);
-                  return newSet;
-                });
-
-                if (activeSectionTranscription === currentlyProcessingPath) {
-                  setActiveSectionTranscription(null);
+          // Determine if this is a global or section-specific update
+          const processingPath = llmData.currentlyProcessingPath || currentlyProcessingPath;
+          const isGlobalUpdate = llmData.isGlobalRecording === true || 
+                               llmData.recordingType === 'global' || 
+                               (!processingPath && selectedSections.size === 0);
+          
+          console.log('Processing path:', processingPath);
+          console.log('Is global update:', isGlobalUpdate);
+          console.log('Update type determination:', {
+            'llmData.isGlobalRecording': llmData.isGlobalRecording,
+            'llmData.recordingType': llmData.recordingType,
+            'processingPath': processingPath,
+            'selectedSections.size': selectedSections.size
+          });
+    
+          if (isGlobalUpdate) {
+            // GLOBAL UPDATE: Apply to entire form or selected sections
+            console.log('=== APPLYING GLOBAL UPDATE ===');
+            
+            if (selectedSections.size === 0) {
+              // No sections selected - update entire form
+              console.log('Updating entire form globally');
+              dispatch({
+                type: 'MERGE_LLM_DATA',
+                data: llmData.formData,
+                source: 'llm',
+              });
+              if (onLLMUpdate) onLLMUpdate(llmData.formData);
+            } else {
+              // Apply only to selected sections
+              console.log('Updating selected sections only:', Array.from(selectedSections));
+              const selectedSectionsData: any = {};
+              Object.keys(llmData.formData).forEach((key) => {
+                if (selectedSections.has(key)) {
+                  selectedSectionsData[key] = llmData.formData[key];
                 }
+              });
+    
+              if (Object.keys(selectedSectionsData).length > 0) {
+                dispatch({
+                  type: 'MERGE_LLM_DATA',
+                  data: selectedSectionsData,
+                  source: 'llm',
+                });
+                if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
               } else {
-                setPlanTranscriptions((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]: '',
-                }));
-
-                setPlanRecorderKeys((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]:
-                    (prev[currentlyProcessingPath] || 0) + 1,
-                }));
-
-                setProcessedPlans((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(currentlyProcessingPath);
-                  return newSet;
+                toast({
+                  title: 'No Updates for Selected Sections',
+                  description: 'The AI did not provide data for your selected sections',
                 });
-
-                if (activePlanTranscription === currentlyProcessingPath) {
-                  setActivePlanTranscription(null);
-                }
               }
             }
           } else {
-            const selectedSectionsData: any = {};
-            Object.keys(llmData.formData).forEach((key) => {
-              if (selectedSections.has(key)) {
-                selectedSectionsData[key] = llmData.formData[key];
+            // SECTION-SPECIFIC UPDATE: Apply only to the specific section/path
+            console.log('=== APPLYING SECTION-SPECIFIC UPDATE ===');
+            console.log('Target processing path:', processingPath);
+            
+            // Find the relevant data for this specific path
+            const pathParts = processingPath.split('.');
+            let relevantData: any = {};
+            
+            // Strategy 1: Try to extract data that belongs to this specific path
+            if (pathParts.length === 1) {
+              // Top-level section (e.g., "assessments", "plans")
+              const sectionKey = pathParts[0];
+              if (llmData.formData[sectionKey]) {
+                relevantData[sectionKey] = llmData.formData[sectionKey];
+                console.log('Found top-level section data for:', sectionKey);
               }
-            });
-
-            if (Object.keys(selectedSectionsData).length > 0) {
+            } else if (pathParts.length >= 2) {
+              // Nested path (e.g., "plans.0", "assessments.0.tests.1")
+              const topLevelKey = pathParts[0];
+              if (llmData.formData[topLevelKey]) {
+                relevantData[topLevelKey] = llmData.formData[topLevelKey];
+                console.log('Found nested section data for:', topLevelKey);
+              }
+            }
+            
+            // Strategy 2: If no specific match, be more selective
+            if (Object.keys(relevantData).length === 0) {
+              console.log('No direct match found, trying to find related data');
+              
+              // Look for any keys that might be related to the processing path
+              const possibleKeys = Object.keys(llmData.formData).filter(key => 
+                processingPath.includes(key) || key.includes(pathParts[0])
+              );
+              
+              if (possibleKeys.length > 0) {
+                console.log('Found possible related keys:', possibleKeys);
+                possibleKeys.forEach(key => {
+                  relevantData[key] = llmData.formData[key];
+                });
+              } else {
+                // Last resort: apply full data but log a warning
+                console.warn('No specific match found, applying full data as fallback');
+                relevantData = llmData.formData;
+              }
+            }
+    
+            if (Object.keys(relevantData).length > 0) {
+              console.log('Applying section-specific data:', relevantData);
               dispatch({
                 type: 'MERGE_LLM_DATA',
-                data: selectedSectionsData,
+                data: relevantData,
                 source: 'llm',
               });
-              if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
-
-              if (currentlyProcessingPath) {
-                const isSection = Object.keys(sectionTranscriptions).includes(
-                  currentlyProcessingPath
-                );
-
-                if (
-                  isSection &&
-                  selectedSections.has(currentlyProcessingPath)
-                ) {
-                  setSectionTranscriptions((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]: '',
-                  }));
-                  setSectionRecorderKeys((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]:
-                      (prev[currentlyProcessingPath] || 0) + 1,
-                  }));
-                  setProcessedSections((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.add(currentlyProcessingPath);
-                    return newSet;
-                  });
-                  if (activeSectionTranscription === currentlyProcessingPath) {
-                    setActiveSectionTranscription(null);
-                  }
-                } else if (!isSection) {
-                  setPlanTranscriptions((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]: '',
-                  }));
-                  setPlanRecorderKeys((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]:
-                      (prev[currentlyProcessingPath] || 0) + 1,
-                  }));
-                  setProcessedPlans((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.add(currentlyProcessingPath);
-                    return newSet;
-                  });
-                  if (activePlanTranscription === currentlyProcessingPath) {
-                    setActivePlanTranscription(null);
-                  }
-                }
-              }
+              if (onLLMUpdate) onLLMUpdate(relevantData);
             } else {
               toast({
-                title: 'No Updates for Selected Sections',
-                description:
-                  'The AI did not provide data for your selected sections',
+                title: 'No Relevant Updates',
+                description: 'The AI did not provide data relevant to this section',
               });
+            }
+    
+            // Clear transcription for the specific path that was processed
+            if (processingPath) {
+              console.log(`=== CLEARING TRANSCRIPTION FOR PROCESSED PATH: ${processingPath} ===`);
+    
+              const isSection = Object.keys(sectionTranscriptions).includes(processingPath) ||
+                               processingPath.split('.').length === 1;
+    
+              if (isSection) {
+                console.log('Clearing section transcription for:', processingPath);
+                setSectionTranscriptions((prev) => ({
+                  ...prev,
+                  [processingPath]: '',
+                }));
+    
+                setSectionRecorderKeys((prev) => ({
+                  ...prev,
+                  [processingPath]: (prev[processingPath] || 0) + 1,
+                }));
+    
+                setProcessedSections((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(processingPath);
+                  return newSet;
+                });
+    
+                if (activeSectionTranscription === processingPath) {
+                  setActiveSectionTranscription(null);
+                }
+              } else {
+                // It's a plan or test
+                console.log('Clearing plan/test transcription for:', processingPath);
+                setPlanTranscriptions((prev) => ({
+                  ...prev,
+                  [processingPath]: '',
+                }));
+    
+                setPlanRecorderKeys((prev) => ({
+                  ...prev,
+                  [processingPath]: (prev[processingPath] || 0) + 1,
+                }));
+    
+                setProcessedPlans((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(processingPath);
+                  return newSet;
+                });
+    
+                if (activePlanTranscription === processingPath) {
+                  setActivePlanTranscription(null);
+                }
+              }
             }
           }
         }
@@ -686,18 +751,54 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       ]
     );
 
+    // 2. Add a cleanup function for resetting processed states
+const resetProcessedState = useCallback((path: string) => {
+  console.log('=== RESETTING PROCESSED STATE FOR:', path, '===');
+  
+  // Remove from processed sections
+  setProcessedSections((prev) => {
+    const newSet = new Set(prev);
+    newSet.delete(path);
+    return newSet;
+  });
+  
+  // Remove from processed plans
+  setProcessedPlans((prev) => {
+    const newSet = new Set(prev);
+    newSet.delete(path);
+    return newSet;
+  });
+  
+  // Reset recorder keys to allow new recordings
+  setSectionRecorderKeys((prev) => ({
+    ...prev,
+    [path]: (prev[path] || 0) + 1,
+  }));
+  
+  setPlanRecorderKeys((prev) => ({
+    ...prev,
+    [path]: (prev[path] || 0) + 1,
+  }));
+}, [setProcessedSections, setProcessedPlans, setSectionRecorderKeys, setPlanRecorderKeys]);
+
     // IMPORTANT: Expose methods to the parent via ref
     useImperativeHandle(
       ref,
       () => ({
         updateFormWithLLMData,
+        updatePlanTranscription,
+        clearPlanTranscription,
         updateSectionTranscription,
         clearSectionTranscription,
+        resetProcessedState
       }),
       [
+        updatePlanTranscription,
+        clearPlanTranscription,
         updateFormWithLLMData,
         updateSectionTranscription,
         clearSectionTranscription,
+        resetProcessedState
       ]
     );
 
@@ -771,12 +872,19 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       const isAlreadyProcessed = processedPlans.has(testPath);
       const isCurrentlyProcessing = currentlyProcessingPath === testPath;
       const isInQueue = processingQueue.some((item) => item.path === testPath);
-
+      
+      // Determine if this test is currently being processed
+      const isThisTestProcessing = isCurrentlyProcessing && (isProcessing || isAutoProcessing);
+    
       return (
-        <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-green-50">
+        <div className={`mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 ${
+          isThisTestProcessing ? 'bg-yellow-50 border-yellow-300' : 'bg-green-50'
+        }`}>
           <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
             <div className="flex items-center gap-1 sm:gap-2">
-              <span className="text-xs font-medium text-green-700">
+              <span className={`text-xs font-medium ${
+                isThisTestProcessing ? 'text-yellow-700' : 'text-green-700'
+              }`}>
                 Test Audio:
               </span>
               <FieldAudioRecorder
@@ -789,54 +897,103 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
                   !isWebSocketConnected ||
                   isProcessing ||
                   isAutoProcessing ||
+                  isThisTestProcessing ||
                   (recordingMode === 'global' && transcription.trim() !== '')
                 }
               />
+              
+              {/* Add loading spinner for this test */}
+              {isThisTestProcessing && (
+                <div className="flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-600 border-t-transparent"></div>
+                  <span className="text-xs text-yellow-600">Processing...</span>
+                </div>
+              )}
             </div>
+            
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+              variant={isAlreadyProcessed ? "secondary" : isThisTestProcessing ? "ghost" : "outline"}
+              className={`h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation ${
+                isThisTestProcessing ? 'cursor-not-allowed opacity-60' : ''
+              }`}
               onClick={() => handleTestTranscriptionProcess(testPath)}
               disabled={
                 isProcessing ||
                 isAutoProcessing ||
+                isThisTestProcessing ||
                 !transcription.trim() ||
                 !isWebSocketConnected ||
-                isAlreadyProcessed ||
                 (recordingMode === 'global' && transcription.trim() !== '')
               }
+              title={
+                isThisTestProcessing 
+                  ? "Processing in progress..." 
+                  : isAlreadyProcessed 
+                  ? "Click to override/reprocess this test" 
+                  : "Process this test"
+              }
             >
-              <SendHorizonal className="h-4 w-4" />
-              <span>
-                {isCurrentlyProcessing
-                  ? 'Processing...'
-                  : isInQueue
-                  ? 'Queued'
-                  : isAlreadyProcessed
-                  ? 'Processed'
-                  : recordingMode === 'global' && transcription.trim() !== ''
-                  ? 'Global Mode'
-                  : 'Process'}
-              </span>
+              {isThisTestProcessing ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <SendHorizonal className="h-4 w-4" />
+                  <span>
+                    {isInQueue
+                      ? 'Queued'
+                      : isAlreadyProcessed
+                      ? 'Override'
+                      : recordingMode === 'global' && transcription.trim() !== ''
+                      ? 'Global Mode'
+                      : 'Process'}
+                  </span>
+                </>
+              )}
             </Button>
           </div>
+          
+          {/* Processing status indicator */}
+          {isThisTestProcessing && (
+            <div className="mb-2 text-xs text-yellow-700 bg-yellow-100 p-2 rounded flex items-center gap-2">
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-yellow-600 border-t-transparent"></div>
+              <span>🤖 AI is processing this test...</span>
+            </div>
+          )}
+          
+          {/* Override indicator */}
+          {isAlreadyProcessed && !isThisTestProcessing && (
+            <div className="mb-2 text-xs text-green-600 bg-green-100 p-1 rounded">
+              ✓ This test has been processed. You can still record/type to override it.
+            </div>
+          )}
+          
           <TranscriptionBox
             value={transcription}
             onChange={(text) => handleTestTranscriptionChange(testPath, text)}
-            isProcessing={
-              isCurrentlyProcessing && (isProcessing || isAutoProcessing)
-            }
+            isProcessing={isThisTestProcessing}
             autoProcess={() => {}}
             autoProcessDelay={5000}
-            className="min-h-12 text-sm"
+            className={`min-h-12 text-sm ${
+              isThisTestProcessing ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
             placeholder={
-              recordingMode === 'global' && transcription.trim() !== ''
+              isThisTestProcessing
+                ? 'Processing in progress...'
+                : recordingMode === 'global' && transcription.trim() !== ''
                 ? 'Global recording mode - test audio temporarily disabled'
+                : isAlreadyProcessed
+                ? 'This test is processed. Speak or type to override...'
                 : 'Speak or type to enter information for this specific test...'
             }
-            disabled={recordingMode === 'global' && transcription.trim() !== ''}
+            disabled={
+              isThisTestProcessing ||
+              (recordingMode === 'global' && transcription.trim() !== '')
+            }
           />
         </div>
       );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { WebSocketMessage, ServerResponse } from '@/types/form';
 
@@ -42,7 +42,7 @@ export function useWebSocket(options: WebSocketOptions) {
   }, []);
 
   // Start heartbeat monitoring
-  const startHeartbeat = useCallback(() => {
+  const startHeartbeat = React.useCallback(() => {
     clearHeartbeatTimer();
     lastServerPingRef.current = Date.now();
 
@@ -174,6 +174,7 @@ export function useWebSocket(options: WebSocketOptions) {
           const serverResponse = data as ServerResponse;
 
           // Handle different response types
+          console.log('@@ serverResponse: ', serverResponse);
           if (serverResponse.error) {
             console.error('Server error:', serverResponse.error);
             toast({
@@ -240,6 +241,21 @@ export function useWebSocket(options: WebSocketOptions) {
               );
             }
           }
+
+  //         // ADD THIS NEW SECTION:
+  // // Route transcription to the correct field type
+  // if (currentlyProcessingPath && formRendererRef.current) {
+  //   // Import these utility functions at the top if not already imported:
+  //   // import { isPlanPath, isTestPath } from '../utils/FormRenderer.utils';
+    
+  //   if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
+  //     // It's a plan or test - update plan transcription
+  //     formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, serverResponse.transcription);
+  //   } else {
+  //     // It's a section - update section transcription
+  //     formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, serverResponse.transcription);
+  //   }
+  // }
 
           // Set processing to false when we receive any response
           setIsProcessing(false);

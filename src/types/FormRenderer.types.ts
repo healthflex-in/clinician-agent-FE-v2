@@ -28,8 +28,10 @@ export type FormAction =
 // Type for the form renderer ref
 export interface FormRendererRef {
   updateFormWithLLMData: (llmData: any) => void;
-  updateSectionTranscription: (sectionPath: string, text: string) => void;
+  clearPlanTranscription: (planPath: string) => void;
   clearSectionTranscription: (sectionPath: string) => void;
+  updatePlanTranscription: (planPath: string, text: string) => void;
+  updateSectionTranscription: (sectionPath: string, text: string) => void;
 }
 
 // Processing queue item type

@@ -350,9 +350,9 @@ const FormPage = () => {
       console.log('Data:', data);
       console.log('Current recording mode:', recordingMode);
       console.log('Currently processing path:', currentlyProcessingPath);
-  
+
       if (!data) return;
-  
+
       try {
         if (formRendererRef.current) {
           // Pass the currently processing path to help with routing
@@ -360,16 +360,16 @@ const FormPage = () => {
             ...data,
             currentlyProcessingPath
           };
-          
+
           formRendererRef.current.updateFormWithLLMData(dataWithContext);
-  
+
           if (data.formData) {
             setFormData(data.formData);
-  
+
             // CRITICAL: Clear processing state IMMEDIATELY after successful update
             const wasProcessingSpecificPath = currentlyProcessingPath;
             setCurrentlyProcessingPath(null);
-  
+
             // Handle different recording modes with proper cleanup
             if (recordingMode === 'global') {
               console.log('Global mode: Clearing global transcription after form data update');
@@ -383,12 +383,12 @@ const FormPage = () => {
               // Don't reset recording mode to idle - this allows other sections to work
               // But clear the active section path so new sections can be recorded
               setActiveSectionPath(null);
-              
+
               // IMPORTANT: Don't change recordingMode to 'idle' here
               // This allows other section recordings to work properly
             }
           }
-  
+
           toast({
             title: 'Form Updated',
             description: 'Form data has been processed and updated',
@@ -523,34 +523,37 @@ const FormPage = () => {
     console.log('=== Transcription received ===');
     console.log('Transcription:', transcription);
     console.log('Currently processing path:', currentlyProcessingPath);
-    console.log('Recording mode:', recordingMode);
-    console.log('Active section path:', activeSectionPath);
   
-    // Priority 1: If we have a specific path being processed, route to that field
+    // CRITICAL FIX: If we have a specific path being processed, ONLY route to that field
     if (currentlyProcessingPath && formRendererRef.current) {
       console.log('ROUTING: Transcription to specific field:', currentlyProcessingPath);
       
+      // IMPORTANT: Clear any existing transcription for this path first
       if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
+        // Clear existing plan transcription before setting new one
+        formRendererRef.current.clearPlanTranscription(currentlyProcessingPath);
+        // Set new transcription
         formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, transcription);
       } else {
+        // Clear existing section transcription before setting new one
+        formRendererRef.current.clearSectionTranscription(currentlyProcessingPath);
+        // Set new transcription
         formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, transcription);
       }
-      return; // IMPORTANT: Don't update global transcription
+      
+      return; // CRITICAL: Don't continue to other routing
     }
   
-    // Priority 2: Handle section recording mode with activeSectionPath
+    // Rest of the routing logic remains the same...
     if (recordingMode === 'section' && activeSectionPath && formRendererRef.current) {
       console.log('ROUTING: Transcription to active section:', activeSectionPath);
       formRendererRef.current.updateSectionTranscription(activeSectionPath, transcription);
-      return; // IMPORTANT: Don't update global transcription
+      return;
     }
   
-    // Priority 3: Only update global if we're actually in global mode or idle with no specific paths
-    if ((recordingMode === 'global' || recordingMode === 'idle') && !currentlyProcessingPath && !activeSectionPath) {
+    if (recordingMode === 'global' && !currentlyProcessingPath && !activeSectionPath) {
       console.log('ROUTING: Transcription to global');
       setTranscriptText(transcription);
-    } else {
-      console.log('ROUTING: Transcription ignored - not in appropriate mode');
     }
   }, [transcription, recordingMode, activeSectionPath, currentlyProcessingPath, formKey]);
 
@@ -565,28 +568,28 @@ const FormPage = () => {
       connect();
       return;
     }
-  
+
     console.log('=== Global audio recording completed ===');
     console.log('Previous recording mode:', recordingMode);
     console.log('Previous processing path:', currentlyProcessingPath);
     console.log('Previous active section:', activeSectionPath);
-  
+
     // CRITICAL: Completely reset state for global recording
     setRecordingMode('global');
     setActiveSectionPath(null);
     setCurrentlyProcessingPath(null);
-  
+
     const context = {
       formKey,
       formData: formData || {},
       isGlobalRecording: true,
       recordingType: 'global' // Add explicit flag
     };
-  
+
     console.log('Sending global audio with context:', context);
-  
+
     const sent = sendAudio(base64Audio, context);
-  
+
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -607,7 +610,7 @@ const FormPage = () => {
       });
       return;
     }
-  
+
     if (!isConnected) {
       toast({
         title: 'Not connected',
@@ -616,26 +619,26 @@ const FormPage = () => {
       });
       return;
     }
-  
+
     console.log('=== Processing global transcription ===');
     console.log('Transcription text:', transcriptText);
-  
+
     // Ensure we're in global mode
     setRecordingMode('global');
     setActiveSectionPath(null);
     setCurrentlyProcessingPath(null);
-  
+
     const context = {
       formKey,
       formData: formData || {},
       isGlobalRecording: true,
       recordingType: 'global'
     };
-  
+
     console.log('Processing global transcription with context:', context);
-  
+
     const sent = processTranscription(transcriptText, context);
-  
+
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -762,7 +765,6 @@ const FormPage = () => {
   
     console.log('=== Section audio recording completed ===');
     console.log('Context received:', context);
-    console.log('Previous recording mode:', recordingMode);
   
     // Determine which path is being processed
     let processingPath = null;
@@ -776,34 +778,41 @@ const FormPage = () => {
   
     if (!processingPath) {
       console.error('No processing path found in context:', context);
-      toast({
-        title: 'Error',
-        description: 'Could not determine section for recording',
-        variant: 'destructive',
-      });
       return;
     }
   
-    console.log('Setting up section recording for path:', processingPath);
+    // CRITICAL FIX: Clear any existing transcription for this specific path
+    if (formRendererRef.current) {
+      if (isPlanPath(processingPath, formKey) || isTestPath(processingPath, formKey)) {
+        console.log('Clearing existing plan transcription for:', processingPath);
+        formRendererRef.current.clearPlanTranscription(processingPath);
+      } else {
+        console.log('Clearing existing section transcription for:', processingPath);
+        formRendererRef.current.clearSectionTranscription(processingPath);
+      }
+    }
   
-    // Set section recording mode and paths
+    // Clear global transcription
+    if (transcriptText.trim() !== '') {
+      console.log('Clearing global transcription for section recording');
+      setTranscriptText('');
+      setTranscription('');
+    }
+  
+    // Set processing state
     setRecordingMode('section');
     setCurrentlyProcessingPath(processingPath);
     
-    // Set active section path only for top-level sections
     if (context.sectionPath) {
       setActiveSectionPath(context.sectionPath);
     }
   
-    // Add explicit section-specific flags to context
     const enhancedContext = {
       ...context,
       isGlobalRecording: false,
       recordingType: 'section',
       specificPath: processingPath
     };
-  
-    console.log('Sending section audio with enhanced context:', enhancedContext);
   
     const sent = sendAudio(base64Audio, enhancedContext);
   
@@ -813,7 +822,6 @@ const FormPage = () => {
         description: 'Connection issues detected',
         variant: 'destructive',
       });
-      // Reset state on failure
       setRecordingMode('idle');
       setActiveSectionPath(null);
       setCurrentlyProcessingPath(null);
@@ -834,11 +842,18 @@ const FormPage = () => {
       connect();
       return;
     }
-  
+
     console.log('=== Processing section transcription ===');
     console.log('Transcription:', transcription);
     console.log('Context:', context);
-  
+
+    // CRITICAL: Clear global transcription when processing section transcription
+    if (transcriptText.trim() !== '') {
+      console.log('Clearing global transcription for section processing');
+      setTranscriptText('');
+      setTranscription('');
+    }
+
     // Determine the processing path
     let processingPath = null;
     if (context.sectionPath) {
@@ -848,23 +863,23 @@ const FormPage = () => {
     } else if (context.testPath) {
       processingPath = context.testPath;
     }
-  
+
     if (!processingPath) {
       console.error('No processing path found in context:', context);
       return;
     }
-    
+
     console.log('Setting currently processing path to:', processingPath);
-    
+
     // Set processing state
     setRecordingMode('section');
     setCurrentlyProcessingPath(processingPath);
-    
+
     // Set active section path only for top-level sections
     if (context.sectionPath) {
       setActiveSectionPath(context.sectionPath);
     }
-  
+
     // Add explicit flags to context
     const enhancedContext = {
       ...context,
@@ -872,11 +887,11 @@ const FormPage = () => {
       recordingType: 'section',
       specificPath: processingPath
     };
-  
+
     console.log('Processing transcription with enhanced context:', enhancedContext);
-  
+
     const sent = processTranscription(transcription, enhancedContext);
-  
+
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -898,6 +913,35 @@ const FormPage = () => {
     setTranscriptText('');
     setTranscription('');
   }, []);
+
+  const handleGlobalTranscriptionChange = (text: string) => {
+    console.log('=== Global TranscriptionBox onChange ===');
+    console.log('Previous transcriptText:', transcriptText);
+    console.log('New text from TranscriptionBox:', text);
+    console.log('Current recording mode:', recordingMode);
+    console.log('Currently processing path:', currentlyProcessingPath);
+
+    // CRITICAL: Don't update global transcription if we're processing a section
+    if (currentlyProcessingPath) {
+      console.log('Ignoring global transcription change - section processing active');
+      return;
+    }
+
+    // CRITICAL: Don't update global transcription if we're in active section mode
+    if (recordingMode === 'section' && activeSectionPath) {
+      console.log('Ignoring global transcription change - active section recording');
+      return;
+    }
+
+    setTranscription(text);
+    setTranscriptText(text);
+
+    // Switch to global mode when user starts typing (only if not in section mode)
+    if (text.trim().length > 0 && recordingMode === 'idle') {
+      console.log('Switching to global mode due to text input');
+      setRecordingMode('global');
+    }
+  };
 
   // Reset form
   const handleFormReset = () => {
@@ -1095,21 +1139,7 @@ const FormPage = () => {
                 <TranscriptionBox
                   key={`global-transcription-${audioRecorderKey}`} // Force re-render when audio recorder resets
                   value={transcriptText}
-                  onChange={(text) => {
-                    console.log('=== Global TranscriptionBox onChange ===');
-                    console.log('Previous transcriptText:', transcriptText);
-                    console.log('New text from TranscriptionBox:', text);
-                    console.log('Current recording mode:', recordingMode);
-
-                    setTranscription(text);
-                    setTranscriptText(text);
-
-                    // Switch to global mode when user starts typing
-                    if (text.trim().length > 0 && recordingMode === 'idle') {
-                      console.log('Switching to global mode due to text input');
-                      setRecordingMode('global');
-                    }
-                  }}
+                  onChange={handleGlobalTranscriptionChange}
                   isProcessing={isProcessing && recordingMode === 'global'}
                   className="mt-4"
                   autoProcess={handleAutoProcess}
@@ -1125,19 +1155,23 @@ const FormPage = () => {
                     !transcriptText.trim() ||
                     !isConnected ||
                     recordingMode === 'section' ||
+                    currentlyProcessingPath !== null || // Don't allow global processing during section processing
                     microphonePermission !== 'granted'
                   }
                   variant={
                     isProcessing ||
-                    !transcriptText.trim() ||
-                    !isConnected ||
-                    microphonePermission !== 'granted'
+                      !transcriptText.trim() ||
+                      !isConnected ||
+                      currentlyProcessingPath !== null ||
+                      microphonePermission !== 'granted'
                       ? 'outline'
                       : 'default'
                   }
                   className="px-6"
                 >
-                  Process Transcription
+                  {isProcessing && recordingMode === 'global' && !currentlyProcessingPath
+                    ? 'Processing Global...'
+                    : 'Process Global Transcription'}
                 </Button>
               </div>
             </CardContent>

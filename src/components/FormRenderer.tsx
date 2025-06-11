@@ -872,12 +872,19 @@ const resetProcessedState = useCallback((path: string) => {
       const isAlreadyProcessed = processedPlans.has(testPath);
       const isCurrentlyProcessing = currentlyProcessingPath === testPath;
       const isInQueue = processingQueue.some((item) => item.path === testPath);
+      
+      // Determine if this test is currently being processed
+      const isThisTestProcessing = isCurrentlyProcessing && (isProcessing || isAutoProcessing);
     
       return (
-        <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-green-50">
+        <div className={`mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 ${
+          isThisTestProcessing ? 'bg-yellow-50 border-yellow-300' : 'bg-green-50'
+        }`}>
           <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
             <div className="flex items-center gap-1 sm:gap-2">
-              <span className="text-xs font-medium text-green-700">
+              <span className={`text-xs font-medium ${
+                isThisTestProcessing ? 'text-yellow-700' : 'text-green-700'
+              }`}>
                 Test Audio:
               </span>
               <FieldAudioRecorder
@@ -890,42 +897,76 @@ const resetProcessedState = useCallback((path: string) => {
                   !isWebSocketConnected ||
                   isProcessing ||
                   isAutoProcessing ||
+                  isThisTestProcessing ||
                   (recordingMode === 'global' && transcription.trim() !== '')
                 }
               />
+              
+              {/* Add loading spinner for this test */}
+              {isThisTestProcessing && (
+                <div className="flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-600 border-t-transparent"></div>
+                  <span className="text-xs text-yellow-600">Processing...</span>
+                </div>
+              )}
             </div>
+            
             <Button
               type="button"
               size="sm"
-              variant={isAlreadyProcessed ? "secondary" : "outline"}
-              className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+              variant={isAlreadyProcessed ? "secondary" : isThisTestProcessing ? "ghost" : "outline"}
+              className={`h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation ${
+                isThisTestProcessing ? 'cursor-not-allowed opacity-60' : ''
+              }`}
               onClick={() => handleTestTranscriptionProcess(testPath)}
               disabled={
                 isProcessing ||
                 isAutoProcessing ||
+                isThisTestProcessing ||
                 !transcription.trim() ||
                 !isWebSocketConnected ||
                 (recordingMode === 'global' && transcription.trim() !== '')
               }
-              title={isAlreadyProcessed ? "Click to override/reprocess this test" : "Process this test"}
+              title={
+                isThisTestProcessing 
+                  ? "Processing in progress..." 
+                  : isAlreadyProcessed 
+                  ? "Click to override/reprocess this test" 
+                  : "Process this test"
+              }
             >
-              <SendHorizonal className="h-4 w-4" />
-              <span>
-                {isCurrentlyProcessing
-                  ? 'Processing...'
-                  : isInQueue
-                  ? 'Queued'
-                  : isAlreadyProcessed
-                  ? 'Override' // Changed from 'Processed' to 'Override'
-                  : recordingMode === 'global' && transcription.trim() !== ''
-                  ? 'Global Mode'
-                  : 'Process'}
-              </span>
+              {isThisTestProcessing ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <SendHorizonal className="h-4 w-4" />
+                  <span>
+                    {isInQueue
+                      ? 'Queued'
+                      : isAlreadyProcessed
+                      ? 'Override'
+                      : recordingMode === 'global' && transcription.trim() !== ''
+                      ? 'Global Mode'
+                      : 'Process'}
+                  </span>
+                </>
+              )}
             </Button>
           </div>
           
-          {/* Add override indicator */}
-          {isAlreadyProcessed && (
+          {/* Processing status indicator */}
+          {isThisTestProcessing && (
+            <div className="mb-2 text-xs text-yellow-700 bg-yellow-100 p-2 rounded flex items-center gap-2">
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-yellow-600 border-t-transparent"></div>
+              <span>🤖 AI is processing this test...</span>
+            </div>
+          )}
+          
+          {/* Override indicator */}
+          {isAlreadyProcessed && !isThisTestProcessing && (
             <div className="mb-2 text-xs text-green-600 bg-green-100 p-1 rounded">
               ✓ This test has been processed. You can still record/type to override it.
             </div>
@@ -934,20 +975,25 @@ const resetProcessedState = useCallback((path: string) => {
           <TranscriptionBox
             value={transcription}
             onChange={(text) => handleTestTranscriptionChange(testPath, text)}
-            isProcessing={
-              isCurrentlyProcessing && (isProcessing || isAutoProcessing)
-            }
+            isProcessing={isThisTestProcessing}
             autoProcess={() => {}}
             autoProcessDelay={5000}
-            className="min-h-12 text-sm"
+            className={`min-h-12 text-sm ${
+              isThisTestProcessing ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
             placeholder={
-              recordingMode === 'global' && transcription.trim() !== ''
+              isThisTestProcessing
+                ? 'Processing in progress...'
+                : recordingMode === 'global' && transcription.trim() !== ''
                 ? 'Global recording mode - test audio temporarily disabled'
                 : isAlreadyProcessed
                 ? 'This test is processed. Speak or type to override...'
                 : 'Speak or type to enter information for this specific test...'
             }
-            disabled={recordingMode === 'global' && transcription.trim() !== ''}
+            disabled={
+              isThisTestProcessing ||
+              (recordingMode === 'global' && transcription.trim() !== '')
+            }
           />
         </div>
       );

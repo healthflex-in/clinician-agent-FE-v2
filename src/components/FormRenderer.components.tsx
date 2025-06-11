@@ -175,105 +175,141 @@ export const SectionTranscriptionBox: React.FC<
   onSectionTranscriptionProcess,
   onTranscriptionChange,
 }) => {
-  // Audio recorder should be enabled when:
-  // 1. WebSocket is connected
-  // 2. Not currently processing globally
-  // 3. Not in auto-processing state
-  // 4. Either in idle/section mode OR global mode has completed (empty transcription indicates completion)
-  const isAudioRecorderDisabled =
-    !isWebSocketConnected ||
-    isProcessing ||
-    isAutoProcessing ||
-    (recordingMode === 'global' && transcription.trim() !== ''); // Only disable during active global mode
-
-    return (
-      <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-blue-50">
-        <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
-          <div className="flex items-center gap-1 sm:gap-2">
-            <input
-              type="checkbox"
-              id={`section-${sectionPath}`}
-              checked={isSelected}
-              onChange={(e) => onSectionSelection(sectionPath, e.target.checked)}
-              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-            />
-            <label
-              htmlFor={`section-${sectionPath}`}
-              className="text-xs font-medium text-blue-700 cursor-pointer"
-            >
-              Section Audio:
-            </label>
-            <FieldAudioRecorder
-              key={`${sectionPath}-${sectionRecorderKey}`}
-              onAudioRecorded={(base64Audio) =>
-                onSectionAudioRecorded(base64Audio, sectionPath)
-              }
-              fieldPath={sectionPath}
-              isDisabled={
-                !isWebSocketConnected ||
-                isProcessing ||
-                isAutoProcessing ||
-                (recordingMode === 'global' && transcription.trim() !== '')
-              }
-            />
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant={isAlreadyProcessed ? "secondary" : "outline"}
-            className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
-            onClick={() => onSectionTranscriptionProcess(sectionPath)}
-            disabled={
+  // Determine if this section is currently being processed
+  const isThisSectionProcessing = isCurrentlyProcessing && (isProcessing || isAutoProcessing);
+  
+  return (
+    <div className={`mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 ${
+      isThisSectionProcessing ? 'bg-yellow-50 border-yellow-300' : 'bg-blue-50'
+    }`}>
+      <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <input
+            type="checkbox"
+            id={`section-${sectionPath}`}
+            checked={isSelected}
+            onChange={(e) => onSectionSelection(sectionPath, e.target.checked)}
+            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+            disabled={isThisSectionProcessing}
+          />
+          <label
+            htmlFor={`section-${sectionPath}`}
+            className={`text-xs font-medium cursor-pointer ${
+              isThisSectionProcessing ? 'text-yellow-700' : 'text-blue-700'
+            }`}
+          >
+            Section Audio:
+          </label>
+          <FieldAudioRecorder
+            key={`${sectionPath}-${sectionRecorderKey}`}
+            onAudioRecorded={(base64Audio) =>
+              onSectionAudioRecorded(base64Audio, sectionPath)
+            }
+            fieldPath={sectionPath}
+            isDisabled={
+              !isWebSocketConnected ||
               isProcessing ||
               isAutoProcessing ||
-              !transcription.trim() ||
-              !isWebSocketConnected ||
+              isThisSectionProcessing ||
               (recordingMode === 'global' && transcription.trim() !== '')
             }
-            title={isAlreadyProcessed ? "Click to override/reprocess this section" : "Process this section"}
-          >
-            <SendHorizonal className="h-4 w-4" />
-            <span>
-              {isCurrentlyProcessing
-                ? 'Processing...'
-                : isInQueue
-                ? 'Queued'
-                : isAlreadyProcessed
-                ? 'Override' // Changed from 'Processed' to 'Override'
-                : recordingMode === 'global' && transcription.trim() !== ''
-                ? 'Global Mode'
-                : 'Process'}
-            </span>
-          </Button>
+          />
+          
+          {/* Add loading spinner for this section */}
+          {isThisSectionProcessing && (
+            <div className="flex items-center gap-1">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-600 border-t-transparent"></div>
+              <span className="text-xs text-yellow-600">Processing...</span>
+            </div>
+          )}
         </div>
         
-        {/* Add override indicator */}
-        {isAlreadyProcessed && (
-          <div className="mb-2 text-xs text-blue-600 bg-blue-100 p-1 rounded">
-            ✓ This section has been processed. You can still record/type to override it.
-          </div>
-        )}
-        
-        <TranscriptionBox
-          value={transcription}
-          onChange={(text) => onTranscriptionChange(sectionPath, text)}
-          isProcessing={
-            isCurrentlyProcessing && (isProcessing || isAutoProcessing)
+        <Button
+          type="button"
+          size="sm"
+          variant={isAlreadyProcessed ? "secondary" : isThisSectionProcessing ? "ghost" : "outline"}
+          className={`h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation ${
+            isThisSectionProcessing ? 'cursor-not-allowed opacity-60' : ''
+          }`}
+          onClick={() => onSectionTranscriptionProcess(sectionPath)}
+          disabled={
+            isProcessing ||
+            isAutoProcessing ||
+            isThisSectionProcessing ||
+            !transcription.trim() ||
+            !isWebSocketConnected ||
+            (recordingMode === 'global' && transcription.trim() !== '')
           }
-          autoProcess={() => {}}
-          autoProcessDelay={5000}
-          className="min-h-12 text-sm"
-          placeholder={
-            recordingMode === 'global' && transcription.trim() !== ''
-              ? 'Global recording mode - section audio temporarily disabled'
-              : isAlreadyProcessed
-              ? 'This section is processed. Speak or type to override...'
-              : 'Speak or type to enter information for this specific section...'
+          title={
+            isThisSectionProcessing 
+              ? "Processing in progress..." 
+              : isAlreadyProcessed 
+              ? "Click to override/reprocess this section" 
+              : "Process this section"
           }
-          disabled={recordingMode === 'global' && transcription.trim() !== ''}
-        />
+        >
+          {isThisSectionProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
+              <span>Processing...</span>
+            </>
+          ) : (
+            <>
+              <SendHorizonal className="h-4 w-4" />
+              <span>
+                {isInQueue
+                  ? 'Queued'
+                  : isAlreadyProcessed
+                  ? 'Override'
+                  : recordingMode === 'global' && transcription.trim() !== ''
+                  ? 'Global Mode'
+                  : 'Process'}
+              </span>
+            </>
+          )}
+        </Button>
       </div>
-    );
+      
+      {/* Processing status indicator */}
+      {isThisSectionProcessing && (
+        <div className="mb-2 text-xs text-yellow-700 bg-yellow-100 p-2 rounded flex items-center gap-2">
+          <div className="animate-spin rounded-full h-3 w-3 border-2 border-yellow-600 border-t-transparent"></div>
+          <span>🤖 AI is processing this section...</span>
+        </div>
+      )}
+      
+      {/* Override indicator */}
+      {isAlreadyProcessed && !isThisSectionProcessing && (
+        <div className="mb-2 text-xs text-blue-600 bg-blue-100 p-1 rounded">
+          ✓ This section has been processed. You can still record/type to override it.
+        </div>
+      )}
+      
+      <TranscriptionBox
+        value={transcription}
+        onChange={(text) => onTranscriptionChange(sectionPath, text)}
+        isProcessing={isThisSectionProcessing}
+        autoProcess={() => {}}
+        autoProcessDelay={5000}
+        className={`min-h-12 text-sm ${
+          isThisSectionProcessing ? 'opacity-60 cursor-not-allowed' : ''
+        }`}
+        placeholder={
+          isThisSectionProcessing
+            ? 'Processing in progress...'
+            : recordingMode === 'global' && transcription.trim() !== ''
+            ? 'Global recording mode - section audio temporarily disabled'
+            : isAlreadyProcessed
+            ? 'This section is processed. Speak or type to override...'
+            : 'Speak or type to enter information for this specific section...'
+        }
+        disabled={
+          isThisSectionProcessing ||
+          (recordingMode === 'global' && transcription.trim() !== '')
+        }
+      />
+    </div>
+  );
 };
 
 // PlanTranscriptionBox Component
@@ -308,38 +344,18 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
   onPlanTranscriptionProcess,
   onPlanTranscriptionChange,
 }) => {
-  // Plan audio recorder should be enabled when:
-  // 1. WebSocket is connected
-  // 2. Not currently processing globally
-  // 3. Not in auto-processing state
-  // 4. Either not in global mode OR global mode has completed (empty transcription)
-  const isPlanAudioRecorderDisabled =
-    !isWebSocketConnected ||
-    isProcessing ||
-    isAutoProcessing ||
-    (recordingMode === 'global' && transcription.trim() !== ''); // Only disable during active global mode
-
-  const handleAudioRecorded = (base64Audio: string) => {
-    console.log('@@ handle change');
-    // Record the audio and process the transcription
-    onPlanAudioRecorded(base64Audio, planPath);
-
-    // // Simulate transcription update after processing audio
-    // const simulatedTranscription = 'Simulated transcription from recorded audio';
-
-    // // Update the transcription state with the processed transcription text
-    // onPlanTranscriptionChange(planPath, simulatedTranscription);
-
-    // // // Simulate clearing the transcription after processing
-    // // setTimeout(() => {
-    // //   onPlanTranscriptionChange(planPath, ''); // Clear the transcription after processing
-    // // }, 3000); // Clear after 3 seconds (or after processing is completed)
-  };
-return (
-  <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-purple-50">
+  // Determine if this plan is currently being processed
+  const isThisPlanProcessing = isCurrentlyProcessing && (isProcessing || isAutoProcessing);
+  
+  return (
+    <div className={`mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 ${
+      isThisPlanProcessing ? 'bg-yellow-50 border-yellow-300' : 'bg-purple-50'
+    }`}>
       <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
         <div className="flex items-center gap-1 sm:gap-2">
-          <span className="text-xs font-medium text-purple-700">
+          <span className={`text-xs font-medium ${
+            isThisPlanProcessing ? 'text-yellow-700' : 'text-purple-700'
+          }`}>
             Plan Audio:
           </span>
           <FieldAudioRecorder
@@ -352,42 +368,68 @@ return (
               !isWebSocketConnected ||
               isProcessing ||
               isAutoProcessing ||
+              isThisPlanProcessing ||
               (recordingMode === 'global' && transcription.trim() !== '')
             }
           />
+          
+          {/* Add loading spinner for this plan */}
+          {isThisPlanProcessing && (
+            <div className="flex items-center gap-1">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-600 border-t-transparent"></div>
+              <span className="text-xs text-yellow-600">Processing...</span>
+            </div>
+          )}
         </div>
+        
         <Button
           type="button"
           size="sm"
-          variant={isAlreadyProcessed ? "secondary" : "outline"}
-          className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+          variant={isAlreadyProcessed ? "secondary" : isThisPlanProcessing ? "ghost" : "outline"}
+          className={`h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation ${
+            isThisPlanProcessing ? 'cursor-not-allowed opacity-60' : ''
+          }`}
           onClick={() => onPlanTranscriptionProcess(planPath)}
           disabled={
             isProcessing ||
             isAutoProcessing ||
+            isThisPlanProcessing ||
             !transcription.trim() ||
             !isWebSocketConnected ||
             (recordingMode === 'global' && transcription.trim() !== '')
           }
-          title={isAlreadyProcessed ? "Click to override/reprocess this plan" : "Process this plan"}
+          title={
+            isThisPlanProcessing 
+              ? "Processing in progress..." 
+              : isAlreadyProcessed 
+              ? "Click to override/reprocess this plan" 
+              : "Process this plan"
+          }
         >
-          <SendHorizonal className="h-4 w-4" />
-          <span>
-            {isCurrentlyProcessing
-              ? 'Processing...'
-              : isInQueue
-              ? 'Queued'
-              : isAlreadyProcessed
-              ? 'Override' // Changed from 'Processed' to 'Override'
-              : recordingMode === 'global' && transcription.trim() !== ''
-              ? 'Global Mode'
-              : 'Process'}
-          </span>
+          {isThisPlanProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
+              <span>Processing...</span>
+            </>
+          ) : (
+            <>
+              <SendHorizonal className="h-4 w-4" />
+              <span>
+                {isInQueue
+                  ? 'Queued'
+                  : isAlreadyProcessed
+                  ? 'Override'
+                  : recordingMode === 'global' && transcription.trim() !== ''
+                  ? 'Global Mode'
+                  : 'Process'}
+              </span>
+            </>
+          )}
         </Button>
       </div>
       
-      {/* Add override indicator */}
-      {isAlreadyProcessed && (
+      {/* Override indicator */}
+      {isAlreadyProcessed && !isThisPlanProcessing && (
         <div className="mb-2 text-xs text-purple-600 bg-purple-100 p-1 rounded">
           ✓ This plan has been processed. You can still record/type to override it.
         </div>
@@ -396,23 +438,28 @@ return (
       <TranscriptionBox
         value={transcription}
         onChange={(text) => onPlanTranscriptionChange(planPath, text)}
-        isProcessing={
-          isCurrentlyProcessing && (isProcessing || isAutoProcessing)
-        }
+        isProcessing={isThisPlanProcessing}
         autoProcess={() => {}}
         autoProcessDelay={5000}
-        className="min-h-12 text-sm"
+        className={`min-h-12 text-sm ${
+          isThisPlanProcessing ? 'opacity-60 cursor-not-allowed' : ''
+        }`}
         placeholder={
-          recordingMode === 'global' && transcription.trim() !== ''
+          isThisPlanProcessing
+            ? 'Processing in progress...'
+            : recordingMode === 'global' && transcription.trim() !== ''
             ? 'Global recording mode - plan audio temporarily disabled'
             : isAlreadyProcessed
             ? 'This plan is processed. Speak or type to override...'
             : 'Speak or type to enter information for this specific plan...'
         }
-        disabled={recordingMode === 'global' && transcription.trim() !== ''}
+        disabled={
+          isThisPlanProcessing ||
+          (recordingMode === 'global' && transcription.trim() !== '')
+        }
       />
     </div>
-  )
+  );
 };
 
 // Input Field Component

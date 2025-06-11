@@ -225,26 +225,31 @@ export const useFormHandlers = (
   // Handle section transcription processing
   const handleSectionTranscriptionProcess = useCallback(
     (sectionPath: string) => {
-      if (!onTranscriptionProcess || isProcessing || isAutoProcessing) return;
-
+      if (
+        !onTranscriptionProcess ||
+        isProcessing ||
+        isAutoProcessing ||
+        recordingMode === 'global'
+      )
+        return;
+  
       console.log(`Manual processing request for section ${sectionPath}`);
-
+  
       // Remove from queue if it exists
       processingQueueRef.current = processingQueueRef.current.filter(
         (item) => item.path !== sectionPath
       );
       setProcessingQueue([...processingQueueRef.current]);
-
+  
       // Clear timeout
       const existingTimeout = pathTimeoutsRef.current.get(sectionPath);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
         pathTimeoutsRef.current.delete(sectionPath);
       }
-
+  
       const transcription = sectionTranscriptions[sectionPath] || '';
-      const isAlreadyProcessed = processedSections.has(sectionPath);
-
+  
       if (!transcription.trim()) {
         toast({
           title: 'Empty transcription',
@@ -253,30 +258,38 @@ export const useFormHandlers = (
         });
         return;
       }
-
-      if (isAlreadyProcessed) {
-        console.log(`Section ${sectionPath} already processed, skipping`);
-        return;
+  
+      // ALLOW REPROCESSING: Don't check if already processed
+      // Users should be able to reprocess sections for corrections
+      // const isAlreadyProcessed = processedSections.has(sectionPath);
+      // if (isAlreadyProcessed) {
+      //   console.log(`Section ${sectionPath} already processed, skipping`);
+      //   return;
+      // }
+  
+      // If it was already processed, remove it from processed state
+      if (processedSections.has(sectionPath)) {
+        console.log(`Section ${sectionPath} was already processed, allowing reprocessing`);
+        setProcessedSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(sectionPath);
+          return newSet;
+        });
       }
-
+  
       setIsAutoProcessing(true);
       setCurrentlyProcessingPath(sectionPath);
-
+  
       const context = {
         formKey,
         formData: state,
         sectionPath,
         selectedSections: Array.from(selectedSections),
       };
-
+  
       console.log(`Processing transcription for section: ${sectionPath}`);
-
-      setProcessedSections((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(sectionPath);
-        return newSet;
-      });
-
+  
+      // Mark as processed after successful processing (this will be done in the success callback)
       onTranscriptionProcess(transcription, context);
     },
     [
@@ -289,6 +302,7 @@ export const useFormHandlers = (
       processedSections,
       isProcessing,
       isAutoProcessing,
+      recordingMode,
       setIsAutoProcessing,
       setCurrentlyProcessingPath,
       setProcessedSections,
@@ -308,25 +322,24 @@ export const useFormHandlers = (
         recordingMode === 'global'
       )
         return;
-
+  
       console.log(`Manual processing request for plan ${planPath}`);
-
+  
       // Remove from queue if it exists
       processingQueueRef.current = processingQueueRef.current.filter(
         (item) => item.path !== planPath
       );
       setProcessingQueue([...processingQueueRef.current]);
-
+  
       // Clear timeout
       const existingTimeout = pathTimeoutsRef.current.get(planPath);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
         pathTimeoutsRef.current.delete(planPath);
       }
-
+  
       const transcription = planTranscriptions[planPath] || '';
-      const isAlreadyProcessed = processedPlans.has(planPath);
-
+  
       if (!transcription.trim()) {
         toast({
           title: 'Empty transcription',
@@ -335,30 +348,30 @@ export const useFormHandlers = (
         });
         return;
       }
-
-      if (isAlreadyProcessed) {
-        console.log(`Plan ${planPath} already processed, skipping`);
-        return;
+  
+      // ALLOW REPROCESSING: Don't check if already processed
+      // If it was already processed, remove it from processed state
+      if (processedPlans.has(planPath)) {
+        console.log(`Plan ${planPath} was already processed, allowing reprocessing`);
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(planPath);
+          return newSet;
+        });
       }
-
+  
       setIsAutoProcessing(true);
       setCurrentlyProcessingPath(planPath);
-
+  
       const context = {
         formKey,
         formData: state,
         planPath,
         selectedSections: Array.from(selectedSections),
       };
-
+  
       console.log(`Processing transcription for plan: ${planPath}`);
-
-      setProcessedPlans((prev) => {
-        const newSet = new Set(prev);
-        newSet.add(planPath);
-        return newSet;
-      });
-
+  
       onTranscriptionProcess(transcription, context);
     },
     [

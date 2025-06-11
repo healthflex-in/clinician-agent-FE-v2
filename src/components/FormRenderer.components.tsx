@@ -186,79 +186,94 @@ export const SectionTranscriptionBox: React.FC<
     isAutoProcessing ||
     (recordingMode === 'global' && transcription.trim() !== ''); // Only disable during active global mode
 
-  return (
-    <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-gray-50">
-      <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            <Checkbox
-              id={`select-${sectionPath}`}
+    return (
+      <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-blue-50">
+        <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <input
+              type="checkbox"
+              id={`section-${sectionPath}`}
               checked={isSelected}
-              onCheckedChange={(checked) =>
-                onSectionSelection(sectionPath, checked === true)
-              }
-              className="border-black text-black form-checkbox touch-manipulation"
+              onChange={(e) => onSectionSelection(sectionPath, e.target.checked)}
+              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
             />
             <label
-              htmlFor={`select-${sectionPath}`}
-              className="text-xs font-medium text-slate-700 cursor-pointer"
+              htmlFor={`section-${sectionPath}`}
+              className="text-xs font-medium text-blue-700 cursor-pointer"
             >
-              Process
+              Section Audio:
             </label>
+            <FieldAudioRecorder
+              key={`${sectionPath}-${sectionRecorderKey}`}
+              onAudioRecorded={(base64Audio) =>
+                onSectionAudioRecorded(base64Audio, sectionPath)
+              }
+              fieldPath={sectionPath}
+              isDisabled={
+                !isWebSocketConnected ||
+                isProcessing ||
+                isAutoProcessing ||
+                (recordingMode === 'global' && transcription.trim() !== '')
+              }
+            />
           </div>
-          <FieldAudioRecorder
-            key={`${sectionPath}-${sectionRecorderKey}`}
-            onAudioRecorded={(base64Audio) =>
-              onSectionAudioRecorded(base64Audio, sectionPath)
+          <Button
+            type="button"
+            size="sm"
+            variant={isAlreadyProcessed ? "secondary" : "outline"}
+            className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
+            onClick={() => onSectionTranscriptionProcess(sectionPath)}
+            disabled={
+              isProcessing ||
+              isAutoProcessing ||
+              !transcription.trim() ||
+              !isWebSocketConnected ||
+              (recordingMode === 'global' && transcription.trim() !== '')
             }
-            fieldPath={sectionPath}
-            isDisabled={isAudioRecorderDisabled}
-          />
+            title={isAlreadyProcessed ? "Click to override/reprocess this section" : "Process this section"}
+          >
+            <SendHorizonal className="h-4 w-4" />
+            <span>
+              {isCurrentlyProcessing
+                ? 'Processing...'
+                : isInQueue
+                ? 'Queued'
+                : isAlreadyProcessed
+                ? 'Override' // Changed from 'Processed' to 'Override'
+                : recordingMode === 'global' && transcription.trim() !== ''
+                ? 'Global Mode'
+                : 'Process'}
+            </span>
+          </Button>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
-          onClick={() => onSectionTranscriptionProcess(sectionPath)}
-          disabled={
-            isProcessing ||
-            isAutoProcessing ||
-            !transcription.trim() ||
-            !isWebSocketConnected ||
-            isAlreadyProcessed
+        
+        {/* Add override indicator */}
+        {isAlreadyProcessed && (
+          <div className="mb-2 text-xs text-blue-600 bg-blue-100 p-1 rounded">
+            ✓ This section has been processed. You can still record/type to override it.
+          </div>
+        )}
+        
+        <TranscriptionBox
+          value={transcription}
+          onChange={(text) => onTranscriptionChange(sectionPath, text)}
+          isProcessing={
+            isCurrentlyProcessing && (isProcessing || isAutoProcessing)
           }
-        >
-          <SendHorizonal className="h-4 w-4" />
-          <span>
-            {isCurrentlyProcessing
-              ? 'Processing...'
-              : isInQueue
-              ? 'Queued'
+          autoProcess={() => {}}
+          autoProcessDelay={5000}
+          className="min-h-12 text-sm"
+          placeholder={
+            recordingMode === 'global' && transcription.trim() !== ''
+              ? 'Global recording mode - section audio temporarily disabled'
               : isAlreadyProcessed
-              ? 'Processed'
-              : 'Process'}
-          </span>
-        </Button>
+              ? 'This section is processed. Speak or type to override...'
+              : 'Speak or type to enter information for this specific section...'
+          }
+          disabled={recordingMode === 'global' && transcription.trim() !== ''}
+        />
       </div>
-      <TranscriptionBox
-        value={transcription}
-        onChange={(text) => onTranscriptionChange(sectionPath, text)}
-        isProcessing={
-          isCurrentlyProcessing && (isProcessing || isAutoProcessing)
-        }
-        autoProcess={() => {}}
-        autoProcessDelay={5000}
-        className="min-h-12 text-sm"
-        placeholder={
-          recordingMode === 'global' && transcription.trim() !== ''
-            ? 'Global recording mode - section input temporarily disabled'
-            : 'Speak or type to enter information for this section...'
-        }
-        disabled={recordingMode === 'global' && transcription.trim() !== ''} // Only disable during active global mode
-      />
-    </div>
-  );
+    );
 };
 
 // PlanTranscriptionBox Component
@@ -320,23 +335,31 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
     // //   onPlanTranscriptionChange(planPath, ''); // Clear the transcription after processing
     // // }, 3000); // Clear after 3 seconds (or after processing is completed)
   };
-
-  return (
-    <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-blue-50">
+return (
+  <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-purple-50">
       <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
         <div className="flex items-center gap-1 sm:gap-2">
-          <span className="text-xs font-medium text-blue-700">Plan Audio:</span>
+          <span className="text-xs font-medium text-purple-700">
+            Plan Audio:
+          </span>
           <FieldAudioRecorder
             key={`${planPath}-${planRecorderKey}`}
-            onAudioRecorded={handleAudioRecorded}
+            onAudioRecorded={(base64Audio) =>
+              onPlanAudioRecorded(base64Audio, planPath)
+            }
             fieldPath={planPath}
-            isDisabled={isPlanAudioRecorderDisabled}
+            isDisabled={
+              !isWebSocketConnected ||
+              isProcessing ||
+              isAutoProcessing ||
+              (recordingMode === 'global' && transcription.trim() !== '')
+            }
           />
         </div>
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant={isAlreadyProcessed ? "secondary" : "outline"}
           className="h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation"
           onClick={() => onPlanTranscriptionProcess(planPath)}
           disabled={
@@ -344,9 +367,9 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
             isAutoProcessing ||
             !transcription.trim() ||
             !isWebSocketConnected ||
-            isAlreadyProcessed ||
-            (recordingMode === 'global' && transcription.trim() !== '') // Only disable during active global mode
+            (recordingMode === 'global' && transcription.trim() !== '')
           }
+          title={isAlreadyProcessed ? "Click to override/reprocess this plan" : "Process this plan"}
         >
           <SendHorizonal className="h-4 w-4" />
           <span>
@@ -355,13 +378,21 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
               : isInQueue
               ? 'Queued'
               : isAlreadyProcessed
-              ? 'Processed'
+              ? 'Override' // Changed from 'Processed' to 'Override'
               : recordingMode === 'global' && transcription.trim() !== ''
               ? 'Global Mode'
               : 'Process'}
           </span>
         </Button>
       </div>
+      
+      {/* Add override indicator */}
+      {isAlreadyProcessed && (
+        <div className="mb-2 text-xs text-purple-600 bg-purple-100 p-1 rounded">
+          ✓ This plan has been processed. You can still record/type to override it.
+        </div>
+      )}
+      
       <TranscriptionBox
         value={transcription}
         onChange={(text) => onPlanTranscriptionChange(planPath, text)}
@@ -374,12 +405,14 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
         placeholder={
           recordingMode === 'global' && transcription.trim() !== ''
             ? 'Global recording mode - plan audio temporarily disabled'
+            : isAlreadyProcessed
+            ? 'This plan is processed. Speak or type to override...'
             : 'Speak or type to enter information for this specific plan...'
         }
-        disabled={recordingMode === 'global' && transcription.trim() !== ''} // Only disable during active global mode
+        disabled={recordingMode === 'global' && transcription.trim() !== ''}
       />
     </div>
-  );
+  )
 };
 
 // Input Field Component

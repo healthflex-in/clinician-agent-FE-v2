@@ -468,42 +468,38 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         console.log('LLM Data:', llmData);
         console.log('Currently processing path:', currentlyProcessingPath);
         console.log('Recording mode:', recordingMode);
-
+        console.log('Selected sections:', Array.from(selectedSections));
+    
         // Handle structured payload (global processing)
         if (llmData.payloadType === 'structured' && llmData.formData) {
-          console.log(
-            'Received structured form data - stopping all processing and resetting for section mode'
-          );
-
+          console.log('Received structured form data - complete form filling');
+    
           // Clear all timeouts and processing state
           pathTimeoutsRef.current.forEach((timeout) => {
             clearTimeout(timeout);
           });
           pathTimeoutsRef.current.clear();
-
+    
           processingQueueRef.current = [];
           setProcessingQueue([]);
           setIsAutoProcessing(false);
           setCurrentlyProcessingPath(null);
-
-          // CRITICAL: Reset processed sections to allow new recording
-          // Don't mark all sections as processed for global mode
+    
+          // Reset processed sections to allow new recording
           setProcessedSections(new Set());
           setProcessedPlans(new Set());
-
-          // Clear all transcriptions and reset recorder keys to enable fresh recording
-          const allSections =
-            FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
+    
+          // Clear all transcriptions and reset recorder keys
+          const allSections = FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
           const clearedTranscriptions: Record<string, string> = {};
           const resetRecorderKeys: Record<string, number> = {};
           allSections.forEach((section) => {
             clearedTranscriptions[section] = '';
-            resetRecorderKeys[section] =
-              (sectionRecorderKeys[section] || 0) + 1;
+            resetRecorderKeys[section] = (sectionRecorderKeys[section] || 0) + 1;
           });
           setSectionTranscriptions(clearedTranscriptions);
           setSectionRecorderKeys(resetRecorderKeys);
-
+    
           // Clear all plan transcriptions and reset their recorder keys
           setPlanTranscriptions({});
           setPlanRecorderKeys((prev) => {
@@ -513,147 +509,158 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             });
             return resetKeys;
           });
-
+    
           llmData = { formData: llmData.formData };
         }
-
+    
         // Process suggestions
         if (llmData.suggestions) {
           setSuggestions(llmData.suggestions);
           setTimeout(() => setSuggestions(null), 7000);
         }
-
+    
         // Process form data
         if (llmData.formData) {
-          if (selectedSections.size === 0) {
-            dispatch({
-              type: 'MERGE_LLM_DATA',
-              data: llmData.formData,
-              source: 'llm',
-            });
-            if (onLLMUpdate) onLLMUpdate(llmData.formData);
-
-            if (currentlyProcessingPath) {
-              console.log(
-                `Clearing transcription for currently processing: ${currentlyProcessingPath}`
-              );
-
-              const isSection = Object.keys(sectionTranscriptions).includes(
-                currentlyProcessingPath
-              );
-
-              if (isSection) {
-                setSectionTranscriptions((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]: '',
-                }));
-
-                setSectionRecorderKeys((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]:
-                    (prev[currentlyProcessingPath] || 0) + 1,
-                }));
-
-                setProcessedSections((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(currentlyProcessingPath);
-                  return newSet;
-                });
-
-                if (activeSectionTranscription === currentlyProcessingPath) {
-                  setActiveSectionTranscription(null);
+          // Check if this is a section-specific update
+          const processingPath = llmData.currentlyProcessingPath || currentlyProcessingPath;
+          const isGlobalUpdate = !processingPath || llmData.isGlobalRecording === true;
+          
+          console.log('Processing path:', processingPath);
+          console.log('Is global update:', isGlobalUpdate);
+    
+          if (isGlobalUpdate) {
+            // GLOBAL UPDATE: Apply to entire form or selected sections
+            console.log('Applying global update');
+            
+            if (selectedSections.size === 0) {
+              // No sections selected - update entire form
+              console.log('Updating entire form');
+              dispatch({
+                type: 'MERGE_LLM_DATA',
+                data: llmData.formData,
+                source: 'llm',
+              });
+              if (onLLMUpdate) onLLMUpdate(llmData.formData);
+            } else {
+              // Apply only to selected sections
+              console.log('Updating selected sections only');
+              const selectedSectionsData: any = {};
+              Object.keys(llmData.formData).forEach((key) => {
+                if (selectedSections.has(key)) {
+                  selectedSectionsData[key] = llmData.formData[key];
                 }
+              });
+    
+              if (Object.keys(selectedSectionsData).length > 0) {
+                dispatch({
+                  type: 'MERGE_LLM_DATA',
+                  data: selectedSectionsData,
+                  source: 'llm',
+                });
+                if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
               } else {
-                setPlanTranscriptions((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]: '',
-                }));
-
-                setPlanRecorderKeys((prev) => ({
-                  ...prev,
-                  [currentlyProcessingPath]:
-                    (prev[currentlyProcessingPath] || 0) + 1,
-                }));
-
-                setProcessedPlans((prev) => {
-                  const newSet = new Set(prev);
-                  newSet.add(currentlyProcessingPath);
-                  return newSet;
+                toast({
+                  title: 'No Updates for Selected Sections',
+                  description: 'The AI did not provide data for your selected sections',
                 });
-
-                if (activePlanTranscription === currentlyProcessingPath) {
-                  setActivePlanTranscription(null);
-                }
               }
             }
           } else {
-            const selectedSectionsData: any = {};
-            Object.keys(llmData.formData).forEach((key) => {
-              if (selectedSections.has(key)) {
-                selectedSectionsData[key] = llmData.formData[key];
-              }
-            });
-
-            if (Object.keys(selectedSectionsData).length > 0) {
-              dispatch({
-                type: 'MERGE_LLM_DATA',
-                data: selectedSectionsData,
-                source: 'llm',
-              });
-              if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
-
-              if (currentlyProcessingPath) {
-                const isSection = Object.keys(sectionTranscriptions).includes(
-                  currentlyProcessingPath
-                );
-
-                if (
-                  isSection &&
-                  selectedSections.has(currentlyProcessingPath)
-                ) {
-                  setSectionTranscriptions((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]: '',
-                  }));
-                  setSectionRecorderKeys((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]:
-                      (prev[currentlyProcessingPath] || 0) + 1,
-                  }));
-                  setProcessedSections((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.add(currentlyProcessingPath);
-                    return newSet;
-                  });
-                  if (activeSectionTranscription === currentlyProcessingPath) {
-                    setActiveSectionTranscription(null);
-                  }
-                } else if (!isSection) {
-                  setPlanTranscriptions((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]: '',
-                  }));
-                  setPlanRecorderKeys((prev) => ({
-                    ...prev,
-                    [currentlyProcessingPath]:
-                      (prev[currentlyProcessingPath] || 0) + 1,
-                  }));
-                  setProcessedPlans((prev) => {
-                    const newSet = new Set(prev);
-                    newSet.add(currentlyProcessingPath);
-                    return newSet;
-                  });
-                  if (activePlanTranscription === currentlyProcessingPath) {
-                    setActivePlanTranscription(null);
-                  }
-                }
+            // SECTION-SPECIFIC UPDATE: Apply only to the specific section/path
+            console.log('Applying section-specific update to:', processingPath);
+            
+            // Find the relevant data for this specific path
+            const pathParts = processingPath.split('.');
+            let relevantData: any = {};
+            
+            // Try to extract data that belongs to this specific path
+            if (pathParts.length === 1) {
+              // Top-level section
+              const sectionKey = pathParts[0];
+              if (llmData.formData[sectionKey]) {
+                relevantData[sectionKey] = llmData.formData[sectionKey];
               }
             } else {
-              toast({
-                title: 'No Updates for Selected Sections',
-                description:
-                  'The AI did not provide data for your selected sections',
+              // Nested path (like plans, tests, etc.)
+              // For nested paths, we might need to update parent sections too
+              // but we'll be more conservative and only update relevant parts
+              
+              // For now, let's try to find any matching top-level keys
+              const topLevelKey = pathParts[0];
+              if (llmData.formData[topLevelKey]) {
+                relevantData[topLevelKey] = llmData.formData[topLevelKey];
+              }
+              
+              // If no top-level match, apply the full data but log it
+              if (Object.keys(relevantData).length === 0) {
+                console.log('No specific match found, applying full data');
+                relevantData = llmData.formData;
+              }
+            }
+    
+            if (Object.keys(relevantData).length > 0) {
+              console.log('Applying relevant data:', relevantData);
+              dispatch({
+                type: 'MERGE_LLM_DATA',
+                data: relevantData,
+                source: 'llm',
               });
+              if (onLLMUpdate) onLLMUpdate(relevantData);
+            } else {
+              toast({
+                title: 'No Relevant Updates',
+                description: 'The AI did not provide data relevant to this section',
+              });
+            }
+    
+            // Clear transcription for the specific path that was processed
+            if (processingPath) {
+              console.log(`Clearing transcription for processed path: ${processingPath}`);
+    
+              const isSection = Object.keys(sectionTranscriptions).includes(processingPath);
+    
+              if (isSection) {
+                setSectionTranscriptions((prev) => ({
+                  ...prev,
+                  [processingPath]: '',
+                }));
+    
+                setSectionRecorderKeys((prev) => ({
+                  ...prev,
+                  [processingPath]: (prev[processingPath] || 0) + 1,
+                }));
+    
+                setProcessedSections((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(processingPath);
+                  return newSet;
+                });
+    
+                if (activeSectionTranscription === processingPath) {
+                  setActiveSectionTranscription(null);
+                }
+              } else {
+                // It's a plan or test
+                setPlanTranscriptions((prev) => ({
+                  ...prev,
+                  [processingPath]: '',
+                }));
+    
+                setPlanRecorderKeys((prev) => ({
+                  ...prev,
+                  [processingPath]: (prev[processingPath] || 0) + 1,
+                }));
+    
+                setProcessedPlans((prev) => {
+                  const newSet = new Set(prev);
+                  newSet.add(processingPath);
+                  return newSet;
+                });
+    
+                if (activePlanTranscription === processingPath) {
+                  setActivePlanTranscription(null);
+                }
+              }
             }
           }
         }

@@ -261,7 +261,7 @@ export const SectionTranscriptionBox: React.FC<
   );
 };
 
-// Plan Transcription Box Component
+// PlanTranscriptionBox Component
 interface PlanTranscriptionBoxProps {
   planPath: string;
   transcription: string;
@@ -304,6 +304,23 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
     isAutoProcessing ||
     (recordingMode === 'global' && transcription.trim() !== ''); // Only disable during active global mode
 
+  const handleAudioRecorded = (base64Audio: string) => {
+    console.log('@@ handle change');
+    // Record the audio and process the transcription
+    onPlanAudioRecorded(base64Audio, planPath);
+
+    // // Simulate transcription update after processing audio
+    // const simulatedTranscription = 'Simulated transcription from recorded audio';
+
+    // // Update the transcription state with the processed transcription text
+    // onPlanTranscriptionChange(planPath, simulatedTranscription);
+
+    // // // Simulate clearing the transcription after processing
+    // // setTimeout(() => {
+    // //   onPlanTranscriptionChange(planPath, ''); // Clear the transcription after processing
+    // // }, 3000); // Clear after 3 seconds (or after processing is completed)
+  };
+
   return (
     <div className="mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 bg-blue-50">
       <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
@@ -311,9 +328,7 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
           <span className="text-xs font-medium text-blue-700">Plan Audio:</span>
           <FieldAudioRecorder
             key={`${planPath}-${planRecorderKey}`}
-            onAudioRecorded={(base64Audio) =>
-              onPlanAudioRecorded(base64Audio, planPath)
-            }
+            onAudioRecorded={handleAudioRecorded}
             fieldPath={planPath}
             isDisabled={isPlanAudioRecorderDisabled}
           />

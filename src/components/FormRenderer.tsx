@@ -691,10 +691,14 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       ref,
       () => ({
         updateFormWithLLMData,
+        updatePlanTranscription,
+        clearPlanTranscription,
         updateSectionTranscription,
         clearSectionTranscription,
       }),
       [
+        updatePlanTranscription,
+        clearPlanTranscription,
         updateFormWithLLMData,
         updateSectionTranscription,
         clearSectionTranscription,

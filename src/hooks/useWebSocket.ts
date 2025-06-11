@@ -242,6 +242,21 @@ export function useWebSocket(options: WebSocketOptions) {
             }
           }
 
+  //         // ADD THIS NEW SECTION:
+  // // Route transcription to the correct field type
+  // if (currentlyProcessingPath && formRendererRef.current) {
+  //   // Import these utility functions at the top if not already imported:
+  //   // import { isPlanPath, isTestPath } from '../utils/FormRenderer.utils';
+    
+  //   if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
+  //     // It's a plan or test - update plan transcription
+  //     formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, serverResponse.transcription);
+  //   } else {
+  //     // It's a section - update section transcription
+  //     formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, serverResponse.transcription);
+  //   }
+  // }
+
           // Set processing to false when we receive any response
           setIsProcessing(false);
         } catch (e) {

@@ -22,6 +22,7 @@ import TranscriptionBox from '@/components/audio/TranscriptionBox';
 import SuggestionBox from '@/components/ui/suggestion-box';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useToast } from '@/hooks/use-toast';
+import { isPlanPath, isTestPath } from '@/utils/FormRenderer.utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { WifiOff, Save, RefreshCw, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,6 +62,7 @@ const FormPage = () => {
   const [reportId, setReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [patientName, setPatientName] = useState<string>('Patient');
+  const [currentlyProcessingPath, setCurrentlyProcessingPath] = useState<string | null>(null);
 
   // Microphone permission states
   const [microphonePermission, setMicrophonePermission] = useState<
@@ -350,16 +352,19 @@ const FormPage = () => {
       console.log('=== handleIncomingFormData called ===');
       console.log('Data:', data);
       console.log('Current recording mode:', recordingMode);
-
+  
       if (!data) return;
-
+  
       try {
         if (formRendererRef.current) {
           formRendererRef.current.updateFormWithLLMData(data);
-
+  
           if (data.formData) {
             setFormData(data.formData);
-
+  
+            // ADD THIS LINE - Clear the currently processing path
+            setCurrentlyProcessingPath(null);
+  
             // CLEAR GLOBAL TRANSCRIPTION AFTER ANY FORM DATA UPDATE
             if (recordingMode === 'global') {
               console.log(
@@ -368,11 +373,11 @@ const FormPage = () => {
               setTranscriptText('');
               setTranscription('');
               setRecordingMode('idle');
-
+  
               // Force re-render of audio recorder by resetting key
               setAudioRecorderKey((prev) => prev + 1);
             }
-
+  
             // RESET TO IDLE MODE AFTER SECTION PROCESSING TO ALLOW OTHER SECTIONS
             if (recordingMode === 'section') {
               console.log(
@@ -382,7 +387,7 @@ const FormPage = () => {
               setActiveSectionPath(null);
             }
           }
-
+  
           toast({
             title: 'Form Updated',
             description: 'Form data has been processed and updated',
@@ -507,20 +512,45 @@ const FormPage = () => {
   // Update transcription when received from WebSocket
   useEffect(() => {
     if (!transcription) return;
-
-    if (recordingMode === 'global') {
-      setTranscriptText(transcription);
-    } else if (
-      recordingMode === 'section' &&
-      activeSectionPath &&
-      formRendererRef.current
-    ) {
-      formRendererRef.current.updateSectionTranscription(
-        activeSectionPath,
-        transcription
-      );
+  
+    console.log('=== Transcription useEffect triggered ===');
+    console.log('transcription:', transcription);
+    console.log('currentlyProcessingPath:', currentlyProcessingPath);
+    console.log('recordingMode:', recordingMode);
+    console.log('activeSectionPath:', activeSectionPath);
+  
+    // If we have a specific path being processed (plan/test/section), route to that field
+    if (currentlyProcessingPath && formRendererRef.current) {
+      console.log('Routing transcription to specific field:', currentlyProcessingPath);
+      
+      if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
+        // It's a plan or test - update plan transcription
+        formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, transcription);
+      } else {
+        // It's a section - update section transcription
+        formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, transcription);
+      }
+      return; // Don't update global transcription if we're processing a specific field
     }
-  }, [transcription, recordingMode, activeSectionPath]);
+  
+    // Handle global recording mode - no specific path set
+    if (recordingMode === 'global') {
+      console.log('Updating global transcription:', transcription);
+      setTranscriptText(transcription);
+      return;
+    }
+  
+    // Handle section recording mode with activeSectionPath
+    if (recordingMode === 'section' && activeSectionPath && formRendererRef.current) {
+      console.log('Updating section transcription for activeSectionPath:', activeSectionPath);
+      formRendererRef.current.updateSectionTranscription(activeSectionPath, transcription);
+      return;
+    }
+  
+    // Fallback: if no specific routing, treat as global
+    console.log('Fallback: treating as global transcription');
+    setTranscriptText(transcription);
+  }, [transcription, recordingMode, activeSectionPath, currentlyProcessingPath, formKey]);
 
   // GLOBAL AUDIO RECORDING
   const handleAudioEncoded = (base64Audio: string) => {
@@ -533,23 +563,24 @@ const FormPage = () => {
       connect();
       return;
     }
-
+  
     console.log('Global audio recording completed');
-
+  
     // Set to global mode and clear previous state
     setRecordingMode('global');
     setActiveSectionPath(null);
-
+    // DON'T set currentlyProcessingPath for global recordings - keep it null
+  
     // DON'T clear transcriptText here - let the user see what was transcribed
     // The clearing will happen after processing
-
+  
     const context = {
       formKey,
       formData: formData || {},
     };
-
+  
     const sent = sendAudio(base64Audio, context);
-
+  
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -704,34 +735,44 @@ const FormPage = () => {
 
   // SECTION AUDIO RECORDING
   const handleFieldAudioEncoded = (base64Audio: string, context: any) => {
-    if (!isConnected) {
-      toast({
-        title: 'Not connected',
-        description: 'Attempting to reconnect...',
-        variant: 'destructive',
-      });
-      connect();
-      return;
-    }
+  if (!isConnected) {
+    toast({
+      title: 'Not connected',
+      description: 'Attempting to reconnect...',
+      variant: 'destructive',
+    });
+    connect();
+    return;
+  }
 
-    // Set to section mode
-    if (context.sectionPath) {
-      setRecordingMode('section');
-      setActiveSectionPath(context.sectionPath);
-    }
+  // Determine which path is being processed
+  let processingPath = null;
+  if (context.sectionPath) {
+    processingPath = context.sectionPath;
+    setRecordingMode('section');
+    setActiveSectionPath(context.sectionPath);
+  } else if (context.planPath) {
+    processingPath = context.planPath;
+  } else if (context.testPath) {
+    processingPath = context.testPath;
+  }
 
-    const sent = sendAudio(base64Audio, context);
+  // Set the currently processing path
+  setCurrentlyProcessingPath(processingPath);
 
-    if (!sent) {
-      toast({
-        title: 'Failed to send audio',
-        description: 'Connection issues detected',
-        variant: 'destructive',
-      });
-      setRecordingMode('idle');
-      setActiveSectionPath(null);
-    }
-  };
+  const sent = sendAudio(base64Audio, context);
+
+  if (!sent) {
+    toast({
+      title: 'Failed to send audio',
+      description: 'Connection issues detected',
+      variant: 'destructive',
+    });
+    setRecordingMode('idle');
+    setActiveSectionPath(null);
+    setCurrentlyProcessingPath(null);
+  }
+};
 
   // SECTION TRANSCRIPTION PROCESSING
   const handleFieldTranscriptionProcess = (
@@ -747,15 +788,28 @@ const FormPage = () => {
       connect();
       return;
     }
-
+  
+    // Set the currently processing path
+    let processingPath = null;
+    if (context.sectionPath) {
+      processingPath = context.sectionPath;
+    } else if (context.planPath) {
+      processingPath = context.planPath;
+    } else if (context.testPath) {
+      processingPath = context.testPath;
+    }
+    
+    setCurrentlyProcessingPath(processingPath);
+  
     const sent = processTranscription(transcription, context);
-
+  
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
         description: 'Connection issues detected',
         variant: 'destructive',
       });
+      setCurrentlyProcessingPath(null);
     }
   };
 

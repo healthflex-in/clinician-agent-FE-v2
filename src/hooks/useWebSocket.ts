@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { WebSocketMessage, ServerResponse } from '@/types/form';
 
@@ -11,30 +11,29 @@ interface WebSocketOptions {
 }
 
 export function useWebSocket(options: WebSocketOptions) {
-  const { url, onOpen, onClose, onError, onFormData } = options;
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<Event | null>(null);
-  const [transcription, setTranscription] = useState<string>('');
-  const [formData, setFormData] = useState<any>(null);
-  const [suggestions, setSuggestions] = useState<string | null>(null);
-  const [recommendations, setRecommendations] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const { url, onOpen, onClose, onError, onFormData } = options;
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttemptsRef = useRef<number>(0);
   const maxReconnectAttempts = 20;
-
-  // Heartbeat refs with updated timeout values
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastServerPingRef = useRef<number>(0);
   const PING_INTERVAL = 300000; // 300 seconds
   const CONNECTION_TIMEOUT = 80000; // 80 seconds
-  const KEEP_ALIVE = 600000; // 10 minutes (new)
+
+  const [formData, setFormData] = React.useState<any>(null);
+  const [isConnected, setIsConnected] = React.useState(false);
+  const [error, setError] = React.useState<Event | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isConnecting, setIsConnecting] = React.useState(false);
+  const [transcription, setTranscription] = React.useState<string>('');
+  const [suggestions, setSuggestions] = React.useState<string | null>(null);
+  const [recommendations, setRecommendations] = React.useState<string | null>(null);
+
+  const wsRef = React.useRef<WebSocket | null>(null);
+  const lastServerPingRef = React.useRef<number>(0);
+  const reconnectAttemptsRef = React.useRef<number>(0);
+  const heartbeatIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Clear heartbeat timer
-  const clearHeartbeatTimer = useCallback(() => {
+  const clearHeartbeatTimer = React.useCallback(() => {
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current);
       heartbeatIntervalRef.current = null;
@@ -63,7 +62,7 @@ export function useWebSocket(options: WebSocketOptions) {
     }, PING_INTERVAL);
   }, [clearHeartbeatTimer, PING_INTERVAL, CONNECTION_TIMEOUT]);
 
-  const connect = useCallback(() => {
+  const connect = React.useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN || isConnecting) return;
 
     try {
@@ -242,21 +241,6 @@ export function useWebSocket(options: WebSocketOptions) {
             }
           }
 
-  //         // ADD THIS NEW SECTION:
-  // // Route transcription to the correct field type
-  // if (currentlyProcessingPath && formRendererRef.current) {
-  //   // Import these utility functions at the top if not already imported:
-  //   // import { isPlanPath, isTestPath } from '../utils/FormRenderer.utils';
-    
-  //   if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
-  //     // It's a plan or test - update plan transcription
-  //     formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, serverResponse.transcription);
-  //   } else {
-  //     // It's a section - update section transcription
-  //     formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, serverResponse.transcription);
-  //   }
-  // }
-
           // Set processing to false when we receive any response
           setIsProcessing(false);
         } catch (e) {
@@ -291,7 +275,7 @@ export function useWebSocket(options: WebSocketOptions) {
     clearHeartbeatTimer,
   ]);
 
-  const disconnect = useCallback(() => {
+  const disconnect = React.useCallback(() => {
     clearHeartbeatTimer();
     if (wsRef.current) {
       wsRef.current.close();
@@ -299,7 +283,7 @@ export function useWebSocket(options: WebSocketOptions) {
     }
   }, [clearHeartbeatTimer]);
 
-  const sendMessage = useCallback((message: WebSocketMessage) => {
+  const sendMessage = React.useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setIsProcessing(true);
       console.log('Sending message:', message);
@@ -317,7 +301,7 @@ export function useWebSocket(options: WebSocketOptions) {
     return false;
   }, []);
 
-  const sendAudio = useCallback(
+  const sendAudio = React.useCallback(
     (base64Audio: string, currentFormData?: any) => {
       // Get user ID and appointment ID from localStorage or route params
       const userId = localStorage.getItem('userId') || '';
@@ -327,9 +311,8 @@ export function useWebSocket(options: WebSocketOptions) {
       // Make sure the audio is in the correct format (data URL)
       let audioData = base64Audio;
       if (!audioData.startsWith('data:')) {
-        audioData = `data:audio/wav;base64,${
-          audioData.split(',')[1] || audioData
-        }`;
+        audioData = `data:audio/wav;base64,${audioData.split(',')[1] || audioData
+          }`;
       }
 
       // Format for audio payload
@@ -354,7 +337,7 @@ export function useWebSocket(options: WebSocketOptions) {
     [sendMessage]
   );
 
-  const processTranscription = useCallback(
+  const processTranscription = React.useCallback(
     (transcriptionText: string, currentFormData?: any) => {
       // Get user ID and appointment ID from localStorage or route params
       const userId = localStorage.getItem('userId') || '';
@@ -382,7 +365,7 @@ export function useWebSocket(options: WebSocketOptions) {
     [sendMessage]
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       clearHeartbeatTimer();
       if (wsRef.current) {

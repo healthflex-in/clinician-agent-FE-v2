@@ -1,41 +1,74 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React from 'react';
 import { Mic, MicOff, Loader } from 'lucide-react';
+
 import {
   encodeWAV,
-  blobToBase64,
-  detectSilence,
   getUserMedia,
-  resampleAudio,
+  detectSilence,
 } from '@/utils/audio';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 interface RecorderProps {
-  onAudioEncoded: (base64Audio: string) => void;
+  label?: string;
+  isDisabled?: boolean;
   isProcessing: boolean;
+  size?: 'sm' | 'md' | 'lg';
+
+  onRecordingStart?: () => void;
+  onRecordingStop?: () => void;
+  onAudioEncoded: (base64Audio: string) => void;
 }
 
 type RecorderState = 'inactive' | 'recording' | 'paused';
 
-const Recorder: React.FC<RecorderProps> = ({
-  onAudioEncoded,
+export const Recorder: React.FC<RecorderProps> = ({
+  label,
+  size = 'md',
   isProcessing,
+  onAudioEncoded,
+  onRecordingStart,
+  onRecordingStop,
+  isDisabled = false,
 }) => {
-  const [state, setState] = useState<RecorderState>('inactive');
-  const [isPermissionGranted, setIsPermissionGranted] = useState<boolean | null>(null);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const { toast } = useToast();
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const silenceDetectorRef = useRef<(() => void) | null>(null);
-  const isProcessingAudioRef = useRef(false);
+  const [state, setState] = React.useState<RecorderState>('inactive');
+  const [isRequestingPermission, setIsRequestingPermission] = React.useState(false);
+  const [isPermissionGranted, setIsPermissionGranted] = React.useState<boolean | null>(null);
+
+  const chunksRef = React.useRef<Blob[]>([]);
+  const isProcessingAudioRef = React.useRef(false);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const silenceDetectorRef = React.useRef<(() => void) | null>(null);
+
+  const getSizeClasses = () => {
+    switch (size) {
+      case 'sm':
+        return 'w-12 h-12'; // Smaller button
+      case 'lg':
+        return 'w-20 h-20'; // Larger button
+      default:
+        return 'w-16 h-16'; // Default (md)
+    }
+  };
+
+  const getIconSize = () => {
+    switch (size) {
+      case 'sm':
+        return 'h-4 w-4';
+      case 'lg':
+        return 'h-8 w-8';
+      default:
+        return 'h-6 w-6';
+    }
+  };
 
   // Handle permission request
-  const requestPermission = useCallback(async () => {
+  const requestPermission = React.useCallback(async () => {
     if (isRequestingPermission) return;
     
     setIsRequestingPermission(true);
@@ -73,7 +106,7 @@ const Recorder: React.FC<RecorderProps> = ({
   }, [isRequestingPermission, toast]);
 
   // Process audio data
-  const processAudioData = useCallback(async () => {
+  const processAudioData = React.useCallback(async () => {
     if (chunksRef.current.length === 0 || isProcessingAudioRef.current) {
       console.log('No audio chunks or already processing');
       return;
@@ -137,9 +170,7 @@ const Recorder: React.FC<RecorderProps> = ({
   }, [onAudioEncoded, toast]);
 
   // Start recording
-  const startRecording = useCallback(async () => {
-    console.log('Starting recording...');
-    
+  const startRecording = React.useCallback(async () => {
     if (!streamRef.current || !analyserRef.current) {
       console.error('Stream or analyser not available');
       return;
@@ -201,8 +232,12 @@ const Recorder: React.FC<RecorderProps> = ({
 
       mediaRecorder.start(100); // Record in 100ms chunks
       setState('recording');
-      console.log('Recording started');
 
+      if (onRecordingStart) {
+        onRecordingStart();
+      }
+
+      console.log('Recording started');
     } catch (err) {
       console.error('Error starting recording:', err);
       toast({
@@ -211,12 +246,10 @@ const Recorder: React.FC<RecorderProps> = ({
         description: 'Failed to start recording.',
       });
     }
-  }, [processAudioData, toast]);
+  }, [processAudioData, toast, onRecordingStart]);
 
   // Stop recording
-  const stopRecording = useCallback(() => {
-    console.log('Stopping recording...');
-    
+  const stopRecording = React.useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -228,11 +261,20 @@ const Recorder: React.FC<RecorderProps> = ({
     }
 
     setState('paused');
+
+    if (onRecordingStop) {
+      onRecordingStop();
+    }
   }, []);
 
   // Handle single click to toggle recording
-  const handleRecordingClick = useCallback(async () => {
+  const handleRecordingClick = React.useCallback(async () => {
     console.log('Recording button clicked, current state:', state);
+
+    if (isDisabled) {
+      console.log('Recorder is disabled, ignoring click');
+      return;
+    }
     
     // Prevent multiple rapid clicks
     if (isProcessing || isProcessingAudioRef.current) {
@@ -252,10 +294,10 @@ const Recorder: React.FC<RecorderProps> = ({
     } else if (state === 'recording') {
       stopRecording();
     }
-  }, [state, isPermissionGranted, isProcessing, requestPermission, startRecording, stopRecording]);
+  }, [state, isPermissionGranted, isProcessing, isDisabled, requestPermission, startRecording, stopRecording]);
 
   // Initialize on mount
-  useEffect(() => {
+  React.useEffect(() => {
     // Check if the browser supports audio recording
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast({
@@ -306,7 +348,7 @@ const Recorder: React.FC<RecorderProps> = ({
   }, [toast]); // Only depend on toast
 
   // Clean up on unmount
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (silenceDetectorRef.current) {
         silenceDetectorRef.current();
@@ -358,23 +400,30 @@ const Recorder: React.FC<RecorderProps> = ({
 
   return (
     <div className="flex flex-col items-center">
+      {/* ADD: Optional label above button */}
+      {label && (
+        <div className="text-xs font-medium mb-2 text-center text-muted-foreground">
+          {label}
+        </div>
+      )}
+      
       <div className="relative">
-        {state === 'recording' && (
+        {state === 'recording' && !isDisabled && (
           <span className="absolute -inset-2 rounded-full bg-red-400/20 animate-ping"></span>
         )}
         <Button
           onClick={handleRecordingClick}
-          disabled={isRequestingPermission}
-          className={`w-16 h-16 rounded-full transition-all duration-300 ease-in-out ${buttonClassName}`}
+          disabled={isRequestingPermission || isDisabled}
+          className={`${getSizeClasses()} rounded-full transition-all duration-300 ease-in-out ${buttonClassName} ${
+            isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          <IconComponent 
-            className={`h-6 w-6 ${spinning ? 'animate-spin' : ''}`} 
-          />
+          <IconComponent className={`${getIconSize()} ${spinning ? 'animate-spin' : ''}`}/>
         </Button>
       </div>
 
       <div className="text-sm mt-2 text-center font-medium max-w-xs">
-        {getStatusText()}
+        {isDisabled ? 'Recording disabled' : getStatusText()}
       </div>
     </div>
   );

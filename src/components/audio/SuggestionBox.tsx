@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { AlertCircle, X } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface SuggestionBoxProps {
   suggestions: string;
   onClose: () => void;
 }
 
-const SuggestionBox: React.FC<SuggestionBoxProps> = ({
+export const SuggestionBox: React.FC<SuggestionBoxProps> = ({
   suggestions,
   onClose,
 }) => {

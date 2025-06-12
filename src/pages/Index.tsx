@@ -1,38 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select';
+  User,
+  Loader2,
+  Calendar,
+  Building,
+  ArrowRight,
+  CheckCircle,
+  ClipboardList,
+} from 'lucide-react';
+
+import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Loader2,
-  CheckCircle,
-  ArrowRight,
-  Building,
-  User,
-  Calendar,
-  ClipboardList,
-} from 'lucide-react';
 import formSchemas from '@/schemas/formSchemas';
 import {
-  fetchCenters,
   searchUsers,
+  fetchCenters,
   fetchAppointments,
 } from '@/utils/graphqlClient';
+import {
+  Select,
+  SelectItem,
+  SelectValue,
+  SelectContent,
+  SelectTrigger,
+} from '@/components/ui/select';
+import {
+  Card,
+  CardTitle,
+  CardHeader,
+  CardFooter,
+  CardContent,
+} from '@/components/ui/card';
 
 // Define interfaces for API data
 interface Center {
@@ -55,29 +56,29 @@ interface Appointment {
 }
 
 const Index = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Form state
-  const [formKey, setFormKey] = useState<string>('snc');
-  const [patientId, setPatientId] = useState<string>('');
-  const [patientName, setPatientName] = useState<string>('');
-  const [patientSearch, setPatientSearch] = useState<string>('');
-  const [appointmentId, setAppointmentId] = useState<string>('');
-  const [centerId, setCenterId] = useState<string>('');
+  const [centerId, setCenterId] = React.useState<string>('');
+  const [formKey, setFormKey] = React.useState<string>('snc');
+  const [patientId, setPatientId] = React.useState<string>('');
+  const [patientName, setPatientName] = React.useState<string>('');
+  const [patientSearch, setPatientSearch] = React.useState<string>('');
+  const [appointmentId, setAppointmentId] = React.useState<string>('');
 
   // Data from APIs
-  const [centers, setCenters] = useState<Center[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [centers, setCenters] = React.useState<Center[]>([]);
+  const [patients, setPatients] = React.useState<Patient[]>([]);
+  const [appointments, setAppointments] = React.useState<Appointment[]>([]);
 
   // Loading states
-  const [loadingCenters, setLoadingCenters] = useState(false);
-  const [loadingPatients, setLoadingPatients] = useState(false);
-  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [loadingCenters, setLoadingCenters] = React.useState(false);
+  const [loadingPatients, setLoadingPatients] = React.useState(false);
+  const [loadingAppointments, setLoadingAppointments] = React.useState(false);
 
   // Set viewport for mobile
-  useEffect(() => {
+  React.useEffect(() => {
     // Set viewport meta tag for mobile
     const meta = document.createElement('meta');
     meta.name = 'viewport';
@@ -105,7 +106,7 @@ const Index = () => {
   }, []);
 
   // Get previous values from localStorage
-  useEffect(() => {
+  React.useEffect(() => {
     const savedPatientId = localStorage.getItem('userId');
     const savedAppointmentId = localStorage.getItem('appointmentId');
     const savedFormKey = localStorage.getItem('formKey');
@@ -154,7 +155,7 @@ const Index = () => {
   };
 
   // Search for patients when center is selected and search term changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (centerId && patientSearch) {
       const delaySearch = setTimeout(() => {
         searchPatients(patientSearch);
@@ -196,7 +197,7 @@ const Index = () => {
   };
 
   // Load appointments when patient is selected
-  useEffect(() => {
+  React.useEffect(() => {
     if (patientId) {
       loadAppointments(patientId);
     } else {
@@ -339,9 +340,8 @@ const Index = () => {
               {[1, 2, 3, 4].map((step) => (
                 <div
                   key={step}
-                  className={`w-2 h-2 rounded-full ${
-                    step <= getProgressStep() ? 'bg-primary' : 'bg-gray-200'
-                  }`}
+                  className={`w-2 h-2 rounded-full ${step <= getProgressStep() ? 'bg-primary' : 'bg-gray-200'
+                    }`}
                 />
               ))}
             </div>

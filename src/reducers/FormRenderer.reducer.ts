@@ -1,19 +1,18 @@
-// reducers/FormRenderer.reducer.ts
 import {
-  defaultStateFromSchema,
-  deepUpdateObject,
   getNestedValue,
   findDifferences,
+  deepUpdateObject,
+  defaultStateFromSchema,
 } from '@/utils/schemaUtils';
 import { FormAction } from '../types/FormRenderer.types';
 
 // Reducer function to handle form state updates
 export const formReducer = (
   state: any,
-  action: FormAction,
+  toast: any,
   schema: any,
+  action: FormAction,
   setLlmUpdatedFields: React.Dispatch<React.SetStateAction<Set<string>>>,
-  toast: any
 ): any => {
   switch (action.type) {
     case 'UPDATE_FIELD':

@@ -1,28 +1,31 @@
-import React, { useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Loader } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import React from 'react';
+
 import AudioRecorder from './AudioRecorder';
-import { themeColors } from '@/styles/theme';
+import { useToast } from '@/hooks/use-toast';
 
 interface SectionAudioRecorderProps {
+  label?: string;
   sectionId: string;
   isProcessing: boolean;
-  onAudioEncoded: (base64Audio: string, sectionId: string) => void;
-  label?: string;
   size?: 'sm' | 'md' | 'lg';
+
+  onRecordingStart?: () => void;
+  onRecordingStop?: () => void;
+  onAudioEncoded: (base64Audio: string, sectionId: string) => void;
 }
 
-const SectionAudioRecorder: React.FC<SectionAudioRecorderProps> = ({
+export const SectionAudioRecorder: React.FC<SectionAudioRecorderProps> = ({
   sectionId,
+  size = 'sm',
   isProcessing,
   onAudioEncoded,
+  onRecordingStart,
+  onRecordingStop,
   label = 'Record Section Audio',
-  size = 'sm',
 }) => {
   const { toast } = useToast();
 
-  const handleAudioEncoded = useCallback(
+  const handleAudioEncoded = React.useCallback(
     (base64Audio: string) => {
       onAudioEncoded(base64Audio, sectionId);
     },
@@ -32,10 +35,12 @@ const SectionAudioRecorder: React.FC<SectionAudioRecorderProps> = ({
   return (
     <div className="flex flex-col items-center">
       <AudioRecorder
-        onAudioEncoded={handleAudioEncoded}
-        isProcessing={isProcessing}
         size={size}
         label={label}
+        isProcessing={isProcessing}
+        onRecordingStop={onRecordingStop}
+        onRecordingStart={onRecordingStart}
+        onAudioEncoded={handleAudioEncoded}
       />
     </div>
   );

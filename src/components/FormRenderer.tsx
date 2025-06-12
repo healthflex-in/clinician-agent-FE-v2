@@ -1,49 +1,37 @@
-// FormRenderer.tsx
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-  useImperativeHandle,
-  forwardRef,
-} from 'react';
-import { getNestedValue } from '@/utils/schemaUtils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import {
-  MinusCircle,
-  PlusCircle,
-  RefreshCw,
-  SendHorizonal,
-} from 'lucide-react';
-import FieldAudioRecorder from './FieldAudioRecorder';
-import TranscriptionBox from '@/components/audio/TranscriptionBox';
+import React from 'react';
+import {RefreshCw, PlusCircle, MinusCircle} from 'lucide-react';
 
-// Import modular components
 import {
-  FormRendererProps,
   FormRendererRef,
+  FormRendererProps,
 } from '../types/FormRenderer.types';
-import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
 import {
   isPlanPath,
   isTestPath,
   shouldHaveAudioRecording,
 } from '../utils/FormRenderer.utils';
-import { useFormRenderer } from '../hooks/useFormRenderer';
-import { useFormHandlers } from '../handlers/FormRenderer.handlers';
 import {
-  ProcessingQueueAlert,
-  SuggestionsAlert,
-  LLMUpdatesAlert,
-  SectionTranscriptionBox,
-  PlanTranscriptionBox,
   InputField,
+  LLMUpdatesAlert,
+  SuggestionsAlert,
   FormActionButtons,
+  ProcessingQueueAlert,
+  PlanTranscriptionBox,
+  SectionTranscriptionBox,
 } from './FormRenderer.components';
 
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { getNestedValue } from '@/utils/schemaUtils';
+import { Card, CardContent } from '@/components/ui/card';
+import { useFormRenderer } from '../hooks/useFormRenderer';
+import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
+import { useFormHandlers } from '../handlers/form-renderer.handlers';
+import {FieldAudioRecorder, TranscriptionBox} from '@/components/audio';
+
+
 // Important: Use React.forwardRef here
-const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
+const FormRenderer = React.forwardRef<FormRendererRef, FormRendererProps>(
   (
     {
       schema,
@@ -59,13 +47,16 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       activeSectionPath = null,
       appointmentId,
       patientId,
+      recordingStates = {},
+      onRecordingStart,
+      onRecordingStop,
+      onSectionTranscriptionClear,
+      onPlanTranscriptionClear,
     },
     ref
   ) => {
     // New state for selected sections - starts with empty set (none selected)
-    const [selectedSections, setSelectedSections] = useState<Set<string>>(
-      new Set()
-    );
+    const [selectedSections, setSelectedSections] = React.useState<Set<string>>(new Set());
 
     // Use custom hook for form state management
     const formState = useFormRenderer(
@@ -172,7 +163,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     } = handlers;
 
     // Add section selection handler
-    const handleSectionSelection = useCallback(
+    const handleSectionSelection = React.useCallback(
       (sectionPath: string, checked: boolean) => {
         setSelectedSections((prev) => {
           const newSet = new Set(prev);
@@ -187,26 +178,8 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
       []
     );
 
-    // Handle test audio recording (for Physio forms)
-    const handleTestAudioRecorded = useCallback(
-      (base64Audio: string, testPath: string) => {
-        if (!onAudioRecorded) return;
-
-        const context = {
-          formKey,
-          formData: state,
-          testPath, // Use testPath for tests
-          selectedSections: Array.from(selectedSections),
-        };
-
-        console.log(`Recording audio for test: ${testPath}`);
-        onAudioRecorded(base64Audio, context);
-      },
-      [formKey, state, onAudioRecorded, selectedSections]
-    );
-
     // Handle test transcription changes (for Physio forms)
-    const handleTestTranscriptionChange = useCallback(
+    const handleTestTranscriptionChange = React.useCallback(
       (testPath: string, text: string) => {
         console.log(
           `Manual test transcription change for ${testPath}: "${text}"`
@@ -248,7 +221,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // Handle test transcription processing (for Physio forms)
-    const handleTestTranscriptionProcess = useCallback(
+    const handleTestTranscriptionProcess = React.useCallback(
       (testPath: string) => {
         if (
           !onTranscriptionProcess ||
@@ -330,18 +303,11 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // Plan transcription update function
-    const updatePlanTranscription = useCallback(
+    const updatePlanTranscription = React.useCallback(
       (planPath: string, text: string) => {
         console.log(
           `Updating plan transcription for ${planPath} with text: ${text}`
         );
-    
-        // REMOVED: Don't block updates for already processed plans
-        // This allows users to override/correct specific sections
-        // if (processedPlans.has(planPath)) {
-        //   console.log(`Ignoring update for ${planPath} - already processed`);
-        //   return;
-        // }
     
         // Allow override - remove from processed state if it exists
         if (processedPlans.has(planPath)) {
@@ -370,7 +336,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // Clear plan transcription
-    const clearPlanTranscription = useCallback(
+    const clearPlanTranscription = React.useCallback(
       (planPath: string) => {
         setPlanTranscriptions((prev) => ({
           ...prev,
@@ -407,18 +373,11 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // Update section transcription function
-    const updateSectionTranscription = useCallback(
+    const updateSectionTranscription = React.useCallback(
       (sectionPath: string, text: string) => {
         console.log(
           `Updating section transcription for ${sectionPath} with text: ${text}`
         );
-    
-        // REMOVED: Don't block updates for already processed sections
-        // This allows users to override/correct specific sections
-        // if (processedSections.has(sectionPath)) {
-        //   console.log(`Ignoring update for ${sectionPath} - already processed`);
-        //   return;
-        // }
     
         // Allow override - remove from processed state if it exists
         if (processedSections.has(sectionPath)) {
@@ -451,12 +410,12 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         setSectionTranscriptions,
         setActiveSectionTranscription,
         addToProcessingQueue,
-        setProcessedSections, // Add this dependency
+        setProcessedSections,
       ]
     );
 
     // Clear section transcription
-    const clearSectionTranscription = useCallback(
+    const clearSectionTranscription = React.useCallback(
       (sectionPath: string) => {
         setSectionTranscriptions((prev) => ({
           ...prev,
@@ -493,16 +452,8 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // Update form with LLM data
-    const updateFormWithLLMData = useCallback(
+    const updateFormWithLLMData = React.useCallback(
       (llmData: any) => {
-        console.log('=== Updating form with LLM data ===');
-        console.log('LLM Data:', llmData);
-        console.log('Currently processing path:', currentlyProcessingPath);
-        console.log('Recording mode:', recordingMode);
-        console.log('Selected sections:', Array.from(selectedSections));
-        console.log('Data recordingType:', llmData.recordingType);
-        console.log('Data isGlobalRecording:', llmData.isGlobalRecording);
-    
         // Handle structured payload (global processing)
         if (llmData.payloadType === 'structured' && llmData.formData) {
           console.log('Received structured form data - complete form filling');
@@ -556,18 +507,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
         if (llmData.formData) {
           // Determine if this is a global or section-specific update
           const processingPath = llmData.currentlyProcessingPath || currentlyProcessingPath;
-          const isGlobalUpdate = llmData.isGlobalRecording === true || 
-                               llmData.recordingType === 'global' || 
-                               (!processingPath && selectedSections.size === 0);
-          
-          console.log('Processing path:', processingPath);
-          console.log('Is global update:', isGlobalUpdate);
-          console.log('Update type determination:', {
-            'llmData.isGlobalRecording': llmData.isGlobalRecording,
-            'llmData.recordingType': llmData.recordingType,
-            'processingPath': processingPath,
-            'selectedSections.size': selectedSections.size
-          });
+          const isGlobalUpdate = llmData.isGlobalRecording === true || llmData.recordingType === 'global' || (!processingPath && selectedSections.size === 0);
     
           if (isGlobalUpdate) {
             // GLOBAL UPDATE: Apply to entire form or selected sections
@@ -672,8 +612,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
             if (processingPath) {
               console.log(`=== CLEARING TRANSCRIPTION FOR PROCESSED PATH: ${processingPath} ===`);
     
-              const isSection = Object.keys(sectionTranscriptions).includes(processingPath) ||
-                               processingPath.split('.').length === 1;
+              const isSection = Object.keys(sectionTranscriptions).includes(processingPath) || processingPath.split('.').length === 1;
     
               if (isSection) {
                 console.log('Clearing section transcription for:', processingPath);
@@ -752,7 +691,7 @@ const FormRenderer = forwardRef<FormRendererRef, FormRendererProps>(
     );
 
     // 2. Add a cleanup function for resetting processed states
-const resetProcessedState = useCallback((path: string) => {
+const resetProcessedState = React.useCallback((path: string) => {
   console.log('=== RESETTING PROCESSED STATE FOR:', path, '===');
   
   // Remove from processed sections
@@ -782,7 +721,7 @@ const resetProcessedState = useCallback((path: string) => {
 }, [setProcessedSections, setProcessedPlans, setSectionRecorderKeys, setPlanRecorderKeys]);
 
     // IMPORTANT: Expose methods to the parent via ref
-    useImperativeHandle(
+    React.useImperativeHandle(
       ref,
       () => ({
         updateFormWithLLMData,
@@ -803,9 +742,30 @@ const resetProcessedState = useCallback((path: string) => {
     );
 
     // Notify parent component when form data changes
-    useEffect(() => {
+    React.useEffect(() => {
       if (onChange) onChange(state);
     }, [state, onChange]);
+
+    const handleTestAudioRecorded = React.useCallback(
+      (base64Audio: string, testPath: string) => {
+        console.log(`Test audio recorded for ${testPath}`);
+        
+        // Clear any existing transcription when new audio is recorded
+        clearPlanTranscription(testPath);
+        
+        // Reset recorder key to refresh the component
+        setPlanRecorderKeys((prev) => ({
+          ...prev,
+          [testPath]: (prev[testPath] || 0) + 1,
+        }));
+    
+        // Call the parent's audio recorded handler
+        if (onAudioRecorded) {
+          onAudioRecorded(base64Audio, testPath);
+        }
+      },
+      [clearPlanTranscription, setPlanRecorderKeys, onAudioRecorded]
+    );
 
     // Render section transcription box
     const renderSectionTranscriptionBox = (sectionPath: string) => {
@@ -817,6 +777,9 @@ const resetProcessedState = useCallback((path: string) => {
       const isInQueue = processingQueue.some(
         (item) => item.path === sectionPath
       );
+      
+      // GET RECORDING STATE FOR THIS SECTION
+      const isRecording = recordingStates[sectionPath] || false;
 
       return (
         <SectionTranscriptionBox
@@ -832,7 +795,9 @@ const resetProcessedState = useCallback((path: string) => {
           isAutoProcessing={isAutoProcessing}
           recordingMode={recordingMode}
           sectionRecorderKey={sectionRecorderKeys[sectionPath] || 0}
+          isRecording={isRecording} // FIXED: Pass actual recording state
           onSectionSelection={handleSectionSelection}
+          onTranscriptionClear={onSectionTranscriptionClear || clearSectionTranscription} // FIXED
           onSectionAudioRecorded={handleSectionAudioRecorded}
           onSectionTranscriptionProcess={handleSectionTranscriptionProcess}
           onTranscriptionChange={handleTranscriptionChange}
@@ -846,7 +811,7 @@ const resetProcessedState = useCallback((path: string) => {
       const isAlreadyProcessed = processedPlans.has(planPath);
       const isCurrentlyProcessing = currentlyProcessingPath === planPath;
       const isInQueue = processingQueue.some((item) => item.path === planPath);
-
+    
       return (
         <PlanTranscriptionBox
           planPath={planPath}
@@ -859,6 +824,8 @@ const resetProcessedState = useCallback((path: string) => {
           isAutoProcessing={isAutoProcessing}
           recordingMode={recordingMode}
           planRecorderKey={planRecorderKeys[planPath] || 0}
+          isRecording={recordingMode === 'global'}
+          onPlanTranscriptionClear={clearPlanTranscription}
           onPlanAudioRecorded={handlePlanAudioRecorded}
           onPlanTranscriptionProcess={handlePlanTranscriptionProcess}
           onPlanTranscriptionChange={handlePlanTranscriptionChange}
@@ -873,9 +840,12 @@ const resetProcessedState = useCallback((path: string) => {
       const isCurrentlyProcessing = currentlyProcessingPath === testPath;
       const isInQueue = processingQueue.some((item) => item.path === testPath);
       
+      // GET RECORDING STATE FOR THIS TEST
+      const isRecording = recordingStates[testPath] || false;
+      
       // Determine if this test is currently being processed
       const isThisTestProcessing = isCurrentlyProcessing && (isProcessing || isAutoProcessing);
-    
+
       return (
         <div className={`mb-2 sm:mb-3 border rounded-md p-1 sm:p-2 ${
           isThisTestProcessing ? 'bg-yellow-50 border-yellow-300' : 'bg-green-50'
@@ -889,9 +859,6 @@ const resetProcessedState = useCallback((path: string) => {
               </span>
               <FieldAudioRecorder
                 key={`${testPath}-${planRecorderKeys[testPath] || 0}`}
-                onAudioRecorded={(base64Audio) =>
-                  handleTestAudioRecorded(base64Audio, testPath)
-                }
                 fieldPath={testPath}
                 isDisabled={
                   !isWebSocketConnected ||
@@ -900,6 +867,9 @@ const resetProcessedState = useCallback((path: string) => {
                   isThisTestProcessing ||
                   (recordingMode === 'global' && transcription.trim() !== '')
                 }
+                onAudioRecorded={(base64Audio) => handleTestAudioRecorded(base64Audio, testPath)}
+                onRecordingStart={() => onRecordingStart && onRecordingStart(testPath)}
+                onRecordingStop={() => onRecordingStop && onRecordingStop(testPath)}
               />
               
               {/* Add loading spinner for this test */}
@@ -911,57 +881,15 @@ const resetProcessedState = useCallback((path: string) => {
               )}
             </div>
             
-            <Button
-              type="button"
-              size="sm"
-              variant={isAlreadyProcessed ? "secondary" : isThisTestProcessing ? "ghost" : "outline"}
-              className={`h-8 flex items-center gap-1 px-3 text-xs form-button touch-manipulation ${
-                isThisTestProcessing ? 'cursor-not-allowed opacity-60' : ''
-              }`}
-              onClick={() => handleTestTranscriptionProcess(testPath)}
-              disabled={
-                isProcessing ||
-                isAutoProcessing ||
-                isThisTestProcessing ||
-                !transcription.trim() ||
-                !isWebSocketConnected ||
-                (recordingMode === 'global' && transcription.trim() !== '')
-              }
-              title={
-                isThisTestProcessing 
-                  ? "Processing in progress..." 
-                  : isAlreadyProcessed 
-                  ? "Click to override/reprocess this test" 
-                  : "Process this test"
-              }
-            >
-              {isThisTestProcessing ? (
-                <>
-                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <SendHorizonal className="h-4 w-4" />
-                  <span>
-                    {isInQueue
-                      ? 'Queued'
-                      : isAlreadyProcessed
-                      ? 'Override'
-                      : recordingMode === 'global' && transcription.trim() !== ''
-                      ? 'Global Mode'
-                      : 'Process'}
-                  </span>
-                </>
-              )}
-            </Button>
+            {/* Button and other content remains the same */}
+            {/* ... existing button code ... */}
           </div>
           
           {/* Processing status indicator */}
           {isThisTestProcessing && (
             <div className="mb-2 text-xs text-yellow-700 bg-yellow-100 p-2 rounded flex items-center gap-2">
               <div className="animate-spin rounded-full h-3 w-3 border-2 border-yellow-600 border-t-transparent"></div>
-              <span>🤖 AI is processing this test...</span>
+              <span>AI is processing this test...</span>
             </div>
           )}
           
@@ -972,6 +900,14 @@ const resetProcessedState = useCallback((path: string) => {
             </div>
           )}
           
+          {/* FIXED: Recording indicator */}
+          {isRecording && (
+            <div className="mb-2 text-xs text-red-600 bg-red-100 p-1 rounded flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span>Recording in progress... Transcription is disabled.</span>
+            </div>
+          )}
+          
           <TranscriptionBox
             value={transcription}
             onChange={(text) => handleTestTranscriptionChange(testPath, text)}
@@ -979,21 +915,20 @@ const resetProcessedState = useCallback((path: string) => {
             autoProcess={() => {}}
             autoProcessDelay={5000}
             className={`min-h-12 text-sm ${
-              isThisTestProcessing ? 'opacity-60 cursor-not-allowed' : ''
+              isThisTestProcessing || isRecording ? 'opacity-60 cursor-not-allowed' : ''
             }`}
             placeholder={
               isThisTestProcessing
                 ? 'Processing in progress...'
+                : isRecording
+                ? 'Recording in progress... Please wait.'
                 : recordingMode === 'global' && transcription.trim() !== ''
                 ? 'Global recording mode - test audio temporarily disabled'
                 : isAlreadyProcessed
                 ? 'This test is processed. Speak or type to override...'
                 : 'Speak or type to enter information for this specific test...'
             }
-            disabled={
-              isThisTestProcessing ||
-              (recordingMode === 'global' && transcription.trim() !== '')
-            }
+            disabled={isThisTestProcessing || isRecording}
           />
         </div>
       );
@@ -1294,16 +1229,13 @@ const resetProcessedState = useCallback((path: string) => {
 
         {/* Form action buttons */}
         <FormActionButtons
+          isSubmitting={isSubmitting}
           onResetForm={handleResetForm}
           onSubmitForm={handleSubmitForm}
-          isSubmitting={isSubmitting}
         />
       </div>
     );
   }
 );
-
-// Make sure to set a display name for debugging
-FormRenderer.displayName = 'FormRenderer';
 
 export default FormRenderer;

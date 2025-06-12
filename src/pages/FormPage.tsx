@@ -1,5 +1,7 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { WifiOff, RefreshCw, Mic, MicOff } from 'lucide-react';
+
 import {
   Card,
   CardTitle,
@@ -8,25 +10,26 @@ import {
 } from '@/components/ui/card';
 import {
   Dialog,
+  DialogTitle,
+  DialogHeader,
+  DialogFooter,
   DialogContent,
   DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import AudioRecorder from '@/components/audio/AudioRecorder';
-import TranscriptionBox from '@/components/audio/TranscriptionBox';
-import SuggestionBox from '@/components/ui/suggestion-box';
-import { useWebSocket } from '@/hooks/useWebSocket';
+
 import { useToast } from '@/hooks/use-toast';
-import { isPlanPath, isTestPath } from '@/utils/FormRenderer.utils';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { WifiOff, Save, RefreshCw, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { graphqlRequest } from '@/utils/graphqlClient';
 import formSchemas from '@/schemas/formSchemas';
-import FormRenderer, { FormRendererRef } from '@/components/FormRenderer';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import FormRenderer from '@/components/FormRenderer';
+import { graphqlRequest } from '@/utils/graphqlClient';
 import { ThemeProvider } from '@/styles/theme-provider';
+import SuggestionBox from '@/components/ui/suggestion-box';
+import { FormRendererRef } from '@/types/FormRenderer.types';
+import AudioRecorder from '@/components/audio/AudioRecorder';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import TranscriptionBox from '@/components/audio/TranscriptionBox';
+import { isPlanPath, isTestPath } from '@/utils/FormRenderer.utils';
 
 // Import global styles
 import '@/styles/globalStyles.css';
@@ -38,28 +41,26 @@ type FormPageParams = {
 };
 
 const FormPage = () => {
-  const {
-    formKey = 'physio',
-    patientId,
-    appointmentId,
-  } = useParams<FormPageParams>();
+  const { formKey = 'physio', patientId, appointmentId} = useParams<FormPageParams>();
 
-  // Add state for forcing audio recorder reset
-  const [audioRecorderKey, setAudioRecorderKey] = useState(0);
+  const [transcriptText, setTranscriptText] = React.useState('');
+  const [audioRecorderKey, setAudioRecorderKey] = React.useState(0);
+  const [globalRecordingState, setGlobalRecordingState] = React.useState(false);
+  const [recordingStates, setRecordingStates] = React.useState<{[path: string]: boolean}>({});
 
-  const [transcriptText, setTranscriptText] = useState('');
 
   // Debug transcriptText changes
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('=== transcriptText state changed ===');
     console.log('New transcriptText value:', transcriptText);
     console.log('Length:', transcriptText.length);
   }, [transcriptText]);
-  const [formData, setFormData] = useState<any>(null);
-  const [reportId, setReportId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [patientName, setPatientName] = useState<string>('Patient');
-  const [currentlyProcessingPath, setCurrentlyProcessingPath] = useState<string | null>(null);
+
+  const [formData, setFormData] = React.useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [reportId, setReportId] = React.useState<string | null>(null);
+  const [patientName, setPatientName] = React.useState<string>('Patient');
+  const [currentlyProcessingPath, setCurrentlyProcessingPath] = React.useState<string | null>(null);
 
   // Microphone permission states
   const [microphonePermission, setMicrophonePermission] = useState<
@@ -370,6 +371,14 @@ const FormPage = () => {
             const wasProcessingSpecificPath = currentlyProcessingPath;
             setCurrentlyProcessingPath(null);
 
+            // ADD: Clear recording states
+            if (wasProcessingSpecificPath) {
+              setRecordingStates(prev => ({
+                ...prev,
+                [wasProcessingSpecificPath]: false
+              }));
+            }
+
             // Handle different recording modes with proper cleanup
             if (recordingMode === 'global') {
               console.log('Global mode: Clearing global transcription after form data update');
@@ -378,6 +387,7 @@ const FormPage = () => {
               setRecordingMode('idle'); // Reset to idle
               setActiveSectionPath(null); // Ensure section path is cleared
               setAudioRecorderKey((prev) => prev + 1); // Force re-render
+              setGlobalRecordingState(false); // ADD: Clear global recording state
             } else if (recordingMode === 'section' && wasProcessingSpecificPath) {
               console.log('Section mode: Clearing only the processed section, staying in section mode');
               // Don't reset recording mode to idle - this allows other sections to work
@@ -402,6 +412,9 @@ const FormPage = () => {
         if (recordingMode !== 'idle') {
           setRecordingMode('idle');
         }
+        // ADD: Clear all recording states on error
+        setRecordingStates({});
+        setGlobalRecordingState(false);
         toast({
           title: 'Processing Error',
           description: 'Failed to process form data',
@@ -519,15 +532,15 @@ const FormPage = () => {
   // Update transcription when received from WebSocket
   useEffect(() => {
     if (!transcription) return;
-  
+
     console.log('=== Transcription received ===');
     console.log('Transcription:', transcription);
     console.log('Currently processing path:', currentlyProcessingPath);
-  
+
     // CRITICAL FIX: If we have a specific path being processed, ONLY route to that field
     if (currentlyProcessingPath && formRendererRef.current) {
       console.log('ROUTING: Transcription to specific field:', currentlyProcessingPath);
-      
+
       // IMPORTANT: Clear any existing transcription for this path first
       if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
         // Clear existing plan transcription before setting new one
@@ -540,17 +553,17 @@ const FormPage = () => {
         // Set new transcription
         formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, transcription);
       }
-      
+
       return; // CRITICAL: Don't continue to other routing
     }
-  
+
     // Rest of the routing logic remains the same...
     if (recordingMode === 'section' && activeSectionPath && formRendererRef.current) {
       console.log('ROUTING: Transcription to active section:', activeSectionPath);
       formRendererRef.current.updateSectionTranscription(activeSectionPath, transcription);
       return;
     }
-  
+
     if (recordingMode === 'global' && !currentlyProcessingPath && !activeSectionPath) {
       console.log('ROUTING: Transcription to global');
       setTranscriptText(transcription);
@@ -573,6 +586,9 @@ const FormPage = () => {
     console.log('Previous recording mode:', recordingMode);
     console.log('Previous processing path:', currentlyProcessingPath);
     console.log('Previous active section:', activeSectionPath);
+
+    // ADD: Set global recording state to false when recording completes
+    setGlobalRecordingState(false);
 
     // CRITICAL: Completely reset state for global recording
     setRecordingMode('global');
@@ -597,6 +613,7 @@ const FormPage = () => {
         variant: 'destructive',
       });
       setRecordingMode('idle');
+      setGlobalRecordingState(false); // ADD: Reset on failure
     }
   };
 
@@ -762,10 +779,10 @@ const FormPage = () => {
       connect();
       return;
     }
-  
+
     console.log('=== Section audio recording completed ===');
     console.log('Context received:', context);
-  
+
     // Determine which path is being processed
     let processingPath = null;
     if (context.sectionPath) {
@@ -775,12 +792,18 @@ const FormPage = () => {
     } else if (context.testPath) {
       processingPath = context.testPath;
     }
-  
+
     if (!processingPath) {
       console.error('No processing path found in context:', context);
       return;
     }
-  
+
+    // ADD: Set recording state to false for this path
+    setRecordingStates(prev => ({
+      ...prev,
+      [processingPath]: false
+    }));
+
     // CRITICAL FIX: Clear any existing transcription for this specific path
     if (formRendererRef.current) {
       if (isPlanPath(processingPath, formKey) || isTestPath(processingPath, formKey)) {
@@ -791,31 +814,31 @@ const FormPage = () => {
         formRendererRef.current.clearSectionTranscription(processingPath);
       }
     }
-  
+
     // Clear global transcription
     if (transcriptText.trim() !== '') {
       console.log('Clearing global transcription for section recording');
       setTranscriptText('');
       setTranscription('');
     }
-  
+
     // Set processing state
     setRecordingMode('section');
     setCurrentlyProcessingPath(processingPath);
-    
+
     if (context.sectionPath) {
       setActiveSectionPath(context.sectionPath);
     }
-  
+
     const enhancedContext = {
       ...context,
       isGlobalRecording: false,
       recordingType: 'section',
       specificPath: processingPath
     };
-  
+
     const sent = sendAudio(base64Audio, enhancedContext);
-  
+
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -825,6 +848,11 @@ const FormPage = () => {
       setRecordingMode('idle');
       setActiveSectionPath(null);
       setCurrentlyProcessingPath(null);
+      // ADD: Reset recording state on failure
+      setRecordingStates(prev => ({
+        ...prev,
+        [processingPath]: false
+      }));
     }
   };
 
@@ -902,6 +930,46 @@ const FormPage = () => {
       setCurrentlyProcessingPath(null);
       setActiveSectionPath(null);
       setRecordingMode('idle');
+    }
+  };
+
+  // 4. ADD: Recording state handlers
+  const handleRecordingStart = (path?: string) => {
+    if (path) {
+      // Section/plan recording
+      setRecordingStates(prev => ({
+        ...prev,
+        [path]: true
+      }));
+    } else {
+      // Global recording
+      setGlobalRecordingState(true);
+    }
+  };
+
+  const handleRecordingStop = (path?: string) => {
+    if (path) {
+      // Section/plan recording
+      setRecordingStates(prev => ({
+        ...prev,
+        [path]: false
+      }));
+    } else {
+      // Global recording
+      setGlobalRecordingState(false);
+    }
+  };
+
+  // 5. ADD: Transcription clearing handlers
+  const handleSectionTranscriptionClear = (sectionPath: string) => {
+    if (formRendererRef.current) {
+      formRendererRef.current.clearSectionTranscription(sectionPath);
+    }
+  };
+
+  const handlePlanTranscriptionClear = (planPath: string) => {
+    if (formRendererRef.current) {
+      formRendererRef.current.clearPlanTranscription(planPath);
     }
   };
 
@@ -1131,6 +1199,8 @@ const FormPage = () => {
                     !isConnected ||
                     isProcessing
                   }
+                  onRecordingStart={() => handleRecordingStart()} // ADD: Track global recording start
+                  onRecordingStop={() => handleRecordingStop()}   // ADD: Track global recording stop
                 />
               </div>
 
@@ -1141,9 +1211,15 @@ const FormPage = () => {
                   value={transcriptText}
                   onChange={handleGlobalTranscriptionChange}
                   isProcessing={isProcessing && recordingMode === 'global'}
-                  className="mt-4"
+                  className={`mt-4 ${globalRecordingState ? 'opacity-60 cursor-not-allowed' : ''}`} // ADD: Show disabled state during recording
                   autoProcess={handleAutoProcess}
                   autoProcessDelay={5000}
+                  disabled={globalRecordingState} // ADD: Disable during recording
+                  placeholder={
+                    globalRecordingState
+                      ? 'Recording in progress... Please wait.'
+                      : 'Speak or type to enter information globally...'
+                  }
                 />
               )}
 
@@ -1202,6 +1278,11 @@ const FormPage = () => {
                   activeSectionPath={activeSectionPath}
                   appointmentId={appointmentId}
                   patientId={patientId}
+                  recordingStates={recordingStates}
+                  onRecordingStart={handleRecordingStart}
+                  onRecordingStop={handleRecordingStop}
+                  onSectionTranscriptionClear={handleSectionTranscriptionClear}
+                  onPlanTranscriptionClear={handlePlanTranscriptionClear}
                 />
               </div>
             </CardContent>

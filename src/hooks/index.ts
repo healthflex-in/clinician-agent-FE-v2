@@ -5,3 +5,6 @@ export * from './use-patients';
 export * from './use-web-socket';
 export * from './use-appointments';
 export * from './use-form-renderer';
+export * from './use-voice-recorder';
+export * from './use-form-management';
+export * from './use-microphone-permission';

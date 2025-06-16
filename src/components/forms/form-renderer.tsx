@@ -1204,7 +1204,7 @@ const resetProcessedState = React.useCallback((path: string) => {
     };
 
     return (
-      <div className="w-full max-w-screen pb-20">
+      <div className="w-full max-w-screen">
         {/* Show processing queue status */}
         <ProcessingQueueAlert
           processingQueue={processingQueue}
@@ -1216,8 +1216,8 @@ const resetProcessedState = React.useCallback((path: string) => {
 
         {/* Show LLM updates */}
         <LLMUpdatesAlert
-          llmUpdatedFields={llmUpdatedFields}
           onAcceptAll={acceptAllLLMChanges}
+          llmUpdatedFields={llmUpdatedFields}
         />
 
         <div className="space-y-2">{renderField(schema, '', 'root')}</div>

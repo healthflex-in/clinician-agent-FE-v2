@@ -14,12 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import formSchemas from '@/schemas/formSchemas';
-import {
-  searchUsers,
-  fetchCenters,
-  fetchAppointments,
-} from '@/utils/graphqlClient';
+import formSchemas from '@/schemas/form-schemas';
+import { Patient, useAppointments, useCenters, usePatients } from '@/hooks';
 import {
   Select,
   SelectItem,
@@ -35,26 +31,6 @@ import {
   CardContent,
 } from '@/components/ui/card';
 
-// Define interfaces for API data
-interface Center {
-  _id: string;
-  name: string;
-}
-
-interface Patient {
-  _id: string;
-  profileData: {
-    firstName: string;
-    lastName: string;
-  };
-}
-
-interface Appointment {
-  _id: string;
-  seqNo: string;
-  createdAt: string;
-}
-
 const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -65,17 +41,10 @@ const Index = () => {
   const [patientId, setPatientId] = React.useState<string>('');
   const [patientName, setPatientName] = React.useState<string>('');
   const [patientSearch, setPatientSearch] = React.useState<string>('');
-  const [appointmentId, setAppointmentId] = React.useState<string>('');
 
-  // Data from APIs
-  const [centers, setCenters] = React.useState<Center[]>([]);
-  const [patients, setPatients] = React.useState<Patient[]>([]);
-  const [appointments, setAppointments] = React.useState<Appointment[]>([]);
-
-  // Loading states
-  const [loadingCenters, setLoadingCenters] = React.useState(false);
-  const [loadingPatients, setLoadingPatients] = React.useState(false);
-  const [loadingAppointments, setLoadingAppointments] = React.useState(false);
+  const { centers, loadingCenters } = useCenters();
+  const { patients, loadingPatients, searchPatients, clearPatients } = usePatients(centerId);
+  const { appointments, appointmentId, loadingAppointments, handleAppointmentChange, clearAppointments } = useAppointments(patientId);
 
   // Set viewport for mobile
   React.useEffect(() => {
@@ -100,27 +69,37 @@ const Index = () => {
 
     return () => {
       document.getElementsByTagName('head')[0].removeChild(meta);
-      document.getElementsByTagName('head')[0].removeChild(statusBarMeta);
       document.getElementsByTagName('head')[0].removeChild(webAppMeta);
+      document.getElementsByTagName('head')[0].removeChild(statusBarMeta);
     };
   }, []);
 
   // Get previous values from localStorage
   React.useEffect(() => {
-    const savedPatientId = localStorage.getItem('userId');
-    const savedAppointmentId = localStorage.getItem('appointmentId');
     const savedFormKey = localStorage.getItem('formKey');
+    const savedPatientId = localStorage.getItem('userId');
     const savedCenterId = localStorage.getItem('centerId');
+    const savedAppointmentId = localStorage.getItem('appointmentId');
 
     if (savedCenterId) setCenterId(savedCenterId);
 
     // Only restore these values if centerId exists
     if (savedCenterId) {
-      if (savedPatientId) setPatientId(savedPatientId);
+      if (savedPatientId) {
+        setPatientId(savedPatientId);
+
+        // Restore patient name from localStorage if available
+        const savedPatient = localStorage.getItem('selectedPatient');
+        if (savedPatient) {
+          const parsedPatient = JSON.parse(savedPatient);
+          setPatientName(parsedPatient.name);
+        }
+      }
 
       // Only restore appointmentId if patientId exists
       if (savedPatientId && savedAppointmentId) {
-        setAppointmentId(savedAppointmentId);
+        // Note: appointmentId will be handled by the useAppointments hook
+        // We'll need to update the hook to handle localStorage restoration
 
         // Only restore formKey if appointmentId exists
         if (savedAppointmentId && savedFormKey) {
@@ -128,33 +107,8 @@ const Index = () => {
         }
       }
     }
-
-    // Load centers on component mount
-    loadCenters();
   }, []);
 
-  // Fetch list of centers
-  const loadCenters = async () => {
-    try {
-      setLoadingCenters(true);
-      const response = await fetchCenters();
-      console.log('Centers response:', response);
-      if (response && response.centers) {
-        setCenters(response.centers);
-      }
-    } catch (error) {
-      console.error('Error fetching centers:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load centers. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingCenters(false);
-    }
-  };
-
-  // Search for patients when center is selected and search term changes
   React.useEffect(() => {
     if (centerId && patientSearch) {
       const delaySearch = setTimeout(() => {
@@ -163,75 +117,7 @@ const Index = () => {
 
       return () => clearTimeout(delaySearch);
     }
-  }, [centerId, patientSearch]);
-
-  // Fetch patients based on search term
-  const searchPatients = async (searchTerm: string) => {
-    if (!centerId) {
-      toast({
-        title: 'Center Required',
-        description: 'Please select a center first',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setLoadingPatients(true);
-      const response = await searchUsers('PATIENT', [centerId], searchTerm);
-      console.log('Patient search response:', response);
-
-      if (response && response.users) {
-        setPatients(response.users);
-      }
-    } catch (error) {
-      console.error('Error searching patients:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to search patients. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingPatients(false);
-    }
-  };
-
-  // Load appointments when patient is selected
-  React.useEffect(() => {
-    if (patientId) {
-      loadAppointments(patientId);
-    } else {
-      // Clear appointment selection if patient is deselected
-      setAppointmentId('');
-      setAppointments([]);
-    }
-  }, [patientId]);
-
-  // Fetch appointments for selected patient
-  const loadAppointments = async (patientId: string) => {
-    try {
-      setLoadingAppointments(true);
-      const filter = {
-        patient: patientId,
-      };
-
-      const response = await fetchAppointments(filter);
-      console.log('Appointments response:', response);
-
-      if (response && response.appointments) {
-        setAppointments(response.appointments);
-      }
-    } catch (error) {
-      console.error('Error fetching appointments:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load appointments. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingAppointments(false);
-    }
-  };
+  }, [centerId, patientSearch, searchPatients]);
 
   // Select a patient from search results
   const selectPatient = (patient: Patient) => {
@@ -240,10 +126,7 @@ const Index = () => {
       `${patient.profileData.firstName} ${patient.profileData.lastName}`
     );
     setPatientSearch('');
-    setPatients([]); // Clear search results after selection
-
-    // Clear downstream selections
-    setAppointmentId('');
+    clearPatients(); // Use hook function instead of setPatients([])
   };
 
   // Handle center change
@@ -254,14 +137,8 @@ const Index = () => {
     setPatientId('');
     setPatientName('');
     setPatientSearch('');
-    setAppointmentId('');
-    setPatients([]);
-    setAppointments([]);
-  };
-
-  // Handle appointment change
-  const handleAppointmentChange = (newAppointmentId: string) => {
-    setAppointmentId(newAppointmentId);
+    clearPatients(); // Use hook function
+    clearAppointments(); // Use hook function
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -325,6 +202,13 @@ const Index = () => {
     if (!appointmentId) return 3;
     return 4;
   };
+
+  // console.log('@@ appoitments:', appointments);
+  // console.log('@@ selected patient:', {
+  //   id: patientId,
+  //   name: patientName,
+  // });
+  console.log('@@ selected appointment:', appointmentId);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/10 to-background px-4 py-6 safe-area-top safe-area-bottom">
@@ -439,7 +323,6 @@ const Index = () => {
                     onClick={() => {
                       setPatientId('');
                       setPatientName('');
-                      setAppointmentId(''); // Clear appointment when patient is changed
                     }}
                   >
                     Change
@@ -456,14 +339,17 @@ const Index = () => {
               >
                 <Calendar className="h-4 w-4 mr-1.5 text-black" />
                 Appointment
+                {loadingAppointments && (
+                  <Loader2 className="h-3 w-3 animate-spin ml-2 text-gray-500" />
+                )}
               </Label>
               <Select
                 value={appointmentId}
                 onValueChange={handleAppointmentChange}
-                disabled={!patientId}
+                disabled={!patientId || loadingAppointments}
               >
                 <SelectTrigger className="h-10 text-sm">
-                  <SelectValue placeholder="Select an appointment" />
+                  <SelectValue placeholder={loadingAppointments ? "Loading appointments..." : "Select an appointment"} />
                 </SelectTrigger>
                 <SelectContent>
                   {loadingAppointments ? (

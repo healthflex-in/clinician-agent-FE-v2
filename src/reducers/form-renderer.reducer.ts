@@ -3,8 +3,8 @@ import {
   findDifferences,
   deepUpdateObject,
   defaultStateFromSchema,
-} from '@/utils/schemaUtils';
-import { FormAction } from '../types/FormRenderer.types';
+} from '@/utils/schema-utils';
+import { FormAction } from '@/types/form-renderer.types';
 
 // Reducer function to handle form state updates
 export const formReducer = (

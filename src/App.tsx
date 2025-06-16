@@ -1,9 +1,10 @@
-import React from 'react';
 import './App.css';
+
+import IndexPage from './pages';
+import FormPage from './pages/form-page';
+import NotFoundPage from './pages/not-found';
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import FormPage from './pages/FormPage';
-import IndexPage from './pages/Index';
-import NotFoundPage from './pages/NotFound';
 
 function App() {
   return (

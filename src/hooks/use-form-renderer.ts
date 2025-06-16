@@ -1,16 +1,15 @@
-// hooks/useFormRenderer.ts
 import { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { defaultStateFromSchema } from '@/utils/schemaUtils';
-import { formReducer } from '../reducers/FormRenderer.reducer';
-import { FormAction, ProcessingQueueItem } from '../types/FormRenderer.types';
+
+import { formReducer } from '@/reducers';
+import { defaultStateFromSchema } from '@/utils/schema-utils';
+import { FormAction, ProcessingQueueItem } from '@/types/form-renderer.types';
 import {
   FORM_SECTIONS,
-  AUTO_PROCESS_DELAY,
-  QUEUE_RETRY_DELAY,
   NEXT_QUEUE_DELAY,
-} from '../constants/FormRenderer.constants';
-import { isPlanPath, isTestPath } from '../utils/FormRenderer.utils';
+  QUEUE_RETRY_DELAY,
+  AUTO_PROCESS_DELAY,
+} from '@/constants/form-renderer.constants';
 
 export const useFormRenderer = (
   schema: any,
@@ -20,7 +19,7 @@ export const useFormRenderer = (
   isProcessing: boolean,
   onTranscriptionProcess?: (transcription: string, context: any) => void,
   activeSectionPath?: string | null,
-  selectedSections?: Set<string>
+  selectedSections?: Set<string>,
 ) => {
   const { toast } = useToast();
 
@@ -47,12 +46,10 @@ export const useFormRenderer = (
   const [processedSections, setProcessedSections] = useState<Set<string>>(
     new Set()
   );
-  const [processedPlans, setProcessedPlans] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
-  const [processingQueue, setProcessingQueue] = useState<ProcessingQueueItem[]>(
-    []
-  );
+  const [processedPlans, setProcessedPlans] = useState<Set<string>>(new Set());
+  const [processingQueue, setProcessingQueue] = useState<ProcessingQueueItem[]>([]);
   const [currentlyProcessingPath, setCurrentlyProcessingPath] = useState<
     string | null
   >(null);

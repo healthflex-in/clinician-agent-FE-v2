@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import AudioRecorder from '@/components/audio/AudioRecorder';
-import TranscriptionBox from '@/components/audio/TranscriptionBox';
-import SuggestionBox from '@/components/ui/suggestion-box';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { WifiOff } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { graphqlRequest } from '@/utils/graphqlClient';
-import AssessmentForm from '@/components/forms/AssessmentForm';
+import { AssessmentForm } from '@/components/forms';
+import { useWebSocket } from '@/hooks/use-web-socket';
+import { TranscriptionBox } from '@/components/audio';
+import { graphqlRequest } from '@/utils/graphql-client';
 import { ThemeProvider } from '@/styles/theme-provider';
+import SuggestionBox from '@/components/ui/suggestion-box';
+import AudioRecorder from '@/components/audio/audio-recorder';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface SetType {
   repetitions: string;
@@ -345,8 +346,8 @@ const AssessmentPage = () => {
           selectedSections.length > 0
             ? selectedSections
             : currentSectionId
-            ? [currentSectionId]
-            : [];
+              ? [currentSectionId]
+              : [];
 
         // Update assessment based on sectionsToUpdate
         let updatedAssessment = { ...assessment };

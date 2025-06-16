@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import SectionAudioRecorder from '../audio/SectionAudioRecorder';
-import SectionTranscriptionBox from './SectionTranscriptionBox';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
 import { Save, RefreshCw, Plus, Minus } from 'lucide-react';
-import { themeColors } from '@/styles/theme';
+
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import SectionTranscriptionBox from './section-transcription-box';
+import SectionAudioRecorder from '../audio/section-audio-recorder';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 
 interface AssessmentFormSectionProps {
   title: string;

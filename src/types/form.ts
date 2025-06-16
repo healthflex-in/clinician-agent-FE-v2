@@ -1,22 +1,19 @@
-
-// Types for form data and schemas
-
 export type TestValue = {
   testName: string;
   unitName: string;
-  value: string | number;
-  rightValue: string | number;
-  leftValue: string | number;
   comments: string;
+  value: string | number;
+  leftValue: string | number;
+  rightValue: string | number;
 };
 
 export type ExercisePlan = {
   exercise: string;
   comments: string;
   set: {
-    repetitions: number;
     load: number;
     unit: string;
+    repetitions: number;
   };
   duration: {
     value: number;
@@ -25,9 +22,9 @@ export type ExercisePlan = {
 };
 
 export type ClinicalDetail = {
-  clinicalHistory: string;
-  chiefComplaint: string;
   duration: string;
+  chiefComplaint: string;
+  clinicalHistory: string;
 };
 
 export type SubjectiveAssessment = {
@@ -36,16 +33,16 @@ export type SubjectiveAssessment = {
 };
 
 export type SubjectiveGoal = {
-  goalDetails: string;
   targetDate: string;
+  goalDetails: string;
 };
 
 export type ObjectiveGoal = {
   goalName: string;
-  goalCategory: string;
   unitName: string;
-  value: string | number;
   targetDate: string;
+  goalCategory: string;
+  value: string | number;
 };
 
 export type Recommendation = {

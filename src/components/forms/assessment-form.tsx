@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Save, RefreshCw, Plus } from 'lucide-react';
-import AssessmentFormSection from './AssessmentFormSection';
+import { Save, RefreshCw } from 'lucide-react';
+
 import { useToast } from '@/hooks/use-toast';
-import { themeColors } from '@/styles/theme';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import AssessmentFormSection from './assessment-form-section';
 
 // Define the assessment schema interfaces
 interface SetType {
@@ -79,7 +79,7 @@ interface AssessmentFormProps {
   onSectionReset?: (sectionId: string) => void;
 }
 
-const AssessmentForm: React.FC<AssessmentFormProps> = ({
+export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   formData,
   onChange,
   onAudioEncoded,

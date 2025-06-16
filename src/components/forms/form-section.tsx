@@ -1,30 +1,31 @@
 import React, { useState } from 'react';
-import SectionAudioRecorder from '../audio/SectionAudioRecorder';
-import SectionTranscriptionBox from './SectionTranscriptionBox';
+import { Save, RefreshCw } from 'lucide-react';
+
 import {
   Card,
-  CardContent,
-  CardHeader,
   CardTitle,
+  CardHeader,
   CardFooter,
+  CardContent,
 } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Save, RefreshCw } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import SectionTranscriptionBox from './section-transcription-box';
+import SectionAudioRecorder from '../audio/section-audio-recorder';
 
 interface FormSectionProps {
   title: string;
-  children: React.ReactNode;
-  onAudioEncoded?: (base64Audio: string, sectionId: string) => void;
-  onTranscriptProcess?: (text: string, sectionId: string) => void;
-  isProcessing?: boolean;
   sectionId: string;
-  selectable?: boolean;
   selected?: boolean;
-  onSelectChange?: (sectionId: string, selected: boolean) => void;
+  selectable?: boolean;
+  isProcessing?: boolean;
+  children: React.ReactNode;
   showAudioControls?: boolean;
   onSectionSubmit?: (sectionId: string) => void;
   onSectionReset?: (sectionId: string) => void;
+  onSelectChange?: (sectionId: string, selected: boolean) => void;
+  onTranscriptProcess?: (text: string, sectionId: string) => void;
+  onAudioEncoded?: (base64Audio: string, sectionId: string) => void;
 }
 
 const FormSection: React.FC<FormSectionProps> = ({

@@ -1,19 +1,18 @@
-// types/FormRenderer.types.ts
-
 export interface FormRendererProps {
   schema: any;
   formKey: string;
   formData?: any;
+  patientId?: string;
+  isProcessing?: boolean;
+  appointmentId?: string;
+  isWebSocketConnected?: boolean;
+  activeSectionPath?: string | null;
+  recordingMode?: 'idle' | 'global' | 'section';
+
   onChange?: (data: any) => void;
   onLLMUpdate?: (data: any) => void;
   onAudioRecorded?: (base64Audio: string, context: any) => void;
   onTranscriptionProcess?: (transcription: string, context: any) => void;
-  isWebSocketConnected?: boolean;
-  isProcessing?: boolean;
-  recordingMode?: 'idle' | 'global' | 'section';
-  activeSectionPath?: string | null;
-  appointmentId?: string;
-  patientId?: string;
 
   recordingStates?: {[path: string]: boolean};
   onRecordingStart?: (path?: string) => void;

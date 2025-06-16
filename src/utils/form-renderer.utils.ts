@@ -1,5 +1,4 @@
-// utils/FormRenderer.utils.ts
-import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
+import { FORM_SECTIONS } from '@/constants';
 
 // Check if a path represents a plan item that should have audio recording
 export const isPlanPath = (path: string, formKey: string): boolean => {

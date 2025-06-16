@@ -1,6 +1,6 @@
 import React from 'react';
 
-import AudioRecorder from './AudioRecorder';
+import AudioRecorder from './audio-recorder';
 import { useToast } from '@/hooks/use-toast';
 
 interface SectionAudioRecorderProps {

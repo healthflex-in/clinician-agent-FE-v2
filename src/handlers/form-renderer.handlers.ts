@@ -1,15 +1,15 @@
 import React from 'react';
 
-import { graphqlRequest } from '@/utils/graphqlClient';
-import { FormAction } from '../types/FormRenderer.types';
-import { defaultStateFromSchema } from '@/utils/schemaUtils';
-import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
+import { graphqlRequest } from '@/utils/graphql-client';
+import { FormAction } from '@/types/form-renderer.types';
+import { defaultStateFromSchema } from '@/utils/schema-utils';
+import { FORM_SECTIONS } from '@/constants/form-renderer.constants';
 import {
   isPlanPath,
   isTestPath,
   processFormDataForSubmission,
   updateLocalStorageAfterSubmission,
-} from '../utils/FormRenderer.utils';
+} from '@/utils/form-renderer.utils';
 
 export const useFormHandlers = (
   toast: any,

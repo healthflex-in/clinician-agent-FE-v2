@@ -1,8 +1,5 @@
-// api.ts - CORS-friendly API client
-
 // Store API key in environment variable in production
-const API_KEY =
-  '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20';
+const API_KEY = '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20';
 
 /**
  * CORS-friendly GraphQL client using a public CORS proxy

@@ -1,17 +1,16 @@
-// Top-level section keys for each form type
 export const FORM_SECTIONS = {
   firstAssessment: [
-    'clinicalDetails',
-    'subjectiveAssessments',
-    'subjectiveGoals',
+    'patientAdvice',
     'objectiveGoals',
     'recommendation',
-    'patientAdvice',
+    'subjectiveGoals',
+    'clinicalDetails',
     'objectiveAssessments',
+    'subjectiveAssessments',
   ],
-  assessment: ['plan', 'subjectiveAssessment', 'objectiveAssessment', 'rpe'],
   physio: ['tests'],
   snc: ['plans', 'advice'],
+  assessment: ['plan', 'subjectiveAssessment', 'objectiveAssessment', 'rpe'],
 };
 
 // Auto-processing delay in milliseconds

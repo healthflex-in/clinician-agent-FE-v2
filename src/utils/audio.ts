@@ -1,4 +1,3 @@
-
 /**
  * Get user media (microphone)
  */

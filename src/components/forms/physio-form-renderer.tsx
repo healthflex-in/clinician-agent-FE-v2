@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { MinusCircle, PlusCircle, Save, RefreshCw } from 'lucide-react';
-import FormSection from './FormSection';
+
+import FormSection from './form-section';
 import { TestValue } from '@/types/form';
 import { useToast } from '@/hooks/use-toast';
-import { themeColors } from '@/styles/theme';
+import { Button } from '@/components/ui/button';
 
 interface PhysioFormRendererProps {
   formData: TestValue[];

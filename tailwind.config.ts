@@ -4,10 +4,10 @@ import type { Config } from "tailwindcss";
 export default {
 	darkMode: ["class"],
 	content: [
+		"./src/**/*.{ts,tsx}",
+		"./app/**/*.{ts,tsx}",
 		"./pages/**/*.{ts,tsx}",
 		"./components/**/*.{ts,tsx}",
-		"./app/**/*.{ts,tsx}",
-		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
 	theme: {
@@ -26,7 +26,7 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: 'hsl(var(--primary))',
+					DEFAULT: '#DDFE71',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
@@ -63,19 +63,20 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-        // Add our custom parrot green colors
-        parrot: {
-          50: '#f2fce2',
-          100: '#e1f7c6',
-          200: '#c7ef96',
-          300: '#a9e564',
-          400: '#8ddb3e',
-          500: '#69c219',
-          600: '#529c14',
-          700: '#3c750f',
-          800: '#2b5d0a',
-          900: '#1a4605',
-        },
+				// Add our custom parrot green colors
+				parrot: {
+					'50': '#f2ffe6',
+					'100': '#e0ffc9',
+					'200': '#c2ff99',
+					'300': '#9bff5a',
+					'400': '#78f924',
+					'500': '#67e310',
+					'600': '#4fb805',
+					'700': '#3d8d09',
+					'800': '#326f0f',
+					'900': '#2b6010',
+					'950': '#133700',
+				},
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -83,46 +84,29 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			keyframes: {
-				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+				"accordion-down": {
+					from: { height: "0" },
+					to: { height: "var(--radix-accordion-content-height)" },
 				},
-				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+				"accordion-up": {
+					from: { height: "var(--radix-accordion-content-height)" },
+					to: { height: "0" },
 				},
-        'pulse-ring': {
-          '0%': {
-            transform: 'scale(0.8)',
-            opacity: '0.8'
-          },
-          '100%': {
-            transform: 'scale(1.3)',
-            opacity: '0'
-          }
-        },
-        'bounce-soft': {
-          '0%, 100%': {
-            transform: 'translateY(0)'
-          },
-          '50%': {
-            transform: 'translateY(-5%)'
-          }
-        }
+				"pulse-ring": {
+					"0%": { transform: "scale(0.8)", opacity: "0" },
+					"50%": { opacity: "0.5" },
+					"100%": { transform: "scale(1.2)", opacity: "0" },
+				},
+				"bounce-soft": {
+					"0%, 100%": { transform: "translateY(0)" },
+					"50%": { transform: "translateY(-5px)" },
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-        'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite',
-        'bounce-soft': 'bounce-soft 2s infinite ease-in-out'
+				'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite',
+				'bounce-soft': 'bounce-soft 2s infinite ease-in-out'
 			}
 		}
 	},

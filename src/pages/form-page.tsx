@@ -19,17 +19,17 @@ import {
 
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import formSchemas from '@/schemas/formSchemas';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import FormRenderer from '@/components/FormRenderer';
-import { graphqlRequest } from '@/utils/graphqlClient';
+import {FormRenderer} from '@/components/forms';
+import formSchemas from '@/schemas/form-schemas';
+import { useWebSocket } from '@/hooks/use-web-socket';
+import { graphqlRequest } from '@/utils/graphql-client';
 import { ThemeProvider } from '@/styles/theme-provider';
 import SuggestionBox from '@/components/ui/suggestion-box';
-import { FormRendererRef } from '@/types/FormRenderer.types';
-import AudioRecorder from '@/components/audio/AudioRecorder';
+import { FormRendererRef } from '@/types/form-renderer.types';
+import AudioRecorder from '@/components/audio/audio-recorder';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import TranscriptionBox from '@/components/audio/TranscriptionBox';
-import { isPlanPath, isTestPath } from '@/utils/FormRenderer.utils';
+import TranscriptionBox from '@/components/audio/transcription-box';
+import { isPlanPath, isTestPath } from '@/utils/form-renderer.utils';
 
 // Import global styles
 import '@/styles/globalStyles.css';

@@ -8,11 +8,11 @@ import {
   SendHorizonal,
 } from 'lucide-react';
 
+import { ProcessingQueueItem } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { ProcessingQueueItem } from '../types/FormRenderer.types';
 import { TranscriptionBox, FieldAudioRecorder } from '@/components/audio';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 

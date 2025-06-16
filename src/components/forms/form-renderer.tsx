@@ -2,14 +2,10 @@ import React from 'react';
 import {RefreshCw, PlusCircle, MinusCircle} from 'lucide-react';
 
 import {
-  FormRendererRef,
-  FormRendererProps,
-} from '../types/FormRenderer.types';
-import {
   isPlanPath,
   isTestPath,
   shouldHaveAudioRecording,
-} from '../utils/FormRenderer.utils';
+} from '@/utils/form-renderer.utils';
 import {
   InputField,
   LLMUpdatesAlert,
@@ -18,20 +14,19 @@ import {
   ProcessingQueueAlert,
   PlanTranscriptionBox,
   SectionTranscriptionBox,
-} from './FormRenderer.components';
+} from './form-renderer.components';
 
+import { useFormRenderer } from '@/hooks';
+import { FORM_SECTIONS } from '@/constants';
+import { useFormHandlers } from '@/handlers';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { getNestedValue } from '@/utils/schemaUtils';
+import { getNestedValue } from '@/utils/schema-utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { useFormRenderer } from '../hooks/useFormRenderer';
-import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
-import { useFormHandlers } from '../handlers/form-renderer.handlers';
+import {FormRendererRef, FormRendererProps} from '@/types';
 import {FieldAudioRecorder, TranscriptionBox} from '@/components/audio';
 
-
-// Important: Use React.forwardRef here
-const FormRenderer = React.forwardRef<FormRendererRef, FormRendererProps>(
+export const FormRenderer = React.forwardRef<FormRendererRef, FormRendererProps>(
   (
     {
       schema,

@@ -1,20 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { themeColors } from '@/styles/theme';
+import { Textarea } from '@/components/ui/textarea';
 
 interface SectionTranscriptionBoxProps {
   value: string;
-  onChange: (value: string) => void;
-  isProcessing: boolean;
-  onProcess: () => void;
-  autoProcess?: boolean;
-  autoProcessDelay?: number;
+  label?: string;
   sectionId: string;
   className?: string;
   placeholder?: string;
-  label?: string;
+  isProcessing: boolean;
+  autoProcess?: boolean;
+  autoProcessDelay?: number;
+  onProcess: () => void;
+  onChange: (value: string) => void;
 }
 
 const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
@@ -22,12 +22,12 @@ const SectionTranscriptionBox: React.FC<SectionTranscriptionBoxProps> = ({
   onChange,
   isProcessing,
   onProcess,
-  autoProcess = true,
-  autoProcessDelay = 5000,
   sectionId,
   className = '',
-  placeholder = 'Section transcription will appear here...',
+  autoProcess = true,
   label = 'Transcription',
+  autoProcessDelay = 5000,
+  placeholder = 'Section transcription will appear here...',
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);

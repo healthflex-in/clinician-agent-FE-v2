@@ -1,8 +1,6 @@
-// src/api/graphqlClient.ts
-import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client';
+import { API_KEY, getApiUrl } from './api-config';
 import { onError } from '@apollo/client/link/error';
-import { gql } from '@apollo/client';
-import { API_KEY, getApiUrl } from './apiConfig';
+import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client';
 
 // Create an error handling link
 const errorLink = onError(({ graphQLErrors, networkError }) => {

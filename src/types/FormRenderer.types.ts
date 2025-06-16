@@ -14,6 +14,12 @@ export interface FormRendererProps {
   activeSectionPath?: string | null;
   appointmentId?: string;
   patientId?: string;
+
+  recordingStates?: {[path: string]: boolean};
+  onRecordingStart?: (path?: string) => void;
+  onRecordingStop?: (path?: string) => void;
+  onPlanTranscriptionClear?: (planPath: string) => void;
+  onSectionTranscriptionClear?: (sectionPath: string) => void;
 }
 
 // Action types for the reducer

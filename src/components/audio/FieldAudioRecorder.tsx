@@ -10,7 +10,7 @@ interface FieldAudioRecorderProps {
   onAudioRecorded: (audioBase64: string, fieldPath: string) => void;
 }
 
-const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
+export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
   fieldPath,
   onAudioRecorded,
   isDisabled = false,

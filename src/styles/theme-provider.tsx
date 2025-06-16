@@ -1,12 +1,12 @@
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React from 'react';
 import { currentTheme, ThemeConfig } from './theme';
 
 // Create a context for the theme
-const ThemeContext = createContext<ThemeConfig>(currentTheme);
+const ThemeContext = React.createContext<ThemeConfig>(currentTheme);
 
 // Theme provider component
-export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <ThemeContext.Provider value={currentTheme}>
       {children}
@@ -16,9 +16,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
 // Hook to access the theme
 export const useTheme = (): ThemeConfig => {
-  const context = useContext(ThemeContext);
+  const context = React.useContext(ThemeContext);
   if (context === undefined) {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
+
   return context;
 };

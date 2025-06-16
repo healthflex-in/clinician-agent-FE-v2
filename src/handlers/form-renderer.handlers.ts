@@ -1,8 +1,8 @@
-// handlers/FormRenderer.handlers.ts
-import { useCallback } from 'react';
-import { defaultStateFromSchema } from '@/utils/schemaUtils';
+import React from 'react';
+
 import { graphqlRequest } from '@/utils/graphqlClient';
 import { FormAction } from '../types/FormRenderer.types';
+import { defaultStateFromSchema } from '@/utils/schemaUtils';
 import { FORM_SECTIONS } from '../constants/FormRenderer.constants';
 import {
   isPlanPath,
@@ -12,59 +12,54 @@ import {
 } from '../utils/FormRenderer.utils';
 
 export const useFormHandlers = (
-  formKey: string,
-  schema: any,
-  state: any,
-  dispatch: React.Dispatch<FormAction>,
   toast: any,
-  appointmentId?: string,
-  // State setters and getters
-  sectionTranscriptions: Record<string, string>,
-  planTranscriptions: Record<string, string>,
-  processedSections: Set<string>,
-  processedPlans: Set<string>,
-  selectedSections: Set<string>,
+  state: any,
+  schema: any,
+  formKey: string,
+  dispatch: React.Dispatch<FormAction>,
+
+  // State getters
   isProcessing: boolean,
   isAutoProcessing: boolean,
+  processedPlans: Set<string>,
+  selectedSections: Set<string>,
+  processedSections: Set<string>,
   currentlyProcessingPath: string | null,
+  planTranscriptions: Record<string, string>,
+  sectionTranscriptions: Record<string, string>,
   recordingMode: 'idle' | 'global' | 'section',
-  onTranscriptionProcess?: (transcription: string, context: any) => void,
-  onAudioRecorded?: (base64Audio: string, context: any) => void,
+
   // State setters
-  setLlmUpdatedFields: React.Dispatch<React.SetStateAction<Set<string>>>,
   setIsSubmitting: React.Dispatch<React.SetStateAction<boolean>>,
-  setIsAutoProcessing: React.Dispatch<React.SetStateAction<boolean>>,
-  setCurrentlyProcessingPath: React.Dispatch<
-    React.SetStateAction<string | null>
-  >,
-  setSectionTranscriptions: React.Dispatch<
-    React.SetStateAction<Record<string, string>>
-  >,
-  setPlanTranscriptions: React.Dispatch<
-    React.SetStateAction<Record<string, string>>
-  >,
-  setProcessedSections: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setProcessedPlans: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setActiveSectionTranscription: React.Dispatch<
-    React.SetStateAction<string | null>
-  >,
-  setActivePlanTranscription: React.Dispatch<
-    React.SetStateAction<string | null>
-  >,
-  setSectionRecorderKeys: React.Dispatch<
-    React.SetStateAction<Record<string, number>>
-  >,
-  setPlanRecorderKeys: React.Dispatch<
-    React.SetStateAction<Record<string, number>>
-  >,
   setProcessingQueue: React.Dispatch<React.SetStateAction<any[]>>,
+  setIsAutoProcessing: React.Dispatch<React.SetStateAction<boolean>>,
+  setProcessedPlans: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setLlmUpdatedFields: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setProcessedSections: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setActivePlanTranscription: React.Dispatch<React.SetStateAction<string | null>>,
+  setCurrentlyProcessingPath: React.Dispatch<React.SetStateAction<string | null>>,
+  setPlanRecorderKeys: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+  setActiveSectionTranscription: React.Dispatch<React.SetStateAction<string | null>>,
+  setPlanTranscriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  setSectionRecorderKeys: React.Dispatch<React.SetStateAction<Record<string, number>>>,
+  setSectionTranscriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+
   // Refs and functions
-  pathTimeoutsRef: React.MutableRefObject<Map<string, NodeJS.Timeout>>,
   processingQueueRef: React.MutableRefObject<any[]>,
-  addToProcessingQueue: (path: string, text: string) => void
+  addToProcessingQueue: (path: string, text: string) => void,
+  pathTimeoutsRef: React.MutableRefObject<Map<string, NodeJS.Timeout>>,
+  
+  // Optional parameters (these can now go after required parameters)
+  appointmentId?: string,
+  onRecordingStart?: (path?: string) => void,
+  onRecordingStop?: (path?: string) => void,
+  recordingStates?: {[path: string]: boolean},
+  onAudioRecorded?: (base64Audio: string, context: any) => void,
+  onTranscriptionProcess?: (transcription: string, context: any) => void,
 ) => {
+
   // Field change handler
-  const handleChange = useCallback(
+  const handleChange = React.useCallback(
     (path: string, value: any) => {
       setLlmUpdatedFields((prev) => {
         const newSet = new Set(prev);
@@ -77,7 +72,7 @@ export const useFormHandlers = (
   );
 
   // Add array item handler
-  const handleAddArrayItem = useCallback(
+  const handleAddArrayItem = React.useCallback(
     (path: string, template: any) => {
       dispatch({ type: 'ADD_ARRAY_ITEM', path, template });
     },
@@ -85,7 +80,7 @@ export const useFormHandlers = (
   );
 
   // Remove array item handler
-  const handleRemoveArrayItem = useCallback(
+  const handleRemoveArrayItem = React.useCallback(
     (path: string, index: number) => {
       dispatch({ type: 'REMOVE_ARRAY_ITEM', path, index });
     },
@@ -93,7 +88,7 @@ export const useFormHandlers = (
   );
 
   // Accept all LLM changes
-  const acceptAllLLMChanges = useCallback(() => {
+  const acceptAllLLMChanges = React.useCallback(() => {
     setLlmUpdatedFields(new Set());
     toast({
       title: 'Changes Accepted',
@@ -102,7 +97,7 @@ export const useFormHandlers = (
   }, [toast, setLlmUpdatedFields]);
 
   // Reject specific LLM change
-  const rejectLLMChange = useCallback(
+  const rejectLLMChange = React.useCallback(
     (path: string) => {
       setLlmUpdatedFields((prev) => {
         const newSet = new Set(prev);
@@ -113,73 +108,144 @@ export const useFormHandlers = (
     [setLlmUpdatedFields]
   );
 
-  // Handle section selection
-  const handleSectionSelection = useCallback(
-    (sectionPath: string, checked: boolean) => {
-      // This would need to be passed from parent component or managed differently
-      // For now, this is a placeholder
-      console.log(`Section selection: ${sectionPath}, checked: ${checked}`);
-    },
-    []
-  );
-
-  // Handle section audio recording
-  const handleSectionAudioRecorded = useCallback(
+  // Handle section audio recording with proper state management
+  const handleSectionAudioRecorded = React.useCallback(
     (base64Audio: string, sectionPath: string) => {
+      console.log(`=== SECTION AUDIO RECORDED: ${sectionPath} ===`);
+      
       if (!onAudioRecorded) return;
 
-      const context = {
-        formKey,
-        formData: state,
-        sectionPath,
-        selectedSections: Array.from(selectedSections),
-      };
+      // NOTIFY PARENT THAT RECORDING STOPPED
+      if (onRecordingStop) {
+        onRecordingStop(sectionPath);
+      }
 
-      console.log(`Recording audio for section: ${sectionPath}`);
-      onAudioRecorded(base64Audio, context);
-    },
-    [formKey, state, onAudioRecorded, selectedSections]
-  );
-
-  // Handle plan audio recording
-  const handlePlanAudioRecorded = useCallback(
-    (base64Audio: string, planPath: string) => {
-      if (!onAudioRecorded) return;
-
-      const context = {
-        formKey,
-        formData: state,
-        // Use planPath for both plans and tests for compatibility
-        planPath,
-        selectedSections: Array.from(selectedSections),
-      };
-
-      console.log(`Recording audio for plan: ${planPath}`);
-      onAudioRecorded(base64Audio, context);
-    },
-    [formKey, state, onAudioRecorded, selectedSections]
-  );
-
-  // Handle transcription changes
-  const handleTranscriptionChange = useCallback(
-    (sectionPath: string, text: string) => {
-      console.log(`Manual transcription change for ${sectionPath}: "${text}"`);
-
+      // Clear existing transcription for this section when new audio is recorded
       setSectionTranscriptions((prev) => ({
         ...prev,
-        [sectionPath]: text,
+        [sectionPath]: '', // Clear existing transcription
       }));
 
+      // Remove from processed state if it exists (allow re-recording)
       setProcessedSections((prev) => {
         const newSet = new Set(prev);
         newSet.delete(sectionPath);
         return newSet;
       });
 
+      // Reset recorder key to refresh the component
+      setSectionRecorderKeys((prev) => ({
+        ...prev,
+        [sectionPath]: (prev[sectionPath] || 0) + 1,
+      }));
+
+      const context = {
+        formKey,
+        formData: state,
+        sectionPath,
+        selectedSections: Array.from(selectedSections),
+        isOverride: Object.keys(state).length > 0, // Flag if form already has data
+      };
+
+      console.log(`Sending section audio with context:`, context);
+      onAudioRecorded(base64Audio, context);
+    },
+    [
+      formKey, 
+      state, 
+      onAudioRecorded, 
+      selectedSections, 
+      onRecordingStop,
+      setProcessedSections,
+      setSectionRecorderKeys,
+      setSectionTranscriptions,
+    ]
+  );
+
+  // FIXED: Handle plan audio recording with proper state management
+  const handlePlanAudioRecorded = React.useCallback(
+    (base64Audio: string, planPath: string) => {
+      console.log(`=== PLAN AUDIO RECORDED: ${planPath} ===`);
+      
+      if (!onAudioRecorded) return;
+
+      // NOTIFY PARENT THAT RECORDING STOPPED
+      if (onRecordingStop) {
+        onRecordingStop(planPath);
+      }
+
+      // Clear existing transcription for this plan when new audio is recorded
+      setPlanTranscriptions((prev) => ({
+        ...prev,
+        [planPath]: '', // Clear existing transcription
+      }));
+
+      // Remove from processed state if it exists (allow re-recording)
+      setProcessedPlans((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(planPath);
+        return newSet;
+      });
+
+      // Reset recorder key to refresh the component
+      setPlanRecorderKeys((prev) => ({
+        ...prev,
+        [planPath]: (prev[planPath] || 0) + 1,
+      }));
+
+      const context = {
+        formKey,
+        planPath,
+        formData: state,
+        selectedSections: Array.from(selectedSections),
+        isOverride: Object.keys(state).length > 0, // Flag if form already has data
+      };
+
+      console.log(`Sending plan audio with context:`, context);
+      onAudioRecorded(base64Audio, context);
+    },
+    [
+      formKey, 
+      state, 
+      onAudioRecorded, 
+      selectedSections, 
+      onRecordingStop,
+      setPlanTranscriptions,
+      setProcessedPlans,
+      setPlanRecorderKeys
+    ]
+  );
+
+  // FIXED: Handle transcription changes with proper override behavior
+  const handleTranscriptionChange = React.useCallback(
+    (sectionPath: string, text: string) => {
+      // Don't allow transcription changes during global recording
+      if (recordingMode === 'global') {
+        console.log(`Ignoring section transcription change - global mode active`);
+        return;
+      }
+
+      // Allow override - remove from processed state if it exists
+      if (processedSections.has(sectionPath)) {
+        console.log(`Section ${sectionPath} was already processed, allowing override`);
+        setProcessedSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(sectionPath);
+          return newSet;
+        });
+      }
+
+      setSectionTranscriptions((prev) => ({
+        ...prev,
+        [sectionPath]: text,
+      }));
+
       setActiveSectionTranscription(sectionPath);
       addToProcessingQueue(sectionPath, text);
     },
     [
+      recordingMode,
+      processedSections,
       setSectionTranscriptions,
       setProcessedSections,
       setActiveSectionTranscription,
@@ -187,16 +253,23 @@ export const useFormHandlers = (
     ]
   );
 
-  // Handle plan transcription changes
-  const handlePlanTranscriptionChange = useCallback(
+  // FIXED: Handle plan transcription changes with proper override behavior
+  const handlePlanTranscriptionChange = React.useCallback(
     (planPath: string, text: string) => {
-      console.log(
-        `Manual plan transcription change for ${planPath}: "${text}"`
-      );
-
+      // Don't allow transcription changes during global recording
       if (recordingMode === 'global') {
         console.log(`Ignoring plan transcription change - global mode active`);
         return;
+      }
+
+      // Allow override - remove from processed state if it exists
+      if (processedPlans.has(planPath)) {
+        console.log(`Plan ${planPath} was already processed, allowing override`);
+        setProcessedPlans((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(planPath);
+          return newSet;
+        });
       }
 
       setPlanTranscriptions((prev) => ({
@@ -204,17 +277,12 @@ export const useFormHandlers = (
         [planPath]: text,
       }));
 
-      setProcessedPlans((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(planPath);
-        return newSet;
-      });
-
       setActivePlanTranscription(planPath);
       addToProcessingQueue(planPath, text);
     },
     [
       recordingMode,
+      processedPlans,
       setPlanTranscriptions,
       setProcessedPlans,
       setActivePlanTranscription,
@@ -222,8 +290,8 @@ export const useFormHandlers = (
     ]
   );
 
-  // Handle section transcription processing
-  const handleSectionTranscriptionProcess = useCallback(
+  // FIXED: Handle section transcription processing with override context
+  const handleSectionTranscriptionProcess = React.useCallback(
     (sectionPath: string) => {
       if (
         !onTranscriptionProcess ||
@@ -232,24 +300,22 @@ export const useFormHandlers = (
         recordingMode === 'global'
       )
         return;
-  
-      console.log(`Manual processing request for section ${sectionPath}`);
-  
+
       // Remove from queue if it exists
       processingQueueRef.current = processingQueueRef.current.filter(
         (item) => item.path !== sectionPath
       );
       setProcessingQueue([...processingQueueRef.current]);
-  
+
       // Clear timeout
       const existingTimeout = pathTimeoutsRef.current.get(sectionPath);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
         pathTimeoutsRef.current.delete(sectionPath);
       }
-  
+
       const transcription = sectionTranscriptions[sectionPath] || '';
-  
+
       if (!transcription.trim()) {
         toast({
           title: 'Empty transcription',
@@ -258,16 +324,8 @@ export const useFormHandlers = (
         });
         return;
       }
-  
-      // ALLOW REPROCESSING: Don't check if already processed
-      // Users should be able to reprocess sections for corrections
-      // const isAlreadyProcessed = processedSections.has(sectionPath);
-      // if (isAlreadyProcessed) {
-      //   console.log(`Section ${sectionPath} already processed, skipping`);
-      //   return;
-      // }
-  
-      // If it was already processed, remove it from processed state
+
+      // Allow reprocessing - remove from processed state if it exists
       if (processedSections.has(sectionPath)) {
         console.log(`Section ${sectionPath} was already processed, allowing reprocessing`);
         setProcessedSections((prev) => {
@@ -276,20 +334,20 @@ export const useFormHandlers = (
           return newSet;
         });
       }
-  
+
       setIsAutoProcessing(true);
       setCurrentlyProcessingPath(sectionPath);
-  
+
       const context = {
         formKey,
         formData: state,
         sectionPath,
+        recordingType: 'section',
+        isOverride: Object.keys(state).length > 0,
         selectedSections: Array.from(selectedSections),
       };
-  
-      console.log(`Processing transcription for section: ${sectionPath}`);
-  
-      // Mark as processed after successful processing (this will be done in the success callback)
+
+      console.log(`Processing section transcription with context:`, context);
       onTranscriptionProcess(transcription, context);
     },
     [
@@ -312,8 +370,8 @@ export const useFormHandlers = (
     ]
   );
 
-  // Handle plan transcription processing
-  const handlePlanTranscriptionProcess = useCallback(
+  // FIXED: Handle plan transcription processing with override context
+  const handlePlanTranscriptionProcess = React.useCallback(
     (planPath: string) => {
       if (
         !onTranscriptionProcess ||
@@ -322,24 +380,24 @@ export const useFormHandlers = (
         recordingMode === 'global'
       )
         return;
-  
-      console.log(`Manual processing request for plan ${planPath}`);
-  
+
+      console.log(`=== PROCESSING PLAN TRANSCRIPTION: ${planPath} ===`);
+
       // Remove from queue if it exists
       processingQueueRef.current = processingQueueRef.current.filter(
         (item) => item.path !== planPath
       );
       setProcessingQueue([...processingQueueRef.current]);
-  
+
       // Clear timeout
       const existingTimeout = pathTimeoutsRef.current.get(planPath);
       if (existingTimeout) {
         clearTimeout(existingTimeout);
         pathTimeoutsRef.current.delete(planPath);
       }
-  
+
       const transcription = planTranscriptions[planPath] || '';
-  
+
       if (!transcription.trim()) {
         toast({
           title: 'Empty transcription',
@@ -348,9 +406,8 @@ export const useFormHandlers = (
         });
         return;
       }
-  
-      // ALLOW REPROCESSING: Don't check if already processed
-      // If it was already processed, remove it from processed state
+
+      // Allow reprocessing - remove from processed state if it exists
       if (processedPlans.has(planPath)) {
         console.log(`Plan ${planPath} was already processed, allowing reprocessing`);
         setProcessedPlans((prev) => {
@@ -359,19 +416,20 @@ export const useFormHandlers = (
           return newSet;
         });
       }
-  
+
       setIsAutoProcessing(true);
       setCurrentlyProcessingPath(planPath);
-  
+
       const context = {
         formKey,
         formData: state,
         planPath,
         selectedSections: Array.from(selectedSections),
+        isOverride: Object.keys(state).length > 0, // Flag if this is an override
+        recordingType: 'section',
       };
-  
-      console.log(`Processing transcription for plan: ${planPath}`);
-  
+
+      console.log(`Processing plan transcription with context:`, context);
       onTranscriptionProcess(transcription, context);
     },
     [
@@ -394,16 +452,19 @@ export const useFormHandlers = (
     ]
   );
 
-  // Handle field reset
-  const handleResetField = useCallback(
+  // FIXED: Handle field reset with proper cleanup
+  const handleResetField = React.useCallback(
     (path: string) => {
       if (
         confirm(
           'Are you sure you want to reset this field to its default value?'
         )
       ) {
+        console.log(`=== RESETTING FIELD: ${path} ===`);
+
         dispatch({ type: 'RESET_FIELD', path });
 
+        // Clear section transcriptions and states
         if (sectionTranscriptions[path]) {
           setSectionTranscriptions((prev) => ({
             ...prev,
@@ -415,8 +476,15 @@ export const useFormHandlers = (
             newSet.delete(path);
             return newSet;
           });
+
+          // Reset recorder key
+          setSectionRecorderKeys((prev) => ({
+            ...prev,
+            [path]: (prev[path] || 0) + 1,
+          }));
         }
 
+        // Clear plan transcriptions and states for plans/tests
         if (isPlanPath(path, formKey) || isTestPath(path, formKey)) {
           setPlanTranscriptions((prev) => ({
             ...prev,
@@ -428,8 +496,15 @@ export const useFormHandlers = (
             newSet.delete(path);
             return newSet;
           });
+
+          // Reset recorder key
+          setPlanRecorderKeys((prev) => ({
+            ...prev,
+            [path]: (prev[path] || 0) + 1,
+          }));
         }
 
+        // Clear timeouts and processing queue
         const existingTimeout = pathTimeoutsRef.current.get(path);
         if (existingTimeout) {
           clearTimeout(existingTimeout);
@@ -456,44 +531,59 @@ export const useFormHandlers = (
       setPlanTranscriptions,
       setProcessedSections,
       setProcessedPlans,
+      setSectionRecorderKeys,
+      setPlanRecorderKeys,
       setProcessingQueue,
       pathTimeoutsRef,
       processingQueueRef,
     ]
   );
 
-  // Reset form to initial state
-  const handleResetForm = useCallback(() => {
+  // FIXED: Reset form to initial state with proper cleanup
+  const handleResetForm = React.useCallback(() => {
     if (
       confirm(
         'Are you sure you want to reset this form? All your data will be lost.'
       )
     ) {
+      console.log('=== RESETTING ENTIRE FORM ===');
+
+      // Clear all timeouts
       pathTimeoutsRef.current.forEach((timeout) => {
         clearTimeout(timeout);
       });
       pathTimeoutsRef.current.clear();
 
+      // Clear processing queue and states
       processingQueueRef.current = [];
       setProcessingQueue([]);
       setIsAutoProcessing(false);
       setCurrentlyProcessingPath(null);
 
+      // Reset form data
       dispatch({ type: 'RESET_FORM', data: defaultStateFromSchema(schema) });
       setLlmUpdatedFields(new Set());
 
-      const sections =
-        FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
+      // Reset all transcriptions
+      const sections = FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
       const resetTranscriptions: Record<string, string> = {};
+      const resetRecorderKeys: Record<string, number> = {};
+      
       sections.forEach((section) => {
         resetTranscriptions[section] = '';
+        resetRecorderKeys[section] = Date.now(); // Force re-render with unique keys
       });
+      
       setSectionTranscriptions(resetTranscriptions);
+      setSectionRecorderKeys(resetRecorderKeys);
 
+      // Reset processed states
       setProcessedSections(new Set());
+      setProcessedPlans(new Set());
+
+      // Reset plan transcriptions and keys
       setPlanTranscriptions({});
       setPlanRecorderKeys({});
-      setProcessedPlans(new Set());
 
       toast({
         title: 'Form Reset',
@@ -509,6 +599,7 @@ export const useFormHandlers = (
     setIsAutoProcessing,
     setCurrentlyProcessingPath,
     setSectionTranscriptions,
+    setSectionRecorderKeys,
     setProcessedSections,
     setPlanTranscriptions,
     setPlanRecorderKeys,
@@ -518,8 +609,8 @@ export const useFormHandlers = (
     processingQueueRef,
   ]);
 
-  // Handle form submission
-  const handleSubmitForm = useCallback(async () => {
+  // Handle form submission (unchanged)
+  const handleSubmitForm = React.useCallback(async () => {
     if (!appointmentId) {
       toast({
         title: 'Missing Information',
@@ -532,10 +623,7 @@ export const useFormHandlers = (
     setIsSubmitting(true);
 
     try {
-      const { input, formDataCopy } = processFormDataForSubmission(
-        formKey,
-        state
-      );
+      const { input, formDataCopy } = processFormDataForSubmission(formKey, state);
 
       const mutation = `
         mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
@@ -585,7 +673,6 @@ export const useFormHandlers = (
     handleRemoveArrayItem,
     acceptAllLLMChanges,
     rejectLLMChange,
-    handleSectionSelection,
     handleSectionAudioRecorded,
     handlePlanAudioRecorded,
     handleTranscriptionChange,

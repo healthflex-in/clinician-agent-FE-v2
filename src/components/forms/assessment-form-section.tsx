@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Save, RefreshCw, Plus, Minus } from 'lucide-react';
 
@@ -6,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import SectionTranscriptionBox from './section-transcription-box';
 import SectionAudioRecorder from '../audio/section-audio-recorder';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from '@/components/ui/card';
 
 interface AssessmentFormSectionProps {
   title: string;
@@ -60,28 +65,35 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
   };
 
   return (
-    <Card className={`mb-6 border border-border bg-card ${isArrayItem ? 'ml-4' : ''}`}>
+    <Card
+      className={`mb-6 border border-border bg-card ${
+        isArrayItem ? 'ml-4' : ''
+      }`}
+    >
       <CardHeader className={`pb-2 ${isArrayItem ? 'bg-background/50' : ''}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {selectable && (
-              <Checkbox 
+              <Checkbox
                 checked={selected}
                 onCheckedChange={(checked) => {
-                  if (onSelectChange) onSelectChange(sectionId, checked === true);
+                  if (onSelectChange)
+                    onSelectChange(sectionId, checked === true);
                 }}
                 id={`section-checkbox-${sectionId}`}
                 className="h-4 w-4"
               />
             )}
             <CardTitle className="text-lg font-semibold">
-              {isArrayItem && itemIndex !== undefined ? `${title} ${itemIndex + 1}` : title}
+              {isArrayItem && itemIndex !== undefined
+                ? `${title} ${itemIndex + 1}`
+                : title}
             </CardTitle>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {showAudioControls && (
-              <SectionAudioRecorder 
+              <SectionAudioRecorder
                 sectionId={sectionId}
                 onAudioEncoded={handleAudioEncoded}
                 isProcessing={isProcessing}
@@ -89,11 +101,11 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
                 label={`Record for ${title}`}
               />
             )}
-            
+
             {isArrayItem && onRemoveItem && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onRemoveItem}
                 className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
               >
@@ -121,10 +133,8 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
             />
           </div>
         )}
-        
-        <div className="form-fields">
-          {children}
-        </div>
+
+        <div className="form-fields">{children}</div>
       </CardContent>
 
       <CardFooter className="flex justify-end space-x-2 py-2">
@@ -139,13 +149,13 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
             <span>Add Item</span>
           </Button>
         )}
-      
+
         {(onSectionReset || onSectionSubmit) && (
           <div>
             {onSectionReset && (
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => onSectionReset(sectionId)}
                 className="flex items-center gap-1 mr-2"
               >
@@ -154,8 +164,8 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
               </Button>
             )}
             {onSectionSubmit && (
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={() => onSectionSubmit(sectionId)}
                 className="flex items-center gap-1"
               >

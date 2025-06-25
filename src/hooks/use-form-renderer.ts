@@ -19,7 +19,7 @@ export const useFormRenderer = (
   isProcessing: boolean,
   onTranscriptionProcess?: (transcription: string, context: any) => void,
   activeSectionPath?: string | null,
-  selectedSections?: Set<string>,
+  selectedSections?: Set<string>
 ) => {
   const { toast } = useToast();
 
@@ -49,7 +49,9 @@ export const useFormRenderer = (
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAutoProcessing, setIsAutoProcessing] = useState(false);
   const [processedPlans, setProcessedPlans] = useState<Set<string>>(new Set());
-  const [processingQueue, setProcessingQueue] = useState<ProcessingQueueItem[]>([]);
+  const [processingQueue, setProcessingQueue] = useState<ProcessingQueueItem[]>(
+    []
+  );
   const [currentlyProcessingPath, setCurrentlyProcessingPath] = useState<
     string | null
   >(null);
@@ -66,8 +68,13 @@ export const useFormRenderer = (
 
   // Form reducer with dependencies injected
   const wrappedReducer = useCallback(
-    (state: any, action: FormAction) =>
-      formReducer(state, action, schema, setLlmUpdatedFields, toast),
+    (state: any, action: FormAction) => {
+      console.log('=== WRAPPED REDUCER DEBUG ===');
+      console.log('Action received in wrapper:', action);
+
+      // Call your actual reducer with just state and action
+      return formReducer(state, toast, schema, action, setLlmUpdatedFields);
+    },
     [schema, toast]
   );
 

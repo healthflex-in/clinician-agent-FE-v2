@@ -25,7 +25,9 @@ export function useWebSocket(options: WebSocketOptions) {
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [transcription, setTranscription] = React.useState<string>('');
   const [suggestions, setSuggestions] = React.useState<string | null>(null);
-  const [recommendations, setRecommendations] = React.useState<string | null>(null);
+  const [recommendations, setRecommendations] = React.useState<string | null>(
+    null
+  );
 
   const wsRef = React.useRef<WebSocket | null>(null);
   const lastServerPingRef = React.useRef<number>(0);
@@ -69,12 +71,10 @@ export function useWebSocket(options: WebSocketOptions) {
       setIsConnecting(true);
 
       const wsUrl = url;
-      console.log('Attempting to connect to WebSocket at:', wsUrl);
 
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('WebSocket connected');
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -110,7 +110,6 @@ export function useWebSocket(options: WebSocketOptions) {
       };
 
       wsRef.current.onclose = (event) => {
-        console.log('WebSocket closed');
         setIsConnected(false);
         setIsConnecting(false);
         clearHeartbeatTimer();
@@ -123,11 +122,7 @@ export function useWebSocket(options: WebSocketOptions) {
             10000
           );
           setTimeout(() => connect(), delay);
-        } else {
-          console.log('Max reconnect attempts reached');
-        }
-
-        if (onClose) onClose();
+        } else if (onClose) onClose();
       };
 
       wsRef.current.onerror = (event) => {
@@ -140,9 +135,7 @@ export function useWebSocket(options: WebSocketOptions) {
 
       wsRef.current.onmessage = (event) => {
         try {
-          console.log('Message received:', event.data);
           const data = JSON.parse(event.data);
-          console.log('WebSocket data:', data);
 
           // Handle heartbeat messages first
           if (data.type === 'pong') {
@@ -172,8 +165,6 @@ export function useWebSocket(options: WebSocketOptions) {
           // Handle regular server responses - cast back to ServerResponse
           const serverResponse = data as ServerResponse;
 
-          // Handle different response types
-          console.log('@@ serverResponse: ', serverResponse);
           if (serverResponse.error) {
             console.error('Server error:', serverResponse.error);
             toast({
@@ -194,7 +185,6 @@ export function useWebSocket(options: WebSocketOptions) {
             const formDataResponse =
               serverResponse.form_data || serverResponse.formData;
             setFormData(formDataResponse);
-            console.log('Form data received:', formDataResponse);
 
             // Forward form data to parent component if callback is provided
             if (onFormData) {
@@ -211,14 +201,10 @@ export function useWebSocket(options: WebSocketOptions) {
           if (serverResponse.payloadType === 'structured') {
             if (serverResponse.formData) {
               setFormData(serverResponse.formData);
-              console.log(
-                'Structured form data received:',
-                serverResponse.formData
-              );
 
               // Forward form data to parent component if callback is provided
               if (onFormData) {
-                onFormData(serverResponse.formData);
+                onFormData(serverResponse);
               }
 
               toast({
@@ -229,15 +215,10 @@ export function useWebSocket(options: WebSocketOptions) {
 
             if (serverResponse.suggestions) {
               setSuggestions(serverResponse.suggestions);
-              console.log('Suggestions received:', serverResponse.suggestions);
             }
 
             if (serverResponse.realTimeRecommendations) {
               setRecommendations(serverResponse.realTimeRecommendations);
-              console.log(
-                'Recommendations received:',
-                serverResponse.realTimeRecommendations
-              );
             }
           }
 
@@ -286,7 +267,6 @@ export function useWebSocket(options: WebSocketOptions) {
   const sendMessage = React.useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       setIsProcessing(true);
-      console.log('Sending message:', message);
 
       // Add API key to every message
       const messageWithAuth = {
@@ -311,8 +291,9 @@ export function useWebSocket(options: WebSocketOptions) {
       // Make sure the audio is in the correct format (data URL)
       let audioData = base64Audio;
       if (!audioData.startsWith('data:')) {
-        audioData = `data:audio/wav;base64,${audioData.split(',')[1] || audioData
-          }`;
+        audioData = `data:audio/wav;base64,${
+          audioData.split(',')[1] || audioData
+        }`;
       }
 
       // Format for audio payload
@@ -331,7 +312,6 @@ export function useWebSocket(options: WebSocketOptions) {
         payload.formData = currentFormData;
       }
 
-      console.log('Sending audio payload:', payload);
       return sendMessage(payload);
     },
     [sendMessage]
@@ -359,7 +339,6 @@ export function useWebSocket(options: WebSocketOptions) {
         payload.formData = currentFormData;
       }
 
-      console.log('Processing transcription with payload:', payload);
       return sendMessage(payload);
     },
     [sendMessage]

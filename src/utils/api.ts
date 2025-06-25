@@ -1,5 +1,6 @@
 // Store API key in environment variable in production
-const API_KEY = '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20';
+const API_KEY =
+  'b90718a058accf0130e62c030ef919b3eabbbff85b81bb70985d6ab87995333a';
 
 /**
  * CORS-friendly GraphQL client using a public CORS proxy
@@ -15,11 +16,12 @@ export async function graphqlRequest<T = any>(
   // Warning: This is a temporary solution for development only
   // Do not use this in production - use a proper backend/proxy service
   const corsProxy = 'https://corsproxy.io/?';
-  const apiEndpoint = 'https://devapi.stance.health/graphql';
+  // const apiEndpoint = 'https://devapi.stance.health/graphql';
+  const apiEndpoint = 'http://localhost:3000/graphql';
   const proxyUrl = `${corsProxy}${encodeURIComponent(apiEndpoint)}`;
 
   try {
-    const response = await fetch(proxyUrl, {
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,21 +53,24 @@ export async function graphqlRequest<T = any>(
  * @returns Promise with the response data
  */
 export async function updateAgentReport(input: {
-  patientId: string;
+  patientId?: string;
   appointmentId: string;
   centerId?: string;
-  formKey: string;
-  formData: any;
+  formKey?: string;
+  input: any;
 }) {
   const query = `
-    mutation updateAgentReport($input: UpdateAgentReportInput!) {
-      updateAgentReport(input: $input) {
+    mutation updateAgentReport( $appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
+      updateAgentReport(appointmentId: $appointmentId, input: $input) {
         _id
       }
     }
   `;
 
-  return graphqlRequest(query, { input });
+  return graphqlRequest(query, {
+    appointmentId: input.appointmentId,
+    input: input.input,
+  });
 }
 
 /**
@@ -135,4 +140,57 @@ export async function fetchAppointments(filter: any) {
   `;
 
   return graphqlRequest(query, { filter });
+}
+
+export async function createAgentReport(input: any) {
+  const mutation = `
+    mutation CreateAgentReport($input: CreateAgentReportInput!) {
+      createAgentReport(input: $input) {
+        _id
+        createdAt
+        updatedAt
+        version
+        isActive
+        assessment {
+          plan {
+            advice
+            record
+            plans {
+              exercise
+              comments
+              set {
+                repetitions
+                load
+                unit
+              }
+              duration {
+                value
+                unit
+              }
+            }
+          }
+          subjectiveAssessment {
+            assessment
+            record
+          }
+          objectiveAssessment {
+            record
+            tests {
+              testName
+              unitName
+              value
+              left
+              right
+              comments
+            }
+          }
+          rpe {
+            value
+            record
+          }
+        }
+      }
+    }
+  `;
+  return graphqlRequest(mutation, { input });
 }

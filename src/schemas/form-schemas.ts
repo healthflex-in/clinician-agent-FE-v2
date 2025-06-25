@@ -65,18 +65,18 @@ const formSchemas = {
   },
 
   // Physio Form
-  physio: {
-    tests: [
-      {
-        testName: '',
-        unitName: '',
-        value: 0,
-        left: 0,
-        right: 0,
-        comments: '',
-      },
-    ],
-  },
+  // physio: {
+  //   tests: [
+  //     {
+  //       testName: '',
+  //       unitName: '',
+  //       value: 0,
+  //       left: 0,
+  //       right: 0,
+  //       comments: '',
+  //     },
+  //   ],
+  // },
 
   // Assessment Form
   // assessment: {

@@ -3,7 +3,7 @@
 
 import React from 'react';
 import '@testing-library/jest-dom';
-import FormRenderer from '../src/components/FormRenderer';
+import FormRenderer from '../src/components/forms/form-renderer';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { vi } from 'vitest';
 
@@ -16,12 +16,6 @@ vi.mock('../src/components/FieldAudioRecorder', () => {
       isDisabled,
       ...otherProps
     }: any) {
-      // Debug: Let's see what props are actually passed
-      console.log(`MockFieldAudioRecorder ${fieldPath}:`, {
-        isDisabled,
-        otherProps,
-      });
-
       return (
         <button
           data-testid={`mock-recorder-${fieldPath}`}
@@ -526,10 +520,6 @@ describe('Processing Workflow Tests', () => {
 
     // First, let's check what buttons are actually available
     const allButtons = screen.getAllByRole('button');
-    console.log(
-      'Available buttons:',
-      allButtons.map((btn) => btn.textContent)
-    );
 
     // For SNC forms, we need to simulate plan transcription instead of section transcription
     // Add some transcription text to the plan via ref using act()
@@ -562,11 +552,6 @@ describe('Processing Workflow Tests', () => {
         })
       );
     } else {
-      // If no process button is found, skip this test for SNC forms
-      // since they might handle processing differently
-      console.log(
-        'No process button found for SNC form - this might be expected behavior'
-      );
       expect(true).toBe(true); // Pass the test
     }
   });
@@ -710,11 +695,6 @@ describe('Processing Workflow Tests', () => {
       });
       expect(mockOnTranscriptionProcess).toHaveBeenCalled();
     } else {
-      // For SNC forms, processing might be automatic or handled differently
-      // Just verify that the transcription was set
-      console.log(
-        'No manual process button - SNC might use automatic processing'
-      );
       expect(mockOnAudioRecorded).toHaveBeenCalled(); // At least verify audio was recorded
     }
 
@@ -1296,11 +1276,6 @@ describe('Global vs Section Recording Tests', () => {
 
     // Wait for processing queue to handle
     await new Promise((resolve) => setTimeout(resolve, 200));
-
-    // Both transcriptions should have been processed
-    // Note: Due to auto-processing queue, this might be called automatically
-    // The exact behavior depends on the component's internal queue management
-    console.log('Processing queue test completed');
     expect(true).toBe(true); // Basic assertion
   });
 });

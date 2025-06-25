@@ -43,8 +43,15 @@ const Index = () => {
   const [patientSearch, setPatientSearch] = React.useState<string>('');
 
   const { centers, loadingCenters } = useCenters();
-  const { patients, loadingPatients, searchPatients, clearPatients } = usePatients(centerId);
-  const { appointments, appointmentId, loadingAppointments, handleAppointmentChange, clearAppointments } = useAppointments(patientId);
+  const { patients, loadingPatients, searchPatients, clearPatients } =
+    usePatients(centerId);
+  const {
+    appointments,
+    appointmentId,
+    loadingAppointments,
+    handleAppointmentChange,
+    clearAppointments,
+  } = useAppointments(patientId);
 
   // Set viewport for mobile
   React.useEffect(() => {
@@ -98,9 +105,6 @@ const Index = () => {
 
       // Only restore appointmentId if patientId exists
       if (savedPatientId && savedAppointmentId) {
-        // Note: appointmentId will be handled by the useAppointments hook
-        // We'll need to update the hook to handle localStorage restoration
-
         // Only restore formKey if appointmentId exists
         if (savedAppointmentId && savedFormKey) {
           setFormKey(savedFormKey);
@@ -113,7 +117,7 @@ const Index = () => {
     if (centerId && patientSearch) {
       const delaySearch = setTimeout(() => {
         searchPatients(patientSearch);
-      }, 500); // Debounce search
+      }, 500);
 
       return () => clearTimeout(delaySearch);
     }
@@ -126,7 +130,7 @@ const Index = () => {
       `${patient.profileData.firstName} ${patient.profileData.lastName}`
     );
     setPatientSearch('');
-    clearPatients(); // Use hook function instead of setPatients([])
+    clearPatients();
   };
 
   // Handle center change
@@ -137,8 +141,8 @@ const Index = () => {
     setPatientId('');
     setPatientName('');
     setPatientSearch('');
-    clearPatients(); // Use hook function
-    clearAppointments(); // Use hook function
+    clearPatients();
+    clearAppointments();
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -203,13 +207,6 @@ const Index = () => {
     return 4;
   };
 
-  // console.log('@@ appoitments:', appointments);
-  // console.log('@@ selected patient:', {
-  //   id: patientId,
-  //   name: patientName,
-  // });
-  console.log('@@ selected appointment:', appointmentId);
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/10 to-background px-4 py-6 safe-area-top safe-area-bottom">
       <Card className="w-full max-w-md shadow-lg">
@@ -224,8 +221,9 @@ const Index = () => {
               {[1, 2, 3, 4].map((step) => (
                 <div
                   key={step}
-                  className={`w-2 h-2 rounded-full ${step <= getProgressStep() ? 'bg-primary' : 'bg-gray-200'
-                    }`}
+                  className={`w-2 h-2 rounded-full ${
+                    step <= getProgressStep() ? 'bg-primary' : 'bg-gray-200'
+                  }`}
                 />
               ))}
             </div>
@@ -349,7 +347,13 @@ const Index = () => {
                 disabled={!patientId || loadingAppointments}
               >
                 <SelectTrigger className="h-10 text-sm">
-                  <SelectValue placeholder={loadingAppointments ? "Loading appointments..." : "Select an appointment"} />
+                  <SelectValue
+                    placeholder={
+                      loadingAppointments
+                        ? 'Loading appointments...'
+                        : 'Select an appointment'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {loadingAppointments ? (

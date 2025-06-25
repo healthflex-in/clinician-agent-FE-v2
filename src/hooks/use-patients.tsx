@@ -9,42 +9,44 @@ export type Patient = {
     firstName: string;
     lastName: string;
   };
-}
+};
 
 export const usePatients = (centerId: string) => {
   const { toast } = useToast();
   const [patients, setPatients] = React.useState<Patient[]>([]);
   const [loadingPatients, setLoadingPatients] = React.useState(false);
 
-  const searchPatients = React.useCallback(async (searchTerm: string) => {
-    if (!centerId) {
-      toast({
-        title: 'Center Required',
-        description: 'Please select a center first',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setLoadingPatients(true);
-      const response = await searchUsers('PATIENT', [centerId], searchTerm);
-      console.log('Patient search response:', response);
-
-      if (response && response.users) {
-        setPatients(response.users);
+  const searchPatients = React.useCallback(
+    async (searchTerm: string) => {
+      if (!centerId) {
+        toast({
+          title: 'Center Required',
+          description: 'Please select a center first',
+          variant: 'destructive',
+        });
+        return;
       }
-    } catch (error) {
-      console.error('Error searching patients:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to search patients. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingPatients(false);
-    }
-  }, [centerId, toast]);
+
+      try {
+        setLoadingPatients(true);
+        const response = await searchUsers('PATIENT', [centerId], searchTerm);
+
+        if (response && response.users) {
+          setPatients(response.users);
+        }
+      } catch (error) {
+        console.error('Error searching patients:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to search patients. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingPatients(false);
+      }
+    },
+    [centerId, toast]
+  );
 
   const clearPatients = React.useCallback(() => {
     setPatients([]);

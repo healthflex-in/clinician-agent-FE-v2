@@ -19,13 +19,14 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
 }) => {
   const [isRecording, setIsRecording] = React.useState(false);
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const [mediaRecorder, setMediaRecorder] = React.useState<MediaRecorder | null>(null);
+  const [mediaRecorder, setMediaRecorder] =
+    React.useState<MediaRecorder | null>(null);
 
   const startRecording = React.useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
-      
+
       const audioChunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => {
         audioChunks.push(e.data);
@@ -33,17 +34,17 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
 
       recorder.onstop = async () => {
         setIsProcessing(true);
-        
+
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         const reader = new FileReader();
 
         reader.onload = () => {
           if (reader.result) {
             const base64Audio = (reader.result as string).split(',')[1];
-            
+
             onAudioRecorded(base64Audio, fieldPath);
             setIsProcessing(false);
-            
+
             // FIXED: Call onRecordingStop AFTER audio is processed
             if (onRecordingStop) {
               onRecordingStop();
@@ -59,17 +60,14 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
-      
+
       // FIXED: Call onRecordingStart when recording actually starts
       if (onRecordingStart) {
-        console.log(`=== NOTIFYING RECORDING START: ${fieldPath} ===`);
         onRecordingStart();
       }
-      
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Could not access microphone. Please check permissions.');
-      
+
       // FIXED: Reset states on error
       setIsRecording(false);
       setIsProcessing(false);
@@ -78,7 +76,6 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
 
   const stopRecording = React.useCallback(() => {
     if (mediaRecorder && isRecording) {
-      console.log(`=== STOPPING RECORDING: ${fieldPath} ===`);
       mediaRecorder.stop();
       setIsRecording(false);
       // Note: onRecordingStop will be called in the onstop handler after audio processing
@@ -113,10 +110,10 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
       }`} // ADD: Visual feedback when recording
       disabled={isDisabled || isProcessing}
       title={
-        isProcessing 
+        isProcessing
           ? 'Processing audio...'
-          : isRecording 
-          ? 'Stop recording' 
+          : isRecording
+          ? 'Stop recording'
           : 'Record audio for this section'
       }
     >
@@ -128,12 +125,11 @@ export const FieldAudioRecorder: React.FC<FieldAudioRecorderProps> = ({
         <Mic className="h-4 w-4" />
       )}
       <span className="sr-only">
-        {isProcessing 
+        {isProcessing
           ? 'Processing audio'
-          : isRecording 
-          ? 'Stop recording' 
-          : 'Record audio'
-        }
+          : isRecording
+          ? 'Stop recording'
+          : 'Record audio'}
       </span>
     </Button>
   );

@@ -14,11 +14,14 @@ export interface FormRendererProps {
   onAudioRecorded?: (base64Audio: string, context: any) => void;
   onTranscriptionProcess?: (transcription: string, context: any) => void;
 
-  recordingStates?: {[path: string]: boolean};
+  recordingStates?: { [path: string]: boolean };
   onRecordingStart?: (path?: string) => void;
   onRecordingStop?: (path?: string) => void;
   onPlanTranscriptionClear?: (planPath: string) => void;
   onSectionTranscriptionClear?: (sectionPath: string) => void;
+
+  autoSubmitOnLLMUpdate?: boolean;
+  autoSubmitDelay?: number;
 }
 
 // Action types for the reducer
@@ -26,9 +29,17 @@ export type FormAction =
   | { type: 'UPDATE_FIELD'; path: string; value: any }
   | { type: 'ADD_ARRAY_ITEM'; path: string; template: any }
   | { type: 'REMOVE_ARRAY_ITEM'; path: string; index: number }
+  | { type: 'UPDATE_ARRAY_ITEM'; itemPath: string; value: any }
+  | {
+      type: 'MOVE_ARRAY_ITEM';
+      arrayPath: string;
+      fromIndex: number;
+      toIndex: number;
+    }
   | { type: 'RESET_FORM'; data: any }
   | { type: 'MERGE_LLM_DATA'; data: any; source: 'llm' }
-  | { type: 'RESET_FIELD'; path: string };
+  | { type: 'RESET_FIELD'; path: string }
+  | { type: 'REPLACE_STATE'; data: any };
 
 // Type for the form renderer ref
 export interface FormRendererRef {

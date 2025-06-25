@@ -69,6 +69,33 @@ const FormPage = () => {
     appointmentId: appointmentId || '',
   });
 
+  // FIX: Add loading state to prevent FormRenderer from initializing too early
+  const [isFormDataReady, setIsFormDataReady] = React.useState(false);
+
+  // Track when formData is actually ready (either with API data, null, or confirmed empty)
+  React.useEffect(() => {
+    // Check if useFormManagement has completed its initial load
+    const checkFormDataReady = () => {
+      // If formData is not undefined (it's either data, null, or empty object)
+      if (formData !== undefined) {
+        console.log('FormData is ready:', formData);
+        setIsFormDataReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (!checkFormDataReady()) {
+      // Wait a bit for API call to complete
+      const timer = setTimeout(() => {
+        console.log('FormData timeout - proceeding with current state');
+        setIsFormDataReady(true);
+      }, 3000); // Wait 3 seconds for API data
+
+      return () => clearTimeout(timer);
+    }
+  }, [formData]);
+
   // PHASE 2: Voice Recorder Management - FIXED: Added formRendererRef
   const {
     // WebSocket states
@@ -132,11 +159,31 @@ const FormPage = () => {
     }
   }, [formKey, toast]);
 
+  // Add logs for debugging re-initialization
+  console.log('FormPage formKey:', formKey);
+  console.log('FormPage schema:', schema);
+  console.log('FormPage formData:', formData);
+  console.log('FormPage isFormDataReady:', isFormDataReady);
+
   // Show loading state while checking permissions
   if (microphonePermission === 'checking') {
     return (
       <ThemeProvider>
         <PermissionLoadingState />
+      </ThemeProvider>
+    );
+  }
+
+  // FIX: Show loading state while waiting for form data
+  if (!isFormDataReady) {
+    return (
+      <ThemeProvider>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
+            <p className="text-muted-foreground">Loading form data...</p>
+          </div>
+        </div>
       </ThemeProvider>
     );
   }

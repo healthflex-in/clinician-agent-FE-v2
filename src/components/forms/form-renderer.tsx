@@ -64,6 +64,11 @@ export const FormRenderer = React.forwardRef<
     },
     ref
   ) => {
+    // Log formData, formKey, and schema on every render for debugging
+    console.log('FormRenderer formData:', formData);
+    console.log('FormRenderer formKey:', formKey);
+    console.log('FormRenderer schema:', schema);
+
     // New state for selected sections - starts with empty set (none selected)
     const [selectedSections, setSelectedSections] = React.useState<Set<string>>(
       new Set()
@@ -73,6 +78,11 @@ export const FormRenderer = React.forwardRef<
     const [pendingAutoSubmit, setPendingAutoSubmit] = React.useState(false);
     const autoSubmitTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const lastLLMUpdateRef = React.useRef<number>(0);
+    const isLLMUpdateInProgress = React.useRef(false);
+
+    // FORM INITIALIZATION STATE - FIX FOR PRE-FILLED DATA
+    const [isInitialized, setIsInitialized] = React.useState(false);
+    const initializationRef = React.useRef(false);
 
     // Use custom hook for form state management
     const formState = useFormRenderer(
@@ -193,29 +203,104 @@ export const FormRenderer = React.forwardRef<
         setLlmUpdatedFields,
       });
 
-    // AUTO-SUBMIT TRIGGER FUNCTION
+    // FIX: Initialize form state when formData is received from API
+    React.useEffect(() => {
+      // Case 1: formData is null → use schema defaults
+      if (formData === null && !initializationRef.current) {
+        console.log('FormData is null, using schema defaults');
+        dispatch({
+          type: 'REPLACE_STATE',
+          data: schema,
+        });
+        setIsInitialized(true);
+        initializationRef.current = true;
+        return;
+      }
+
+      // Case 2: formData exists (could be API data or empty object)
+      if (formData !== null && formData !== undefined) {
+        const hasApiContent =
+          formData.advice ||
+          (formData.plans &&
+            formData.plans.some &&
+            formData.plans.some(
+              (plan: any) =>
+                plan.exercise ||
+                plan.comments ||
+                (plan.set && (plan.set.repetitions || plan.set.load))
+            ));
+
+        if (hasApiContent) {
+          // Case 2a: Real API data - use it regardless of initialization state
+          console.log('Found API data, updating form:', formData);
+          dispatch({
+            type: 'REPLACE_STATE',
+            data: formData,
+          });
+          if (!initializationRef.current) {
+            setIsInitialized(true);
+            initializationRef.current = true;
+          }
+        } else if (!initializationRef.current) {
+          // Case 2b: Empty object and not initialized yet - use schema
+          console.log('FormData is empty, using schema defaults');
+          dispatch({
+            type: 'REPLACE_STATE',
+            data: schema,
+          });
+          setIsInitialized(true);
+          initializationRef.current = true;
+        }
+        // Case 2c: Empty object but already initialized - do nothing
+      }
+    }, [formData, dispatch, schema]);
+
+    // AUTO-SUBMIT TRIGGER FUNCTION - FIX: Mark LLM update and let useEffect handle submission
     const triggerAutoSubmit = React.useCallback(() => {
       if (!autoSubmitOnLLMUpdate) return;
 
-      console.log('=== SCHEDULING AUTO-SUBMIT ===');
+      console.log('=== MARKING LLM UPDATE FOR AUTO-SUBMIT ===');
 
-      // Mark that an LLM update occurred
+      // Mark that an LLM update occurred and we should auto-submit
       lastLLMUpdateRef.current = Date.now();
+      isLLMUpdateInProgress.current = true;
       setPendingAutoSubmit(true);
 
       // Clear any existing timeout
       if (autoSubmitTimeoutRef.current) {
         clearTimeout(autoSubmitTimeoutRef.current);
       }
+    }, [autoSubmitOnLLMUpdate]);
 
-      // Schedule auto-submit with delay
-      autoSubmitTimeoutRef.current = setTimeout(() => {
-        console.log('=== EXECUTING AUTO-SUBMIT ===');
-        handleSubmitForm(true); // true = isAutoSubmit
-        setPendingAutoSubmit(false);
-        autoSubmitTimeoutRef.current = null;
-      }, autoSubmitDelay);
-    }, [autoSubmitOnLLMUpdate, autoSubmitDelay, handleSubmitForm]);
+    // FIX: Watch for state changes after LLM update and auto-submit when ready
+    React.useEffect(() => {
+      if (isLLMUpdateInProgress.current && pendingAutoSubmit && isInitialized) {
+        console.log(
+          '=== STATE UPDATED AFTER LLM UPDATE, SCHEDULING AUTO-SUBMIT ==='
+        );
+        console.log('Current state after LLM update:', state);
+
+        // Schedule auto-submit with delay
+        autoSubmitTimeoutRef.current = setTimeout(() => {
+          console.log('=== EXECUTING AUTO-SUBMIT WITH UPDATED STATE ===');
+          console.log('Auto-submitting with state:', state);
+
+          // Submit the form with the updated state
+          handleSubmitForm(true); // true = isAutoSubmit
+
+          // Reset auto-submit flags
+          setPendingAutoSubmit(false);
+          isLLMUpdateInProgress.current = false;
+          autoSubmitTimeoutRef.current = null;
+        }, autoSubmitDelay);
+      }
+    }, [
+      state,
+      pendingAutoSubmit,
+      isInitialized,
+      handleSubmitForm,
+      autoSubmitDelay,
+    ]);
 
     // CLEANUP TIMEOUT ON UNMOUNT
     React.useEffect(() => {
@@ -893,10 +978,22 @@ export const FormRenderer = React.forwardRef<
       ]
     );
 
-    // Notify parent component when form data changes
+    // FIX: Only notify parent component of form data changes after initialization
+    const lastNotifiedState = React.useRef<any>(null);
+
     React.useEffect(() => {
-      if (onChange) onChange(state);
-    }, [state, onChange]);
+      if (onChange && isInitialized) {
+        // Only call onChange if the state has actually changed
+        const stateString = JSON.stringify(state);
+        const lastStateString = JSON.stringify(lastNotifiedState.current);
+
+        if (stateString !== lastStateString) {
+          console.log('Calling onChange with state:', state);
+          lastNotifiedState.current = state;
+          onChange(state);
+        }
+      }
+    }, [state, onChange, isInitialized]);
 
     const handleTestAudioRecorded = React.useCallback(
       (base64Audio: string, testPath: string) => {

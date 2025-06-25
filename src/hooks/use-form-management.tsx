@@ -1,6 +1,7 @@
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { graphqlRequest } from '@/utils/graphql-client';
+import { createAgentReport } from '../utils/api';
 
 type UseFormManagementProps = {
   formKey: string;
@@ -29,6 +30,8 @@ export const useFormManagement = ({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [reportId, setReportId] = React.useState<string | null>(null);
   const [patientName, setPatientName] = React.useState<string>('Patient');
+  const [isInitialLoadComplete, setIsInitialLoadComplete] =
+    React.useState(false);
   const { toast } = useToast();
 
   // Store formKey, patientId and appointmentId in localStorage for WebSocket access
@@ -73,77 +76,105 @@ export const useFormManagement = ({
     };
 
     const createInitialReport = async () => {
-      if (!patientId || !appointmentId) return;
-
+      if (!patientId || !appointmentId) {
+        console.log('No patientId or appointmentId, using schema defaults');
+        setFormData(null); // null means use schema defaults
+        setIsInitialLoadComplete(true);
+        return;
+      }
       try {
-        const existingReport = localStorage.getItem('agentReport');
-        if (existingReport) {
-          try {
-            const parsedReport = JSON.parse(existingReport);
-            if (parsedReport._id) {
-              setReportId(parsedReport._id);
-              if (parsedReport[formKey]) {
-                setFormData(parsedReport[formKey]);
-              }
-              return;
-            }
-          } catch (e) {
-            console.error('Error parsing existing report:', e);
-          }
-        }
-
-        const mutation = `
-          mutation CreateAgentReport($input: CreateAgentReportInput!) {
-            createAgentReport(input: $input) {
-              _id
-              createdAt
-              updatedAt
-              version
-              isActive
-            }
-          }
-        `;
-
         const centerId =
           localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
-
         const variables = {
-          input: {
-            patient: patientId,
-            center: centerId,
-            appointment: appointmentId,
-          },
+          patient: patientId,
+          center: centerId,
+          appointment: appointmentId,
         };
-
-        const result = await graphqlRequest(mutation, variables);
-
+        const result = await createAgentReport(variables);
         if (
           result &&
           result.createAgentReport &&
           result.createAgentReport._id
         ) {
           setReportId(result.createAgentReport._id);
-          localStorage.setItem(
-            'agentReport',
-            JSON.stringify(result.createAgentReport)
-          );
-
           toast({
             title: 'Report Created',
             description: 'New report initialized successfully',
           });
-
-          if (result.createAgentReport[formKey]) {
+          if (
+            formKey === 'snc' &&
+            result.createAgentReport.assessment &&
+            result.createAgentReport.assessment.plan
+          ) {
+            // Log the raw API plan
+            console.log(
+              'API assessment.plan:',
+              result.createAgentReport.assessment.plan
+            );
+            // Transform 'set' to 'sets' for each plan
+            const plan = result.createAgentReport.assessment.plan;
+            const transformedPlan = {
+              ...plan,
+              plans: Array.isArray(plan.plans)
+                ? plan.plans.map((p) => {
+                    let sets = [];
+                    if (Array.isArray(p.set)) {
+                      sets = p.set;
+                    } else if (p.set) {
+                      sets = [p.set];
+                    }
+                    // Remove 'set' and add 'sets'
+                    const { set, ...rest } = p;
+                    return { ...rest, sets };
+                  })
+                : [],
+            };
+            console.log('Transformed SNC plan for form:', transformedPlan);
+            setFormData(transformedPlan);
+            console.log('setFormData called with:', transformedPlan);
+          } else if (result.createAgentReport[formKey]) {
             setFormData(result.createAgentReport[formKey]);
+            console.log(
+              'setFormData called with:',
+              result.createAgentReport[formKey]
+            );
+          } else if (
+            result.createAgentReport.assessment &&
+            formKey === 'assessment'
+          ) {
+            setFormData(result.createAgentReport.assessment);
+            console.log(
+              'setFormData called with:',
+              result.createAgentReport.assessment
+            );
+          } else {
+            // No data returned for this form key, set to null so FormRenderer uses schema
+            console.log('No API data for formKey, using schema defaults');
+            setFormData(null);
+            console.log(
+              'setFormData called with null - will use schema defaults'
+            );
           }
+        } else {
+          // No report created, set to null so FormRenderer uses schema
+          console.log('No report created, using schema defaults');
+          setFormData(null);
+          console.log(
+            'setFormData called with null - will use schema defaults'
+          );
         }
       } catch (error) {
         console.error('Error creating initial report:', error);
+        // On error, set to null so form can still load with schema defaults
+        console.log('Error in API call, using schema defaults');
+        setFormData(null);
         toast({
           title: 'Failed to Create Report',
           description: 'Could not initialize the form data',
           variant: 'destructive',
         });
+      } finally {
+        setIsInitialLoadComplete(true);
       }
     };
 
@@ -151,9 +182,13 @@ export const useFormManagement = ({
     createInitialReport();
   }, [patientId, appointmentId, toast, formKey]);
 
-  // Handle form data changes
+  // Log formKey on every render
+  console.log('useFormManagement formKey:', formKey);
+
+  // Handle form data changes - FIX: Simplified to work for both cases
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
+    console.log('handleFormChange setFormData called with:', newFormData);
 
     try {
       const savedReport = localStorage.getItem('agentReport');
@@ -167,7 +202,7 @@ export const useFormManagement = ({
     }
   };
 
-  // Submit form data
+  // Submit form data - FIX: Use current formData state
   const handleFormSubmit = async () => {
     if (!reportId || !appointmentId) {
       toast({
@@ -178,6 +213,19 @@ export const useFormManagement = ({
       return;
     }
 
+    // FIX: Use the current formData state, not a potentially stale closure
+    const currentFormData = formData;
+
+    if (!currentFormData) {
+      toast({
+        title: 'No Form Data',
+        description: 'No form data to submit',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    console.log('Submitting form data:', currentFormData);
     setIsSubmitting(true);
 
     try {
@@ -194,7 +242,7 @@ export const useFormManagement = ({
         }
       `;
 
-      const formDataCopy = JSON.parse(JSON.stringify(formData));
+      const formDataCopy = JSON.parse(JSON.stringify(currentFormData));
 
       const processData = (obj: any): any => {
         if (!obj || typeof obj !== 'object') return obj;
@@ -226,6 +274,7 @@ export const useFormManagement = ({
         input,
       };
 
+      console.log('Submitting to API:', variables);
       await graphqlRequest(mutation, variables);
 
       toast({
@@ -252,6 +301,7 @@ export const useFormManagement = ({
       )
     ) {
       setFormData(null);
+      console.log('handleFormReset setFormData called with: null');
 
       try {
         const savedReport = localStorage.getItem('agentReport');

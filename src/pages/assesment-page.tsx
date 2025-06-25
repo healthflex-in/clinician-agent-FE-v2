@@ -13,6 +13,7 @@ import SuggestionBox from '@/components/ui/suggestion-box';
 import AudioRecorder from '@/components/audio/audio-recorder';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { createAgentReport } from '../utils/api';
 
 interface SetType {
   repetitions: string;
@@ -141,113 +142,20 @@ const AssessmentPage = () => {
 
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
-
       try {
-        // Check if report already exists in localStorage
-        const existingReport = localStorage.getItem('agentReport');
-        if (existingReport) {
-          try {
-            const parsedReport = JSON.parse(existingReport) as AgentReportType;
-            if (parsedReport._id) {
-              setReportId(parsedReport._id);
-
-              // Also set assessment data if it exists
-              if (parsedReport.assessment) {
-                setAssessment(parsedReport.assessment);
-              }
-
-              return; // Report already exists
-            }
-          } catch (e) {
-            console.error('Error parsing existing report:', e);
-          }
-        }
-
-        // Creating a new report if none exists
-        const mutation = `
-          mutation CreateAgentReport($input: CreateAgentReportInput!) {
-            createAgentReport(input: $input) {
-              _id
-              createdAt
-              updatedAt
-              version
-              isActive
-              assessment {
-                plan {
-                  advice
-                  record
-                  plans {
-                    exercise
-                    comments
-                    set {
-                      repetitions
-                      load
-                      unit
-                    }
-                    duration {
-                      value
-                      unit
-                    }
-                  }
-                }
-                subjectiveAssessment {
-                  assessment
-                  record
-                }
-                objectiveAssessment {
-                  record
-                  tests {
-                    testName
-                    unitName
-                    value
-                    left
-                    right
-                    comments
-                  }
-                }
-                rpe {
-                  value
-                  record
-                }
-              }
-            }
-          }
-        `;
-
-        // Get center ID from localStorage or use default
-        const centerId =
-          localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
-
+        const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
         const variables = {
-          input: {
-            patient: patientId,
-            center: centerId,
-            appointment: appointmentId,
-          },
+          patient: patientId,
+          center: centerId,
+          appointment: appointmentId,
         };
-
-        const result = await graphqlRequest(mutation, variables);
-
-        if (
-          result &&
-          result.createAgentReport &&
-          result.createAgentReport._id
-        ) {
-          // Save the report ID
+        const result = await createAgentReport(variables);
+        if (result && result.createAgentReport && result.createAgentReport._id) {
           setReportId(result.createAgentReport._id);
-
-          // Save the full report in localStorage
-          localStorage.setItem(
-            'agentReport',
-            JSON.stringify(result.createAgentReport)
-          );
-
           toast({
             title: 'Report Created',
             description: 'New report initialized successfully',
           });
-
-          // Set initial form data if it exists
           if (result.createAgentReport.assessment) {
             setAssessment(result.createAgentReport.assessment);
           }
@@ -937,7 +845,6 @@ const AssessmentPage = () => {
                 <SuggestionBox
                   suggestions={suggestions}
                   onClose={() => setSuggestions(null)}
-                  className="bg-white/10 border border-white/20"
                 />
               )}
 
@@ -946,7 +853,6 @@ const AssessmentPage = () => {
                   onAudioEncoded={handleAudioEncoded}
                   isProcessing={isProcessing}
                   label="Record for all sections"
-                  className="bg-white/10 border border-white/20 text-white hover:bg-white/20"
                 />
               </div>
 
@@ -954,7 +860,6 @@ const AssessmentPage = () => {
                 value={transcriptText}
                 onChange={setTranscription}
                 isProcessing={isProcessing}
-                className="bg-white/5 border border-white/20 text-white"
                 autoProcess={handleProcessTranscription}
                 autoProcessDelay={5000}
               />
@@ -1000,10 +905,6 @@ const AssessmentPage = () => {
                   onReset={handleFormReset}
                   onSectionSubmit={handleSectionSubmit}
                   onSectionReset={handleSectionReset}
-                  className="bg-white/5 border border-white/20 p-4 rounded-lg"
-                  labelClassName="text-white"
-                  inputClassName="bg-white/10 border border-white/20 text-white"
-                  buttonClassName="bg-accent hover:bg-accent-dark text-white px-4 py-2 rounded-lg"
                 />
               </div>
             </CardContent>

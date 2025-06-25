@@ -38,7 +38,8 @@ export type FormAction =
     }
   | { type: 'RESET_FORM'; data: any }
   | { type: 'MERGE_LLM_DATA'; data: any; source: 'llm' }
-  | { type: 'RESET_FIELD'; path: string };
+  | { type: 'RESET_FIELD'; path: string }
+  | { type: 'REPLACE_STATE'; data: any };
 
 // Type for the form renderer ref
 export interface FormRendererRef {

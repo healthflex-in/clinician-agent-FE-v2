@@ -91,6 +91,10 @@ export const formReducer = (
       return newState;
     }
 
+    case 'REPLACE_STATE':
+      console.log('REPLACE_STATE action with data:', action.data);
+      return action.data;
+
     case 'RESET_FORM':
       return action.data;
 

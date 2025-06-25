@@ -16,7 +16,8 @@ export async function graphqlRequest<T = any>(
   // Warning: This is a temporary solution for development only
   // Do not use this in production - use a proper backend/proxy service
   const corsProxy = 'https://corsproxy.io/?';
-  const apiEndpoint = 'https://devapi.stance.health/graphql';
+  // const apiEndpoint = 'https://devapi.stance.health/graphql';
+  const apiEndpoint = 'http://localhost:3000/graphql';
   const proxyUrl = `${corsProxy}${encodeURIComponent(apiEndpoint)}`;
 
   try {
@@ -140,4 +141,57 @@ export async function fetchAppointments(filter: any) {
   `;
 
   return graphqlRequest(query, { filter });
+}
+
+export async function createAgentReport(input: any) {
+  const mutation = `
+    mutation CreateAgentReport($input: CreateAgentReportInput!) {
+      createAgentReport(input: $input) {
+        _id
+        createdAt
+        updatedAt
+        version
+        isActive
+        assessment {
+          plan {
+            advice
+            record
+            plans {
+              exercise
+              comments
+              set {
+                repetitions
+                load
+                unit
+              }
+              duration {
+                value
+                unit
+              }
+            }
+          }
+          subjectiveAssessment {
+            assessment
+            record
+          }
+          objectiveAssessment {
+            record
+            tests {
+              testName
+              unitName
+              value
+              left
+              right
+              comments
+            }
+          }
+          rpe {
+            value
+            record
+          }
+        }
+      }
+    }
+  `;
+  return graphqlRequest(mutation, { input });
 }

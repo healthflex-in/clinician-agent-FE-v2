@@ -59,7 +59,6 @@ export async function updateAgentReport(input: {
   formKey?: string;
   input: any;
 }) {
-  console.log('Input data:', JSON.stringify(input, null, 2));
   const query = `
     mutation updateAgentReport( $appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
       updateAgentReport(appointmentId: $appointmentId, input: $input) {

@@ -143,14 +143,19 @@ const AssessmentPage = () => {
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
       try {
-        const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
+        const centerId =
+          localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
         const variables = {
           patient: patientId,
           center: centerId,
           appointment: appointmentId,
         };
         const result = await createAgentReport(variables);
-        if (result && result.createAgentReport && result.createAgentReport._id) {
+        if (
+          result &&
+          result.createAgentReport &&
+          result.createAgentReport._id
+        ) {
           setReportId(result.createAgentReport._id);
           toast({
             title: 'Report Created',
@@ -228,7 +233,6 @@ const AssessmentPage = () => {
     // Automatically try to reconnect every 5 seconds if connection fails
     const reconnectInterval = setInterval(() => {
       if (!isConnected && !isConnecting) {
-        console.log('Attempting to reconnect WebSocket...');
         connect();
       }
     }, 5000);
@@ -254,8 +258,8 @@ const AssessmentPage = () => {
           selectedSections.length > 0
             ? selectedSections
             : currentSectionId
-              ? [currentSectionId]
-              : [];
+            ? [currentSectionId]
+            : [];
 
         // Update assessment based on sectionsToUpdate
         let updatedAssessment = { ...assessment };

@@ -64,11 +64,6 @@ export const FormRenderer = React.forwardRef<
     },
     ref
   ) => {
-    // Log formData, formKey, and schema on every render for debugging
-    console.log('FormRenderer formData:', formData);
-    console.log('FormRenderer formKey:', formKey);
-    console.log('FormRenderer schema:', schema);
-
     // New state for selected sections - starts with empty set (none selected)
     const [selectedSections, setSelectedSections] = React.useState<Set<string>>(
       new Set()
@@ -205,93 +200,73 @@ export const FormRenderer = React.forwardRef<
 
     // FIX: Initialize form state when formData is received from API
     React.useEffect(() => {
-      // Case 1: formData is null → use schema defaults
-      if (formData === null && !initializationRef.current) {
-        console.log('FormData is null, using schema defaults');
-        dispatch({
-          type: 'REPLACE_STATE',
-          data: schema,
-        });
-        setIsInitialized(true);
-        initializationRef.current = true;
+      if (!formData || initializationRef.current) return;
+
+      const isSame = JSON.stringify(state) === JSON.stringify(formData); // shallow equality is not enough
+
+      if (isSame) {
         return;
       }
 
-      // Case 2: formData exists (could be API data or empty object)
-      if (formData !== null && formData !== undefined) {
-        const hasApiContent =
-          formData.advice ||
-          (formData.plans &&
-            formData.plans.some &&
-            formData.plans.some(
-              (plan: any) =>
-                plan.exercise ||
-                plan.comments ||
-                (plan.set && (plan.set.repetitions || plan.set.load))
-            ));
+      const hasApiContent =
+        formData.advice ||
+        (formData.plans &&
+          formData.plans.some(
+            (plan: any) =>
+              plan.exercise ||
+              plan.comments ||
+              (plan.set && (plan.set.repetitions || plan.set.load))
+          ));
 
-        if (hasApiContent) {
-          // Case 2a: Real API data - use it regardless of initialization state
-          console.log('Found API data, updating form:', formData);
-          dispatch({
-            type: 'REPLACE_STATE',
-            data: formData,
-          });
-          if (!initializationRef.current) {
-            setIsInitialized(true);
-            initializationRef.current = true;
-          }
-        } else if (!initializationRef.current) {
-          // Case 2b: Empty object and not initialized yet - use schema
-          console.log('FormData is empty, using schema defaults');
-          dispatch({
-            type: 'REPLACE_STATE',
-            data: schema,
-          });
-          setIsInitialized(true);
-          initializationRef.current = true;
-        }
-        // Case 2c: Empty object but already initialized - do nothing
+      if (hasApiContent) {
+        dispatch({ type: 'REPLACE_STATE', data: formData });
+      } else {
+        dispatch({ type: 'REPLACE_STATE', data: schema });
       }
-    }, [formData, dispatch, schema]);
 
-    // AUTO-SUBMIT TRIGGER FUNCTION - FIX: Mark LLM update and let useEffect handle submission
+      initializationRef.current = true;
+      setIsInitialized(true);
+    }, [formData, dispatch, schema, state]);
+
+    // AUTO-SUBMIT TRIGGER FUNCTION - FIX: Ensure auto-submit actually executes
     const triggerAutoSubmit = React.useCallback(() => {
       if (!autoSubmitOnLLMUpdate) return;
 
-      console.log('=== MARKING LLM UPDATE FOR AUTO-SUBMIT ===');
-
-      // Mark that an LLM update occurred and we should auto-submit
       lastLLMUpdateRef.current = Date.now();
       isLLMUpdateInProgress.current = true;
       setPendingAutoSubmit(true);
 
-      // Clear any existing timeout
       if (autoSubmitTimeoutRef.current) {
         clearTimeout(autoSubmitTimeoutRef.current);
       }
+
+      // Don't use state directly here - it's stale!
+      // Instead, let the useEffect handle the submission with fresh state
     }, [autoSubmitOnLLMUpdate]);
 
-    // FIX: Watch for state changes after LLM update and auto-submit when ready
     React.useEffect(() => {
       if (isLLMUpdateInProgress.current && pendingAutoSubmit && isInitialized) {
-        console.log(
-          '=== STATE UPDATED AFTER LLM UPDATE, SCHEDULING AUTO-SUBMIT ==='
-        );
-        console.log('Current state after LLM update:', state);
+        // Clear any existing timeout
+        if (autoSubmitTimeoutRef.current) {
+          clearTimeout(autoSubmitTimeoutRef.current);
+        }
 
-        // Schedule auto-submit with delay
+        // Schedule auto-submit with fresh state
         autoSubmitTimeoutRef.current = setTimeout(() => {
-          console.log('=== EXECUTING AUTO-SUBMIT WITH UPDATED STATE ===');
-          console.log('Auto-submitting with state:', state);
+          // First, ensure the parent has the latest state
+          if (onChange) {
+            onChange(state);
+          }
 
-          // Submit the form with the updated state
-          handleSubmitForm(true); // true = isAutoSubmit
+          // Then submit the form with a small delay to ensure state propagation
+          setTimeout(() => {
+            handleSubmitForm(true); // true = isAutoSubmit
 
-          // Reset auto-submit flags
-          setPendingAutoSubmit(false);
-          isLLMUpdateInProgress.current = false;
-          autoSubmitTimeoutRef.current = null;
+            // Reset auto-submit flags
+            setPendingAutoSubmit(false);
+            isLLMUpdateInProgress.current = false;
+            autoSubmitTimeoutRef.current = null;
+          }, 200); // Small delay for state propagation
         }, autoSubmitDelay);
       }
     }, [
@@ -300,6 +275,7 @@ export const FormRenderer = React.forwardRef<
       isInitialized,
       handleSubmitForm,
       autoSubmitDelay,
+      onChange,
     ]);
 
     // CLEANUP TIMEOUT ON UNMOUNT
@@ -323,7 +299,6 @@ export const FormRenderer = React.forwardRef<
           pendingAutoSubmit &&
           timeSinceLastLLMUpdate < autoSubmitDelay + 1000
         ) {
-          console.log('=== CANCELLING AUTO-SUBMIT DUE TO USER INTERACTION ===');
           setPendingAutoSubmit(false);
           if (autoSubmitTimeoutRef.current) {
             clearTimeout(autoSubmitTimeoutRef.current);
@@ -353,22 +328,12 @@ export const FormRenderer = React.forwardRef<
     // Handle test transcription changes (for Physio forms)
     const handleTestTranscriptionChange = React.useCallback(
       (testPath: string, text: string) => {
-        console.log(
-          `Manual test transcription change for ${testPath}: "${text}"`
-        );
-
         if (recordingMode === 'global') {
-          console.log(
-            `Ignoring test transcription change - global mode active`
-          );
           return;
         }
 
         // Allow override - remove from processed state if it exists
         if (processedPlans.has(testPath)) {
-          console.log(
-            `Test ${testPath} was already processed, but allowing override`
-          );
           setProcessedPlans((prev) => {
             const newSet = new Set(prev);
             newSet.delete(testPath);
@@ -405,8 +370,6 @@ export const FormRenderer = React.forwardRef<
         )
           return;
 
-        console.log(`Manual processing request for test ${testPath}`);
-
         // Remove from queue if it exists
         processingQueueRef.current = processingQueueRef.current.filter(
           (item) => item.path !== testPath
@@ -434,9 +397,6 @@ export const FormRenderer = React.forwardRef<
         // ALLOW REPROCESSING: Don't check if already processed
         // If it was already processed, remove it from processed state
         if (processedPlans.has(testPath)) {
-          console.log(
-            `Test ${testPath} was already processed, allowing reprocessing`
-          );
           setProcessedPlans((prev) => {
             const newSet = new Set(prev);
             newSet.delete(testPath);
@@ -453,8 +413,6 @@ export const FormRenderer = React.forwardRef<
           testPath, // Use testPath for tests
           selectedSections: Array.from(selectedSections),
         };
-
-        console.log(`Processing transcription for test: ${testPath}`);
 
         onTranscriptionProcess(transcription, context);
       },
@@ -481,15 +439,8 @@ export const FormRenderer = React.forwardRef<
     // Plan transcription update function
     const updatePlanTranscription = React.useCallback(
       (planPath: string, text: string) => {
-        console.log(
-          `Updating plan transcription for ${planPath} with text: ${text}`
-        );
-
         // Allow override - remove from processed state if it exists
         if (processedPlans.has(planPath)) {
-          console.log(
-            `Plan ${planPath} was already processed, but allowing override`
-          );
           setProcessedPlans((prev) => {
             const newSet = new Set(prev);
             newSet.delete(planPath);
@@ -553,15 +504,8 @@ export const FormRenderer = React.forwardRef<
     // Update section transcription function
     const updateSectionTranscription = React.useCallback(
       (sectionPath: string, text: string) => {
-        console.log(
-          `Updating section transcription for ${sectionPath} with text: ${text}`
-        );
-
         // Allow override - remove from processed state if it exists
         if (processedSections.has(sectionPath)) {
-          console.log(
-            `Section ${sectionPath} was already processed, but allowing override`
-          );
           setProcessedSections((prev) => {
             const newSet = new Set(prev);
             newSet.delete(sectionPath);
@@ -634,12 +578,8 @@ export const FormRenderer = React.forwardRef<
     // Update form with LLM data - ENHANCED WITH AUTO-SUBMIT
     const updateFormWithLLMData = React.useCallback(
       (llmData: any) => {
-        console.log('=== RECEIVED LLM DATA ===', llmData);
-
         // Handle structured payload (global processing)
         if (llmData.payloadType === 'structured' && llmData.formData) {
-          console.log('Received structured form data - complete form filling');
-
           // Clear all timeouts and processing state
           pathTimeoutsRef.current.forEach((timeout) => {
             clearTimeout(timeout);
@@ -703,22 +643,11 @@ export const FormRenderer = React.forwardRef<
             llmData.recordingType === 'global' ||
             (!processingPath && selectedSections.size === 0);
 
-          console.log('=== FORM DATA TO APPLY ===', llmData.formData);
-          console.log('=== IS GLOBAL UPDATE ===', isGlobalUpdate);
-
           if (isGlobalUpdate) {
             // GLOBAL UPDATE: Apply to entire form or selected sections
-            console.log('=== APPLYING GLOBAL UPDATE ===');
 
             if (selectedSections.size === 0) {
               // No sections selected - update entire form
-              console.log('=== ABOUT TO DISPATCH ===');
-              console.log('dispatch function:', typeof dispatch, dispatch);
-              console.log('Action object:', {
-                type: 'MERGE_LLM_DATA',
-                data: llmData.formData,
-                source: 'llm',
-              });
 
               dispatch({
                 type: 'MERGE_LLM_DATA',
@@ -729,10 +658,7 @@ export const FormRenderer = React.forwardRef<
               if (onLLMUpdate) onLLMUpdate(llmData.formData);
             } else {
               // Apply only to selected sections
-              console.log(
-                'Updating selected sections only:',
-                Array.from(selectedSections)
-              );
+
               const selectedSectionsData: any = {};
               Object.keys(llmData.formData).forEach((key) => {
                 if (selectedSections.has(key)) {
@@ -756,10 +682,6 @@ export const FormRenderer = React.forwardRef<
               }
             }
           } else {
-            // SECTION-SPECIFIC UPDATE: Apply only to the specific section/path
-            console.log('=== APPLYING SECTION-SPECIFIC UPDATE ===');
-            console.log('Target processing path:', processingPath);
-
             // Find the relevant data for this specific path
             const pathParts = processingPath.split('.');
             let relevantData: any = {};
@@ -770,21 +692,17 @@ export const FormRenderer = React.forwardRef<
               const sectionKey = pathParts[0];
               if (llmData.formData[sectionKey]) {
                 relevantData[sectionKey] = llmData.formData[sectionKey];
-                console.log('Found top-level section data for:', sectionKey);
               }
             } else if (pathParts.length >= 2) {
               // Nested path (e.g., "plans.0", "assessments.0.tests.1")
               const topLevelKey = pathParts[0];
               if (llmData.formData[topLevelKey]) {
                 relevantData[topLevelKey] = llmData.formData[topLevelKey];
-                console.log('Found nested section data for:', topLevelKey);
               }
             }
 
             // Strategy 2: If no specific match, be more selective
             if (Object.keys(relevantData).length === 0) {
-              console.log('No direct match found, trying to find related data');
-
               // Look for any keys that might be related to the processing path
               const possibleKeys = Object.keys(llmData.formData).filter(
                 (key) =>
@@ -792,7 +710,6 @@ export const FormRenderer = React.forwardRef<
               );
 
               if (possibleKeys.length > 0) {
-                console.log('Found possible related keys:', possibleKeys);
                 possibleKeys.forEach((key) => {
                   relevantData[key] = llmData.formData[key];
                 });
@@ -806,7 +723,6 @@ export const FormRenderer = React.forwardRef<
             }
 
             if (Object.keys(relevantData).length > 0) {
-              console.log('Applying section-specific data:', relevantData);
               dispatch({
                 type: 'MERGE_LLM_DATA',
                 data: relevantData,
@@ -823,19 +739,11 @@ export const FormRenderer = React.forwardRef<
 
             // Clear transcription for the specific path that was processed
             if (processingPath) {
-              console.log(
-                `=== CLEARING TRANSCRIPTION FOR PROCESSED PATH: ${processingPath} ===`
-              );
-
               const isSection =
                 Object.keys(sectionTranscriptions).includes(processingPath) ||
                 processingPath.split('.').length === 1;
 
               if (isSection) {
-                console.log(
-                  'Clearing section transcription for:',
-                  processingPath
-                );
                 setSectionTranscriptions((prev) => ({
                   ...prev,
                   [processingPath]: '',
@@ -857,10 +765,6 @@ export const FormRenderer = React.forwardRef<
                 }
               } else {
                 // It's a plan or test
-                console.log(
-                  'Clearing plan/test transcription for:',
-                  processingPath
-                );
                 setPlanTranscriptions((prev) => ({
                   ...prev,
                   [processingPath]: '',
@@ -922,8 +826,6 @@ export const FormRenderer = React.forwardRef<
     // 2. Add a cleanup function for resetting processed states
     const resetProcessedState = React.useCallback(
       (path: string) => {
-        console.log('=== RESETTING PROCESSED STATE FOR:', path, '===');
-
         // Remove from processed sections
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
@@ -978,27 +880,15 @@ export const FormRenderer = React.forwardRef<
       ]
     );
 
-    // FIX: Only notify parent component of form data changes after initialization
-    const lastNotifiedState = React.useRef<any>(null);
-
+    // FIX: Only notify parent component of form data changes after initialization - MINIMAL FIX
     React.useEffect(() => {
       if (onChange && isInitialized) {
-        // Only call onChange if the state has actually changed
-        const stateString = JSON.stringify(state);
-        const lastStateString = JSON.stringify(lastNotifiedState.current);
-
-        if (stateString !== lastStateString) {
-          console.log('Calling onChange with state:', state);
-          lastNotifiedState.current = state;
-          onChange(state);
-        }
+        onChange(state);
       }
     }, [state, onChange, isInitialized]);
 
     const handleTestAudioRecorded = React.useCallback(
       (base64Audio: string, testPath: string) => {
-        console.log(`Test audio recorded for ${testPath}`);
-
         // Clear any existing transcription when new audio is recorded
         clearPlanTranscription(testPath);
 
@@ -1195,25 +1085,29 @@ export const FormRenderer = React.forwardRef<
     };
 
     // Determine the appropriate input field type based on the data type
-    const renderInputForType = (
-      type: string,
-      value: any,
-      path: string,
-      isLLMUpdated: boolean,
-      placeholder?: string
-    ) => {
-      return (
-        <InputField
-          type={type}
-          value={value}
-          path={path}
-          isLLMUpdated={isLLMUpdated}
-          placeholder={placeholder}
-          onChange={handleUserChange} // Changed from handleChange for auto-submit cancellation
-          onRejectLLMChange={rejectLLMChange}
-        />
-      );
-    };
+    const renderInputForType = React.useCallback(
+      (
+        type: string,
+        value: any,
+        path: string,
+        isLLMUpdated: boolean,
+        placeholder?: string
+      ) => {
+        return (
+          <InputField
+            key={path} // Add key to prevent recreation
+            type={type}
+            value={value}
+            path={path}
+            isLLMUpdated={isLLMUpdated}
+            placeholder={placeholder}
+            onChange={handleUserChange} // Changed from handleChange for auto-submit cancellation
+            onRejectLLMChange={rejectLLMChange}
+          />
+        );
+      },
+      [handleUserChange, rejectLLMChange]
+    );
 
     // Render a field based on its type (string, number, object, array)
     const renderField = (
@@ -1441,6 +1335,7 @@ export const FormRenderer = React.forwardRef<
             className={`mb-3 ${
               isLLMUpdated ? 'transition-all duration-300' : ''
             }`}
+            key={`field-${path}`} // Stable key to prevent recreation
           >
             <Label htmlFor={path} className="block mb-1 text-sm">
               {labelText}

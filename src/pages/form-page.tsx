@@ -78,7 +78,6 @@ const FormPage = () => {
     const checkFormDataReady = () => {
       // If formData is not undefined (it's either data, null, or empty object)
       if (formData !== undefined) {
-        console.log('FormData is ready:', formData);
         setIsFormDataReady(true);
         return true;
       }
@@ -88,7 +87,6 @@ const FormPage = () => {
     if (!checkFormDataReady()) {
       // Wait a bit for API call to complete
       const timer = setTimeout(() => {
-        console.log('FormData timeout - proceeding with current state');
         setIsFormDataReady(true);
       }, 3000); // Wait 3 seconds for API data
 
@@ -158,12 +156,6 @@ const FormPage = () => {
       console.error(`Invalid form key: ${formKey}`);
     }
   }, [formKey, toast]);
-
-  // Add logs for debugging re-initialization
-  console.log('FormPage formKey:', formKey);
-  console.log('FormPage schema:', schema);
-  console.log('FormPage formData:', formData);
-  console.log('FormPage isFormDataReady:', isFormDataReady);
 
   // Show loading state while checking permissions
   if (microphonePermission === 'checking') {

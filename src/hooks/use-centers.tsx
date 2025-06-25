@@ -1,12 +1,12 @@
 import React from 'react';
 
 import { useToast } from '@/components/ui/use-toast';
-import { fetchCenters } from "@/utils/graphql-client";
+import { fetchCenters } from '@/utils/graphql-client';
 
 export type Center = {
   _id: string;
   name: string;
-}
+};
 
 export const useCenters = () => {
   const { toast } = useToast();
@@ -17,7 +17,6 @@ export const useCenters = () => {
     try {
       setLoadingCenters(true);
       const response = await fetchCenters();
-      console.log('Centers response:', response);
       if (response && response.centers) {
         setCenters(response.centers);
       }

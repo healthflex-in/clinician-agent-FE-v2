@@ -92,7 +92,6 @@ export const formReducer = (
     }
 
     case 'REPLACE_STATE':
-      console.log('REPLACE_STATE action with data:', action.data);
       return action.data;
 
     case 'RESET_FORM':
@@ -131,10 +130,7 @@ export const formReducer = (
         return target;
       };
 
-      console.log('=== PROCESSING MERGE_LLM_DATA ===');
-
       const newState = mergeDeep({ ...state }, action.data);
-      console.log('New state after merge:', newState);
 
       return newState;
     }
@@ -148,7 +144,6 @@ export const formReducer = (
     }
 
     default:
-      console.log('Unknown action type:', action.type);
       return state;
   }
 };

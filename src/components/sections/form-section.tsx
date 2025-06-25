@@ -67,17 +67,8 @@ export const FormSection: React.FC<FormSectionProps> = ({
   React.useEffect(() => {
     if (!transcription) return;
 
-    console.log('=== Transcription received ===');
-    console.log('Transcription:', transcription);
-    console.log('Currently processing path:', currentlyProcessingPath);
-
     // If we have a specific path being processed, ONLY route to that field
     if (currentlyProcessingPath && formRendererRef.current) {
-      console.log(
-        'ROUTING: Transcription to specific field:',
-        currentlyProcessingPath
-      );
-
       if (
         isPlanPath(currentlyProcessingPath, formKey) ||
         isTestPath(currentlyProcessingPath, formKey)
@@ -110,10 +101,6 @@ export const FormSection: React.FC<FormSectionProps> = ({
       activeSectionPath &&
       formRendererRef.current
     ) {
-      console.log(
-        'ROUTING: Transcription to active section:',
-        activeSectionPath
-      );
       formRendererRef.current.updateSectionTranscription(
         activeSectionPath,
         transcription

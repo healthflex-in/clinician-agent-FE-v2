@@ -77,7 +77,6 @@ export const useFormManagement = ({
 
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) {
-        console.log('No patientId or appointmentId, using schema defaults');
         setFormData(null); // null means use schema defaults
         setIsInitialLoadComplete(true);
         return;
@@ -106,11 +105,6 @@ export const useFormManagement = ({
             result.createAgentReport.assessment &&
             result.createAgentReport.assessment.plan
           ) {
-            // Log the raw API plan
-            console.log(
-              'API assessment.plan:',
-              result.createAgentReport.assessment.plan
-            );
             // Transform 'set' to 'sets' for each plan
             const plan = result.createAgentReport.assessment.plan;
             const transformedPlan = {
@@ -129,44 +123,25 @@ export const useFormManagement = ({
                   })
                 : [],
             };
-            console.log('Transformed SNC plan for form:', transformedPlan);
             setFormData(transformedPlan);
-            console.log('setFormData called with:', transformedPlan);
           } else if (result.createAgentReport[formKey]) {
             setFormData(result.createAgentReport[formKey]);
-            console.log(
-              'setFormData called with:',
-              result.createAgentReport[formKey]
-            );
           } else if (
             result.createAgentReport.assessment &&
             formKey === 'assessment'
           ) {
             setFormData(result.createAgentReport.assessment);
-            console.log(
-              'setFormData called with:',
-              result.createAgentReport.assessment
-            );
           } else {
             // No data returned for this form key, set to null so FormRenderer uses schema
-            console.log('No API data for formKey, using schema defaults');
             setFormData(null);
-            console.log(
-              'setFormData called with null - will use schema defaults'
-            );
           }
         } else {
           // No report created, set to null so FormRenderer uses schema
-          console.log('No report created, using schema defaults');
           setFormData(null);
-          console.log(
-            'setFormData called with null - will use schema defaults'
-          );
         }
       } catch (error) {
         console.error('Error creating initial report:', error);
         // On error, set to null so form can still load with schema defaults
-        console.log('Error in API call, using schema defaults');
         setFormData(null);
         toast({
           title: 'Failed to Create Report',
@@ -183,12 +158,10 @@ export const useFormManagement = ({
   }, [patientId, appointmentId, toast, formKey]);
 
   // Log formKey on every render
-  console.log('useFormManagement formKey:', formKey);
 
   // Handle form data changes - FIX: Simplified to work for both cases
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
-    console.log('handleFormChange setFormData called with:', newFormData);
 
     try {
       const savedReport = localStorage.getItem('agentReport');
@@ -225,7 +198,6 @@ export const useFormManagement = ({
       return;
     }
 
-    console.log('Submitting form data:', currentFormData);
     setIsSubmitting(true);
 
     try {
@@ -274,7 +246,6 @@ export const useFormManagement = ({
         input,
       };
 
-      console.log('Submitting to API:', variables);
       await graphqlRequest(mutation, variables);
 
       toast({
@@ -301,7 +272,6 @@ export const useFormManagement = ({
       )
     ) {
       setFormData(null);
-      console.log('handleFormReset setFormData called with: null');
 
       try {
         const savedReport = localStorage.getItem('agentReport');

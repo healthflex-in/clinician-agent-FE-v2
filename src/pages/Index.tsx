@@ -207,13 +207,6 @@ const Index = () => {
     return 4;
   };
 
-  // console.log('@@ appoitments:', appointments);
-  // console.log('@@ selected patient:', {
-  //   id: patientId,
-  //   name: patientName,
-  // });
-  console.log('@@ selected appointment:', appointmentId);
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/10 to-background px-4 py-6 safe-area-top safe-area-bottom">
       <Card className="w-full max-w-md shadow-lg">

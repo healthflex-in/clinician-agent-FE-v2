@@ -127,8 +127,6 @@ export const useFormHandlers = (
   // Handle section audio recording with proper state management
   const handleSectionAudioRecorded = React.useCallback(
     (base64Audio: string, sectionPath: string) => {
-      console.log(`=== SECTION AUDIO RECORDED: ${sectionPath} ===`);
-
       if (!onAudioRecorded) return;
 
       // NOTIFY PARENT THAT RECORDING STOPPED
@@ -163,7 +161,6 @@ export const useFormHandlers = (
         isOverride: Object.keys(state).length > 0, // Flag if form already has data
       };
 
-      console.log(`Sending section audio with context:`, context);
       onAudioRecorded(base64Audio, context);
     },
     [
@@ -181,8 +178,6 @@ export const useFormHandlers = (
   // FIXED: Handle plan audio recording with proper state management
   const handlePlanAudioRecorded = React.useCallback(
     (base64Audio: string, planPath: string) => {
-      console.log(`=== PLAN AUDIO RECORDED: ${planPath} ===`);
-
       if (!onAudioRecorded) return;
 
       // NOTIFY PARENT THAT RECORDING STOPPED
@@ -217,7 +212,6 @@ export const useFormHandlers = (
         isOverride: Object.keys(state).length > 0, // Flag if form already has data
       };
 
-      console.log(`Sending plan audio with context:`, context);
       onAudioRecorded(base64Audio, context);
     },
     [
@@ -237,17 +231,11 @@ export const useFormHandlers = (
     (sectionPath: string, text: string) => {
       // Don't allow transcription changes during global recording
       if (recordingMode === 'global') {
-        console.log(
-          `Ignoring section transcription change - global mode active`
-        );
         return;
       }
 
       // Allow override - remove from processed state if it exists
       if (processedSections.has(sectionPath)) {
-        console.log(
-          `Section ${sectionPath} was already processed, allowing override`
-        );
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
           newSet.delete(sectionPath);
@@ -278,15 +266,11 @@ export const useFormHandlers = (
     (planPath: string, text: string) => {
       // Don't allow transcription changes during global recording
       if (recordingMode === 'global') {
-        console.log(`Ignoring plan transcription change - global mode active`);
         return;
       }
 
       // Allow override - remove from processed state if it exists
       if (processedPlans.has(planPath)) {
-        console.log(
-          `Plan ${planPath} was already processed, allowing override`
-        );
         setProcessedPlans((prev) => {
           const newSet = new Set(prev);
           newSet.delete(planPath);
@@ -349,9 +333,6 @@ export const useFormHandlers = (
 
       // Allow reprocessing - remove from processed state if it exists
       if (processedSections.has(sectionPath)) {
-        console.log(
-          `Section ${sectionPath} was already processed, allowing reprocessing`
-        );
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
           newSet.delete(sectionPath);
@@ -371,7 +352,6 @@ export const useFormHandlers = (
         selectedSections: Array.from(selectedSections),
       };
 
-      console.log(`Processing section transcription with context:`, context);
       onTranscriptionProcess(transcription, context);
     },
     [
@@ -405,8 +385,6 @@ export const useFormHandlers = (
       )
         return;
 
-      console.log(`=== PROCESSING PLAN TRANSCRIPTION: ${planPath} ===`);
-
       // Remove from queue if it exists
       processingQueueRef.current = processingQueueRef.current.filter(
         (item) => item.path !== planPath
@@ -433,9 +411,6 @@ export const useFormHandlers = (
 
       // Allow reprocessing - remove from processed state if it exists
       if (processedPlans.has(planPath)) {
-        console.log(
-          `Plan ${planPath} was already processed, allowing reprocessing`
-        );
         setProcessedPlans((prev) => {
           const newSet = new Set(prev);
           newSet.delete(planPath);
@@ -455,7 +430,6 @@ export const useFormHandlers = (
         recordingType: 'section',
       };
 
-      console.log(`Processing plan transcription with context:`, context);
       onTranscriptionProcess(transcription, context);
     },
     [
@@ -486,8 +460,6 @@ export const useFormHandlers = (
           'Are you sure you want to reset this field to its default value?'
         )
       ) {
-        console.log(`=== RESETTING FIELD: ${path} ===`);
-
         dispatch({ type: 'RESET_FIELD', path });
 
         // Clear section transcriptions and states
@@ -579,7 +551,6 @@ export const useFormHandlers = (
 
         case 'snc': {
           const data = prepareSNCExercisePayload(formData);
-          console.log('Data----> ', JSON.stringify(data, null, 2));
           return data;
         }
         //       case 'doctor-consultation':
@@ -606,8 +577,6 @@ export const useFormHandlers = (
         'Are you sure you want to reset this form? All your data will be lost.'
       )
     ) {
-      console.log('=== RESETTING ENTIRE FORM ===');
-
       // Clear all timeouts
       pathTimeoutsRef.current.forEach((timeout) => {
         clearTimeout(timeout);
@@ -674,26 +643,8 @@ export const useFormHandlers = (
   const handleSubmitForm = React.useCallback(
     async (isAutoSubmit: boolean = false) => {
       if (isSubmitting) {
-        console.log('Form already submitting, skipping...');
         return;
       }
-
-      console.log(
-        isAutoSubmit
-          ? '=== AUTO-SUBMITTING FORM ==='
-          : '=== MANUAL FORM SUBMIT ==='
-      );
-
-      console.log('=== RAW FORM STATE ===');
-      console.log('1. Form Key:', formKey);
-      console.log('2. State Type:', typeof state);
-      console.log('3. State Keys:', Object.keys(state || {}));
-      console.log('4. Full State:', JSON.stringify(state, null, 2));
-      console.log('5. State Direct:', JSON.stringify(state, null, 2));
-
-      setIsSubmitting(true);
-
-      console.log('------------------------------------------');
 
       try {
         const updateInput = {
@@ -704,11 +655,6 @@ export const useFormHandlers = (
           ...(centerId && { centerId }),
         };
 
-        console.log(
-          'Calling updateAgentReport with input:',
-          JSON.stringify(updateInput, null, 2)
-        );
-
         const result = await updateAgentReport(updateInput);
 
         toast({
@@ -718,8 +664,6 @@ export const useFormHandlers = (
             : 'Form has been saved successfully',
           variant: 'default',
         });
-
-        console.log('Form submitted successfully:', result);
       } catch (error) {
         console.error('Form submission error:', error);
 
@@ -750,15 +694,12 @@ export const useFormHandlers = (
    * FIXED: prepareSNCExercisePayload function to handle "sets" array correctly
    */
   function prepareSNCExercisePayload(formData: any) {
-    console.log('Preparing SNC payload from:', formData);
-
     // Check if formData already has the correct snc structure
     if (
       formData.snc &&
       typeof formData.snc === 'object' &&
       !Array.isArray(formData.snc)
     ) {
-      console.log('Found existing SNC object structure');
       return { snc: formData.snc };
     }
 
@@ -779,8 +720,6 @@ export const useFormHandlers = (
 
     if (Array.isArray(plans) && plans.length > 0) {
       sncObject.plans = plans.map((plan) => {
-        console.log('Processing plan:', plan);
-
         // Extract set data - FIXED to handle "sets" array
         let setData = {
           repetitions: 0,
@@ -790,23 +729,19 @@ export const useFormHandlers = (
 
         // Strategy 1: Check for "sets" array (your form uses this)
         if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
-          console.log('Found sets array:', plan.sets);
           const firstSet = plan.sets[0]; // Take the first set
           setData.repetitions = parseInt(firstSet.repetitions) || 0;
           setData.load = firstSet.load || '';
           setData.unit = firstSet.unit || '';
-          console.log('Extracted from sets array:', setData);
         }
         // Strategy 2: Check for "set" object (API format)
         else if (plan.set && typeof plan.set === 'object') {
-          console.log('Found set object:', plan.set);
           setData.repetitions = parseInt(plan.set.repetitions) || 0;
           setData.load = plan.set.load || '';
           setData.unit = plan.set.unit || '';
         }
         // Strategy 3: Individual fields at plan level
         else {
-          console.log('Looking for individual set fields');
           setData.repetitions =
             parseInt(plan.repetitions) || parseInt(plan.reps) || 0;
           setData.load = plan.load || plan.weight || '';
@@ -842,10 +777,6 @@ export const useFormHandlers = (
       ];
     }
 
-    console.log(
-      'Final SNC payload:',
-      JSON.stringify({ snc: sncObject }, null, 2)
-    );
     return { snc: sncObject };
   }
 

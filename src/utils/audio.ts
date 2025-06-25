@@ -39,7 +39,6 @@ export const detectSilence = (
       if (silenceStart === null) {
         silenceStart = Date.now();
       } else if (Date.now() - silenceStart > detectionInterval) {
-        console.log('Silence detected');
         onSilenceDetected();
         silenceStart = null;
       }
@@ -60,28 +59,31 @@ export const detectSilence = (
 /**
  * Resample audio buffer to a specific rate
  */
-export const resampleAudio = async (audioBuffer: ArrayBuffer, targetSampleRate: number): Promise<ArrayBuffer> => {
+export const resampleAudio = async (
+  audioBuffer: ArrayBuffer,
+  targetSampleRate: number
+): Promise<ArrayBuffer> => {
   const audioContext = new AudioContext();
   const sourceBuffer = await audioContext.decodeAudioData(audioBuffer);
   const originalSampleRate = sourceBuffer.sampleRate;
-  
+
   // If the sample rate is already correct, no need to resample
   if (originalSampleRate === targetSampleRate) {
     return sourceBuffer.getChannelData(0).buffer;
   }
-  
+
   const duration = sourceBuffer.duration;
   const offlineContext = new OfflineAudioContext(
     1, // mono
     Math.ceil(duration * targetSampleRate),
     targetSampleRate
   );
-  
+
   const source = offlineContext.createBufferSource();
   source.buffer = sourceBuffer;
   source.connect(offlineContext.destination);
   source.start(0);
-  
+
   const renderedBuffer = await offlineContext.startRendering();
   return renderedBuffer.getChannelData(0).buffer;
 };
@@ -95,22 +97,22 @@ export const encodeWAV = (audioBuffer: AudioBuffer): Blob => {
   const bitsPerSample = 16;
   const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
   const blockAlign = numChannels * (bitsPerSample / 8);
-  
+
   // Get audio data
   const channelData = audioBuffer.getChannelData(0);
   const dataSize = channelData.length * 2; // 16-bit = 2 bytes per sample
-  
+
   // Create WAV header
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
-  
+
   // RIFF identifier
   writeString(view, 0, 'RIFF');
   // RIFF chunk length
   view.setUint32(4, 36 + dataSize, true);
   // RIFF type
   writeString(view, 8, 'WAVE');
-  
+
   // Format chunk identifier
   writeString(view, 12, 'fmt ');
   // Format chunk length
@@ -127,23 +129,23 @@ export const encodeWAV = (audioBuffer: AudioBuffer): Blob => {
   view.setUint16(32, blockAlign, true);
   // Bits per sample
   view.setUint16(34, bitsPerSample, true);
-  
+
   // Data chunk identifier
   writeString(view, 36, 'data');
   // Data chunk length
   view.setUint32(40, dataSize, true);
-  
+
   // Write the PCM samples - convert Float32 to Int16
   let offset = 44;
   for (let i = 0; i < channelData.length; i++) {
     // Clamp value between -1 and 1
     const sample = Math.max(-1, Math.min(1, channelData[i]));
     // Convert to 16-bit signed integer
-    const value = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+    const value = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
     view.setInt16(offset, value, true);
     offset += 2;
   }
-  
+
   return new Blob([buffer], { type: 'audio/wav' });
 };
 

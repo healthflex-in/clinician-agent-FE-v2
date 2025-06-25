@@ -46,8 +46,6 @@ export const useVoiceRecorder = ({
   // Simple function to handle incoming form data
   const handleIncomingFormData = React.useCallback(
     (data: any) => {
-      console.log('=== Received form data ===', data);
-
       if (!data) return;
 
       // CHECK: Skip if response is empty or "Empty Response"
@@ -57,10 +55,6 @@ export const useVoiceRecorder = ({
           !transcriptionText ||
           transcriptionText.toLowerCase() === 'empty response'
         ) {
-          console.log(
-            'Skipping empty or "Empty Response" transcription:',
-            data.transcription
-          );
           return;
         }
       }
@@ -72,10 +66,6 @@ export const useVoiceRecorder = ({
           formDataStr.includes('empty response') ||
           Object.keys(data.formData).length === 0
         ) {
-          console.log(
-            'Skipping form data with "Empty Response" or empty object:',
-            data.formData
-          );
           return;
         }
       }
@@ -83,8 +73,6 @@ export const useVoiceRecorder = ({
       try {
         // For structured payloads (complete form filling)
         if (data.payloadType === 'structured') {
-          console.log('Structured payload - clearing global transcription');
-
           formRendererRef.current.updateFormWithLLMData(data);
 
           setTranscriptText('');
@@ -150,7 +138,6 @@ export const useVoiceRecorder = ({
     connect();
     const reconnectInterval = setInterval(() => {
       if (!isConnected && !isConnecting) {
-        console.log('Attempting to reconnect...');
         connect();
       }
     }, 5000);
@@ -168,21 +155,11 @@ export const useVoiceRecorder = ({
       !transcriptionText ||
       transcriptionText.toLowerCase() === 'empty response'
     ) {
-      console.log(
-        'Skipping empty or "Empty Response" transcription:',
-        transcription
-      );
       return;
     }
 
-    console.log('=== Routing transcription ===');
-    console.log('Transcription:', transcription);
-    console.log('Recording mode:', recordingMode);
-    console.log('Currently processing path:', currentlyProcessingPath);
-
     // For global mode, always show in global text box
     if (recordingMode === 'global') {
-      console.log('Setting global transcription text');
       setTranscriptText(transcription);
       setHasProcessedCurrentTranscription(false); // Reset processing flag for new transcription
       return;
@@ -194,11 +171,6 @@ export const useVoiceRecorder = ({
       currentlyProcessingPath &&
       formRendererRef?.current
     ) {
-      console.log(
-        'Updating section transcription for path:',
-        currentlyProcessingPath
-      );
-
       try {
         if (
           isPlanPath(currentlyProcessingPath, formKey) ||
@@ -209,7 +181,6 @@ export const useVoiceRecorder = ({
               currentlyProcessingPath,
               transcription
             );
-            console.log('Successfully updated plan transcription');
             return;
           }
         } else {
@@ -218,7 +189,6 @@ export const useVoiceRecorder = ({
               currentlyProcessingPath,
               transcription
             );
-            console.log('Successfully updated section transcription');
             return;
           }
         }
@@ -228,7 +198,6 @@ export const useVoiceRecorder = ({
     }
 
     // Fallback: show in global text box
-    console.log('Fallback: showing transcription in global text box');
     setTranscriptText(transcription);
     setHasProcessedCurrentTranscription(false); // Reset processing flag for new transcription
   }, [transcription, recordingMode, currentlyProcessingPath, formKey]);
@@ -244,8 +213,6 @@ export const useVoiceRecorder = ({
       connect();
       return;
     }
-
-    console.log('=== Global audio recording completed ===');
 
     setRecordingMode('global');
     setActiveSectionPath(null);
@@ -273,13 +240,11 @@ export const useVoiceRecorder = ({
 
   // Recording start/stop handlers
   const handleRecordingStart = () => {
-    console.log('Global recording started');
     setGlobalRecordingState(true);
     setHasProcessedCurrentTranscription(false); // Reset when starting new recording
   };
 
   const handleRecordingStop = () => {
-    console.log('Global recording stopped');
     setGlobalRecordingState(false);
   };
 
@@ -294,8 +259,6 @@ export const useVoiceRecorder = ({
       connect();
       return;
     }
-
-    console.log('=== Field audio recording completed ===', context);
 
     // Determine processing path
     const processingPath =
@@ -353,7 +316,6 @@ export const useVoiceRecorder = ({
 
     // CHECK: Skip if transcription is "Empty Response"
     if (transcriptText.trim().toLowerCase() === 'empty response') {
-      console.log('Skipping processing of "Empty Response"');
       toast({
         title: 'Empty Response',
         description: 'No meaningful content to process',
@@ -370,8 +332,6 @@ export const useVoiceRecorder = ({
       });
       return;
     }
-
-    console.log('=== Processing global transcription ===', transcriptText);
 
     setRecordingMode('global');
     setActiveSectionPath(null);
@@ -413,7 +373,6 @@ export const useVoiceRecorder = ({
 
     // CHECK: Skip if transcription is "Empty Response"
     if (fieldTranscription.trim().toLowerCase() === 'empty response') {
-      console.log('Skipping field processing of "Empty Response"');
       toast({
         variant: 'destructive',
         title: 'Empty Response',
@@ -431,12 +390,6 @@ export const useVoiceRecorder = ({
       connect();
       return;
     }
-
-    console.log(
-      '=== Processing field transcription ===',
-      fieldTranscription,
-      context
-    );
 
     // Determine processing path
     const processingPath =
@@ -486,9 +439,6 @@ export const useVoiceRecorder = ({
       currentlyProcessingPath ||
       (recordingMode === 'section' && activeSectionPath)
     ) {
-      console.log(
-        'Ignoring global transcription change - section processing active'
-      );
       return;
     }
 
@@ -509,7 +459,6 @@ export const useVoiceRecorder = ({
       isConnected &&
       !hasProcessedCurrentTranscription
     ) {
-      console.log('Auto-processing global transcription (first time)');
       handleProcessTranscription();
     } else if (hasProcessedCurrentTranscription) {
       console.log(

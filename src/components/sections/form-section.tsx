@@ -30,7 +30,11 @@ type FormSectionProps = {
   onSectionTranscriptionClear: (sectionPath: string) => void;
   onAudioRecorded: (base64Audio: string, context: any) => void;
   onTranscriptionProcess: (transcription: string, context: any) => void;
-}
+
+  // NEW: Auto-submit props
+  autoSubmitOnLLMUpdate?: boolean;
+  autoSubmitDelay?: number;
+};
 
 export const FormSection: React.FC<FormSectionProps> = ({
   formKey,
@@ -54,6 +58,10 @@ export const FormSection: React.FC<FormSectionProps> = ({
   onSectionTranscriptionClear,
   onPlanTranscriptionClear,
   formRendererRef,
+
+  // NEW: Auto-submit props with defaults
+  autoSubmitOnLLMUpdate = true,
+  autoSubmitDelay = 3000,
 }) => {
   // Update transcription when received from WebSocket
   React.useEffect(() => {
@@ -65,36 +73,67 @@ export const FormSection: React.FC<FormSectionProps> = ({
 
     // If we have a specific path being processed, ONLY route to that field
     if (currentlyProcessingPath && formRendererRef.current) {
-      console.log('ROUTING: Transcription to specific field:', currentlyProcessingPath);
+      console.log(
+        'ROUTING: Transcription to specific field:',
+        currentlyProcessingPath
+      );
 
-      if (isPlanPath(currentlyProcessingPath, formKey) || isTestPath(currentlyProcessingPath, formKey)) {
+      if (
+        isPlanPath(currentlyProcessingPath, formKey) ||
+        isTestPath(currentlyProcessingPath, formKey)
+      ) {
         // Clear existing plan transcription before setting new one
         formRendererRef.current.clearPlanTranscription(currentlyProcessingPath);
         // Set new transcription
-        formRendererRef.current.updatePlanTranscription(currentlyProcessingPath, transcription);
+        formRendererRef.current.updatePlanTranscription(
+          currentlyProcessingPath,
+          transcription
+        );
       } else {
         // Clear existing section transcription before setting new one
-        formRendererRef.current.clearSectionTranscription(currentlyProcessingPath);
+        formRendererRef.current.clearSectionTranscription(
+          currentlyProcessingPath
+        );
         // Set new transcription
-        formRendererRef.current.updateSectionTranscription(currentlyProcessingPath, transcription);
+        formRendererRef.current.updateSectionTranscription(
+          currentlyProcessingPath,
+          transcription
+        );
       }
 
       return; // Don't continue to other routing
     }
 
     // Rest of the routing logic
-    if (recordingMode === 'section' && activeSectionPath && formRendererRef.current) {
-      console.log('ROUTING: Transcription to active section:', activeSectionPath);
-      formRendererRef.current.updateSectionTranscription(activeSectionPath, transcription);
+    if (
+      recordingMode === 'section' &&
+      activeSectionPath &&
+      formRendererRef.current
+    ) {
+      console.log(
+        'ROUTING: Transcription to active section:',
+        activeSectionPath
+      );
+      formRendererRef.current.updateSectionTranscription(
+        activeSectionPath,
+        transcription
+      );
       return;
     }
-  }, [transcription, recordingMode, activeSectionPath, currentlyProcessingPath, formKey]);
+  }, [
+    transcription,
+    recordingMode,
+    activeSectionPath,
+    currentlyProcessingPath,
+    formKey,
+  ]);
 
   return (
     <Card className="w-full shadow-md">
       <CardHeader>
         <CardTitle className="text-center">
-          {formKey.charAt(0).toUpperCase() + formKey.slice(1)} Form - {patientName}
+          {formKey.charAt(0).toUpperCase() + formKey.slice(1)} Form -{' '}
+          {patientName}
         </CardTitle>
       </CardHeader>
 
@@ -120,6 +159,8 @@ export const FormSection: React.FC<FormSectionProps> = ({
             onTranscriptionProcess={onTranscriptionProcess}
             onPlanTranscriptionClear={onPlanTranscriptionClear}
             onSectionTranscriptionClear={onSectionTranscriptionClear}
+            autoSubmitOnLLMUpdate={autoSubmitOnLLMUpdate}
+            autoSubmitDelay={autoSubmitDelay}
           />
         </div>
       </CardContent>

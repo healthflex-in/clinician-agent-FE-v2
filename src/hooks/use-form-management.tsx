@@ -6,7 +6,7 @@ type UseFormManagementProps = {
   formKey: string;
   patientId: string;
   appointmentId: string;
-}
+};
 
 type UseFormManagementReturn = {
   formData: any;
@@ -18,7 +18,7 @@ type UseFormManagementReturn = {
   setFormData: (data: any) => void;
   handleFormSubmit: () => Promise<void>;
   handleFormChange: (newFormData: any) => void;
-}
+};
 
 export const useFormManagement = ({
   formKey,
@@ -104,7 +104,8 @@ export const useFormManagement = ({
           }
         `;
 
-        const centerId = localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
+        const centerId =
+          localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
 
         const variables = {
           input: {
@@ -116,9 +117,16 @@ export const useFormManagement = ({
 
         const result = await graphqlRequest(mutation, variables);
 
-        if (result && result.createAgentReport && result.createAgentReport._id) {
+        if (
+          result &&
+          result.createAgentReport &&
+          result.createAgentReport._id
+        ) {
           setReportId(result.createAgentReport._id);
-          localStorage.setItem('agentReport', JSON.stringify(result.createAgentReport));
+          localStorage.setItem(
+            'agentReport',
+            JSON.stringify(result.createAgentReport)
+          );
 
           toast({
             title: 'Report Created',

@@ -25,7 +25,9 @@ export function useWebSocket(options: WebSocketOptions) {
   const [isConnecting, setIsConnecting] = React.useState(false);
   const [transcription, setTranscription] = React.useState<string>('');
   const [suggestions, setSuggestions] = React.useState<string | null>(null);
-  const [recommendations, setRecommendations] = React.useState<string | null>(null);
+  const [recommendations, setRecommendations] = React.useState<string | null>(
+    null
+  );
 
   const wsRef = React.useRef<WebSocket | null>(null);
   const lastServerPingRef = React.useRef<number>(0);
@@ -218,7 +220,7 @@ export function useWebSocket(options: WebSocketOptions) {
 
               // Forward form data to parent component if callback is provided
               if (onFormData) {
-                onFormData(serverResponse.formData);
+                onFormData(serverResponse);
               }
 
               toast({
@@ -311,8 +313,9 @@ export function useWebSocket(options: WebSocketOptions) {
       // Make sure the audio is in the correct format (data URL)
       let audioData = base64Audio;
       if (!audioData.startsWith('data:')) {
-        audioData = `data:audio/wav;base64,${audioData.split(',')[1] || audioData
-          }`;
+        audioData = `data:audio/wav;base64,${
+          audioData.split(',')[1] || audioData
+        }`;
       }
 
       // Format for audio payload

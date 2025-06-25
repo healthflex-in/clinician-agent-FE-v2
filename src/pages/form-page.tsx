@@ -8,7 +8,10 @@ import { FormRendererRef } from '@/types/form-renderer.types';
 
 // Phase 1: Permission Management
 import { useMicrophonePermission } from '@/hooks';
-import { MicrophonePermissionDialog, PermissionLoadingState } from '@/components/audio';
+import {
+  MicrophonePermissionDialog,
+  PermissionLoadingState,
+} from '@/components/audio';
 
 // Phase 2: Voice Recorder Management
 import { useVoiceRecorder } from '@/hooks';
@@ -29,12 +32,17 @@ type FormPageParams = {
 
 const FormPage = () => {
   const { toast } = useToast();
-  const { formKey = 'physio', patientId, appointmentId } = useParams<FormPageParams>();
+  const {
+    formKey = 'physio',
+    patientId,
+    appointmentId,
+  } = useParams<FormPageParams>();
 
   const formRendererRef = React.useRef<FormRendererRef>(null);
 
   // Initialize schema based on formKey
-  const schema = formSchemas[formKey as keyof typeof formSchemas] || formSchemas.physio;
+  const schema =
+    formSchemas[formKey as keyof typeof formSchemas] || formSchemas.physio;
 
   // PHASE 1: Permission Management
   const {
@@ -136,7 +144,6 @@ const FormPage = () => {
   return (
     <ThemeProvider>
       <div className="min-h-screen flex flex-col items-center bg-gradient-to-b from-primary/5 to-background">
-
         {/* PHASE 1: Microphone Permission Dialog */}
         <MicrophonePermissionDialog
           open={showPermissionDialog}
@@ -150,7 +157,6 @@ const FormPage = () => {
             }
           }}
         />
-
         <div className="w-full space-y-6 pb-16 px-2">
           {/* Header */}
           <div className="w-full max-w-4xl mx-auto px-4 py-2">
@@ -207,6 +213,8 @@ const FormPage = () => {
             onPlanTranscriptionClear={handlePlanTranscriptionClear}
             onTranscriptionProcess={handleFieldTranscriptionProcess}
             onSectionTranscriptionClear={handleSectionTranscriptionClear}
+            autoSubmitOnLLMUpdate={true}
+            autoSubmitDelay={3000}
           />
         </div>
       </div>

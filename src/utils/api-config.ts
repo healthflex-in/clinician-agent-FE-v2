@@ -1,6 +1,6 @@
 export const API_KEY =
   import.meta.env.VITE_API_KEY ||
-  '4e477937c9437478f33e667e835ca735fe9cef5e180b1c0842f1519b90ba5819';
+  'b90718a058accf0130e62c030ef919b3eabbbff85b81bb70985d6ab87995333a';
 
 export const API_URL =
   import.meta.env.VITE_API_URL || 'https://devapi.stance.health/graphql';

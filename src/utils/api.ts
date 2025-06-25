@@ -1,5 +1,6 @@
 // Store API key in environment variable in production
-const API_KEY = '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20';
+const API_KEY =
+  'b90718a058accf0130e62c030ef919b3eabbbff85b81bb70985d6ab87995333a';
 
 /**
  * CORS-friendly GraphQL client using a public CORS proxy
@@ -19,7 +20,7 @@ export async function graphqlRequest<T = any>(
   const proxyUrl = `${corsProxy}${encodeURIComponent(apiEndpoint)}`;
 
   try {
-    const response = await fetch(proxyUrl, {
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,21 +52,25 @@ export async function graphqlRequest<T = any>(
  * @returns Promise with the response data
  */
 export async function updateAgentReport(input: {
-  patientId: string;
+  patientId?: string;
   appointmentId: string;
   centerId?: string;
-  formKey: string;
-  formData: any;
+  formKey?: string;
+  input: any;
 }) {
+  console.log('Input data:', JSON.stringify(input, null, 2));
   const query = `
-    mutation updateAgentReport($input: UpdateAgentReportInput!) {
-      updateAgentReport(input: $input) {
+    mutation updateAgentReport( $appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
+      updateAgentReport(appointmentId: $appointmentId, input: $input) {
         _id
       }
     }
   `;
 
-  return graphqlRequest(query, { input });
+  return graphqlRequest(query, {
+    appointmentId: input.appointmentId,
+    input: input.input,
+  });
 }
 
 /**

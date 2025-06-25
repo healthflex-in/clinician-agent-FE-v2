@@ -1,15 +1,10 @@
 import React from 'react';
 
-import { graphqlRequest } from '@/utils/graphql-client';
 import { FormAction } from '@/types/form-renderer.types';
 import { defaultStateFromSchema } from '@/utils/schema-utils';
 import { FORM_SECTIONS } from '@/constants/form-renderer.constants';
-import {
-  isPlanPath,
-  isTestPath,
-  processFormDataForSubmission,
-  updateLocalStorageAfterSubmission,
-} from '@/utils/form-renderer.utils';
+import { isPlanPath, isTestPath } from '@/utils/form-renderer.utils';
+import { updateAgentReport } from '@/utils/api';
 
 export const useFormHandlers = (
   toast: any,
@@ -36,28 +31,49 @@ export const useFormHandlers = (
   setProcessedPlans: React.Dispatch<React.SetStateAction<Set<string>>>,
   setLlmUpdatedFields: React.Dispatch<React.SetStateAction<Set<string>>>,
   setProcessedSections: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setActivePlanTranscription: React.Dispatch<React.SetStateAction<string | null>>,
-  setCurrentlyProcessingPath: React.Dispatch<React.SetStateAction<string | null>>,
-  setPlanRecorderKeys: React.Dispatch<React.SetStateAction<Record<string, number>>>,
-  setActiveSectionTranscription: React.Dispatch<React.SetStateAction<string | null>>,
-  setPlanTranscriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>,
-  setSectionRecorderKeys: React.Dispatch<React.SetStateAction<Record<string, number>>>,
-  setSectionTranscriptions: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  setActivePlanTranscription: React.Dispatch<
+    React.SetStateAction<string | null>
+  >,
+  setCurrentlyProcessingPath: React.Dispatch<
+    React.SetStateAction<string | null>
+  >,
+  setPlanRecorderKeys: React.Dispatch<
+    React.SetStateAction<Record<string, number>>
+  >,
+  setActiveSectionTranscription: React.Dispatch<
+    React.SetStateAction<string | null>
+  >,
+  setPlanTranscriptions: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >,
+  setSectionRecorderKeys: React.Dispatch<
+    React.SetStateAction<Record<string, number>>
+  >,
+  setSectionTranscriptions: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >,
 
   // Refs and functions
   processingQueueRef: React.MutableRefObject<any[]>,
   addToProcessingQueue: (path: string, text: string) => void,
   pathTimeoutsRef: React.MutableRefObject<Map<string, NodeJS.Timeout>>,
-  
+
+  isSubmitting: boolean,
+  patientId: string,
+  centerId?: string,
+
   // Optional parameters (these can now go after required parameters)
   appointmentId?: string,
   onRecordingStart?: (path?: string) => void,
   onRecordingStop?: (path?: string) => void,
-  recordingStates?: {[path: string]: boolean},
+  recordingStates?: { [path: string]: boolean },
   onAudioRecorded?: (base64Audio: string, context: any) => void,
   onTranscriptionProcess?: (transcription: string, context: any) => void,
-) => {
 
+  autoSubmitOnLLMUpdate?: boolean,
+  onAutoSubmitScheduled?: () => void,
+  onAutoSubmitCancelled?: () => void
+) => {
   // Field change handler
   const handleChange = React.useCallback(
     (path: string, value: any) => {
@@ -112,7 +128,7 @@ export const useFormHandlers = (
   const handleSectionAudioRecorded = React.useCallback(
     (base64Audio: string, sectionPath: string) => {
       console.log(`=== SECTION AUDIO RECORDED: ${sectionPath} ===`);
-      
+
       if (!onAudioRecorded) return;
 
       // NOTIFY PARENT THAT RECORDING STOPPED
@@ -151,10 +167,10 @@ export const useFormHandlers = (
       onAudioRecorded(base64Audio, context);
     },
     [
-      formKey, 
-      state, 
-      onAudioRecorded, 
-      selectedSections, 
+      formKey,
+      state,
+      onAudioRecorded,
+      selectedSections,
       onRecordingStop,
       setProcessedSections,
       setSectionRecorderKeys,
@@ -166,7 +182,7 @@ export const useFormHandlers = (
   const handlePlanAudioRecorded = React.useCallback(
     (base64Audio: string, planPath: string) => {
       console.log(`=== PLAN AUDIO RECORDED: ${planPath} ===`);
-      
+
       if (!onAudioRecorded) return;
 
       // NOTIFY PARENT THAT RECORDING STOPPED
@@ -205,14 +221,14 @@ export const useFormHandlers = (
       onAudioRecorded(base64Audio, context);
     },
     [
-      formKey, 
-      state, 
-      onAudioRecorded, 
-      selectedSections, 
+      formKey,
+      state,
+      onAudioRecorded,
+      selectedSections,
       onRecordingStop,
       setPlanTranscriptions,
       setProcessedPlans,
-      setPlanRecorderKeys
+      setPlanRecorderKeys,
     ]
   );
 
@@ -221,13 +237,17 @@ export const useFormHandlers = (
     (sectionPath: string, text: string) => {
       // Don't allow transcription changes during global recording
       if (recordingMode === 'global') {
-        console.log(`Ignoring section transcription change - global mode active`);
+        console.log(
+          `Ignoring section transcription change - global mode active`
+        );
         return;
       }
 
       // Allow override - remove from processed state if it exists
       if (processedSections.has(sectionPath)) {
-        console.log(`Section ${sectionPath} was already processed, allowing override`);
+        console.log(
+          `Section ${sectionPath} was already processed, allowing override`
+        );
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
           newSet.delete(sectionPath);
@@ -264,7 +284,9 @@ export const useFormHandlers = (
 
       // Allow override - remove from processed state if it exists
       if (processedPlans.has(planPath)) {
-        console.log(`Plan ${planPath} was already processed, allowing override`);
+        console.log(
+          `Plan ${planPath} was already processed, allowing override`
+        );
         setProcessedPlans((prev) => {
           const newSet = new Set(prev);
           newSet.delete(planPath);
@@ -327,7 +349,9 @@ export const useFormHandlers = (
 
       // Allow reprocessing - remove from processed state if it exists
       if (processedSections.has(sectionPath)) {
-        console.log(`Section ${sectionPath} was already processed, allowing reprocessing`);
+        console.log(
+          `Section ${sectionPath} was already processed, allowing reprocessing`
+        );
         setProcessedSections((prev) => {
           const newSet = new Set(prev);
           newSet.delete(sectionPath);
@@ -409,7 +433,9 @@ export const useFormHandlers = (
 
       // Allow reprocessing - remove from processed state if it exists
       if (processedPlans.has(planPath)) {
-        console.log(`Plan ${planPath} was already processed, allowing reprocessing`);
+        console.log(
+          `Plan ${planPath} was already processed, allowing reprocessing`
+        );
         setProcessedPlans((prev) => {
           const newSet = new Set(prev);
           newSet.delete(planPath);
@@ -539,6 +565,40 @@ export const useFormHandlers = (
     ]
   );
 
+  /**
+   * Prepare payload based on form schema/type
+   * @param formKey The form identifier
+   * @param formData The raw form data
+   * @returns Transformed payload for the specific schema
+   */
+  const preparePayloadForSchema = React.useCallback(
+    (formKey: string, formData: any): any => {
+      switch (formKey) {
+        case 'physio':
+          return preparePhysioAssessmentPayload(formData);
+
+        case 'snc': {
+          const data = prepareSNCExercisePayload(formData);
+          console.log('Data----> ', JSON.stringify(data, null, 2));
+          return data;
+        }
+        //       case 'doctor-consultation':
+        //         return prepareDoctorConsultationPayload(formData);
+        //
+        //       case 'patient-intake':
+        //         return preparePatientIntakePayload(formData);
+
+        default:
+          // Default: return the form data as-is
+          console.warn(
+            `No specific payload preparation for formKey: ${formKey}`
+          );
+          return formData;
+      }
+    },
+    []
+  );
+
   // FIXED: Reset form to initial state with proper cleanup
   const handleResetForm = React.useCallback(() => {
     if (
@@ -565,15 +625,16 @@ export const useFormHandlers = (
       setLlmUpdatedFields(new Set());
 
       // Reset all transcriptions
-      const sections = FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
+      const sections =
+        FORM_SECTIONS[formKey as keyof typeof FORM_SECTIONS] || [];
       const resetTranscriptions: Record<string, string> = {};
       const resetRecorderKeys: Record<string, number> = {};
-      
+
       sections.forEach((section) => {
         resetTranscriptions[section] = '';
         resetRecorderKeys[section] = Date.now(); // Force re-render with unique keys
       });
-      
+
       setSectionTranscriptions(resetTranscriptions);
       setSectionRecorderKeys(resetRecorderKeys);
 
@@ -610,63 +671,265 @@ export const useFormHandlers = (
   ]);
 
   // Handle form submission (unchanged)
-  const handleSubmitForm = React.useCallback(async () => {
-    if (!appointmentId) {
-      toast({
-        title: 'Missing Information',
-        description: 'Appointment ID is required to submit the form',
-        variant: 'destructive',
-      });
-      return;
-    }
+  const handleSubmitForm = React.useCallback(
+    async (isAutoSubmit: boolean = false) => {
+      if (isSubmitting) {
+        console.log('Form already submitting, skipping...');
+        return;
+      }
 
-    setIsSubmitting(true);
+      console.log(
+        isAutoSubmit
+          ? '=== AUTO-SUBMITTING FORM ==='
+          : '=== MANUAL FORM SUBMIT ==='
+      );
 
-    try {
-      const { input, formDataCopy } = processFormDataForSubmission(formKey, state);
+      console.log('=== RAW FORM STATE ===');
+      console.log('1. Form Key:', formKey);
+      console.log('2. State Type:', typeof state);
+      console.log('3. State Keys:', Object.keys(state || {}));
+      console.log('4. Full State:', JSON.stringify(state, null, 2));
+      console.log('5. State Direct:', JSON.stringify(state, null, 2));
 
-      const mutation = `
-        mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
-          updateAgentReport(appointmentId: $appointmentId, input: $input) {
-            _id
-            createdAt
-            updatedAt
-            version
-            isActive
-            isFilledCompletely
-          }
-        }
-      `;
+      setIsSubmitting(true);
 
-      const variables = {
-        appointmentId,
-        input,
-      };
+      console.log('------------------------------------------');
 
-      console.log('Submitting data:', JSON.stringify(variables, null, 2));
+      try {
+        const updateInput = {
+          // patientId,
+          appointmentId: appointmentId || '',
+          // formKey,
+          input: preparePayloadForSchema(formKey, state),
+          ...(centerId && { centerId }),
+        };
 
-      const result = await graphqlRequest(mutation, variables);
+        console.log(
+          'Calling updateAgentReport with input:',
+          JSON.stringify(updateInput, null, 2)
+        );
 
-      if (result && result.updateAgentReport) {
+        const result = await updateAgentReport(updateInput);
+
         toast({
-          title: 'Form Submitted',
-          description: 'Your form has been successfully submitted',
+          title: isAutoSubmit ? 'Form Auto-Saved' : 'Form Saved',
+          description: isAutoSubmit
+            ? 'Form has been automatically saved after AI updates'
+            : 'Form has been saved successfully',
+          variant: 'default',
         });
 
-        updateLocalStorageAfterSubmission(formKey, state, formDataCopy, result);
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      toast({
-        title: 'Submission Failed',
-        description: 'There was an error submitting your form',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [appointmentId, formKey, state, toast, setIsSubmitting]);
+        console.log('Form submitted successfully:', result);
+      } catch (error) {
+        console.error('Form submission error:', error);
 
+        toast({
+          title: 'Submission Failed',
+          description: isAutoSubmit
+            ? 'Auto-save failed. Please try submitting manually.'
+            : 'Failed to save form. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [
+      isSubmitting,
+      setIsSubmitting,
+      formKey,
+      state,
+      appointmentId,
+      centerId,
+      toast,
+      preparePayloadForSchema,
+    ]
+  );
+
+  /**
+   * FIXED: prepareSNCExercisePayload function to handle "sets" array correctly
+   */
+  function prepareSNCExercisePayload(formData: any) {
+    console.log('Preparing SNC payload from:', formData);
+
+    // Check if formData already has the correct snc structure
+    if (
+      formData.snc &&
+      typeof formData.snc === 'object' &&
+      !Array.isArray(formData.snc)
+    ) {
+      console.log('Found existing SNC object structure');
+      return { snc: formData.snc };
+    }
+
+    // Build SNC object from form fields
+    const sncObject = {
+      advice:
+        formData.advice ||
+        formData.snc?.advice ||
+        getFieldValue(formData, 'advice') ||
+        '',
+
+      plans: [],
+    };
+
+    // Look for plans data
+    const plans =
+      formData.plans || formData.snc?.plans || getFieldValue(formData, 'plans');
+
+    if (Array.isArray(plans) && plans.length > 0) {
+      sncObject.plans = plans.map((plan) => {
+        console.log('Processing plan:', plan);
+
+        // Extract set data - FIXED to handle "sets" array
+        let setData = {
+          repetitions: 0,
+          load: '',
+          unit: '',
+        };
+
+        // Strategy 1: Check for "sets" array (your form uses this)
+        if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
+          console.log('Found sets array:', plan.sets);
+          const firstSet = plan.sets[0]; // Take the first set
+          setData.repetitions = parseInt(firstSet.repetitions) || 0;
+          setData.load = firstSet.load || '';
+          setData.unit = firstSet.unit || '';
+          console.log('Extracted from sets array:', setData);
+        }
+        // Strategy 2: Check for "set" object (API format)
+        else if (plan.set && typeof plan.set === 'object') {
+          console.log('Found set object:', plan.set);
+          setData.repetitions = parseInt(plan.set.repetitions) || 0;
+          setData.load = plan.set.load || '';
+          setData.unit = plan.set.unit || '';
+        }
+        // Strategy 3: Individual fields at plan level
+        else {
+          console.log('Looking for individual set fields');
+          setData.repetitions =
+            parseInt(plan.repetitions) || parseInt(plan.reps) || 0;
+          setData.load = plan.load || plan.weight || '';
+          setData.unit = plan.unit || '';
+        }
+
+        return {
+          exercise: plan.exercise || '',
+          comments: plan.comments || '',
+          set: setData, // Note: API expects "set" (singular)
+          duration: {
+            value: parseInt(plan.duration?.value) || 0,
+            unit: plan.duration?.unit || '',
+          },
+        };
+      });
+    } else {
+      // Default empty plan structure
+      sncObject.plans = [
+        {
+          exercise: '',
+          comments: '',
+          set: {
+            repetitions: 0,
+            load: '',
+            unit: '',
+          },
+          duration: {
+            value: 0,
+            unit: '',
+          },
+        },
+      ];
+    }
+
+    console.log(
+      'Final SNC payload:',
+      JSON.stringify({ snc: sncObject }, null, 2)
+    );
+    return { snc: sncObject };
+  }
+
+  // Helper function to search for field values in nested form data
+  function getFieldValue(obj: any, fieldName: string): any {
+    if (!obj || typeof obj !== 'object') return undefined;
+
+    // Direct property access
+    if (obj[fieldName] !== undefined) {
+      return obj[fieldName];
+    }
+
+    // Search recursively in nested objects and arrays
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = obj[key];
+
+        if (Array.isArray(value)) {
+          // Search in array items
+          for (const item of value) {
+            const found = getFieldValue(item, fieldName);
+            if (found !== undefined) return found;
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          // Search in nested objects
+          const found = getFieldValue(value, fieldName);
+          if (found !== undefined) return found;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Prepare payload for Physio Assessment forms
+   */
+  function preparePhysioAssessmentPayload(formData: any) {
+    return {
+      physioAssessment: {
+        assessments: formData.assessments || [],
+        plans: formData.plans || [],
+        tests: formData.tests || [],
+        recommendations: formData.recommendations || '',
+        nextAppointment: formData.nextAppointment || '',
+        // Transform any other fields as needed
+        objectives: formData.objectives || [],
+        contraindications: formData.contraindications || [],
+      },
+    };
+  }
+
+  /**
+   * Prepare payload for Doctor Consultation forms
+   */
+  function prepareDoctorConsultationPayload(formData: any) {
+    return {
+      consultation: {
+        chiefComplaint: formData.chiefComplaint || '',
+        history: formData.history || '',
+        examination: formData.examination || '',
+        diagnosis: formData.diagnosis || '',
+        treatment: formData.treatment || [],
+        prescriptions: formData.prescriptions || [],
+        followUp: formData.followUp || '',
+      },
+    };
+  }
+
+  /**
+   * Prepare payload for Patient Intake forms
+   */
+  function preparePatientIntakePayload(formData: any) {
+    return {
+      intake: {
+        personalInfo: formData.personalInfo || {},
+        medicalHistory: formData.medicalHistory || {},
+        currentSymptoms: formData.currentSymptoms || [],
+        allergies: formData.allergies || [],
+        medications: formData.medications || [],
+        lifestyle: formData.lifestyle || {},
+      },
+    };
+  }
   return {
     handleChange,
     handleAddArrayItem,

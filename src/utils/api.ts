@@ -16,8 +16,8 @@ export async function graphqlRequest<T = any>(
   // Warning: This is a temporary solution for development only
   // Do not use this in production - use a proper backend/proxy service
   const corsProxy = 'https://corsproxy.io/?';
-  // const apiEndpoint = 'https://devapi.stance.health/graphql';
-  const apiEndpoint = 'http://localhost:3000/graphql';
+  const apiEndpoint = 'https://devapi.stance.health/graphql';
+  // const apiEndpoint = 'http://localhost:3000/graphql';
   const proxyUrl = `${corsProxy}${encodeURIComponent(apiEndpoint)}`;
 
   try {

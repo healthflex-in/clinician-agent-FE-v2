@@ -21,7 +21,7 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({
   className = '',
   disabled = false,
   isProcessing = false,
-  autoProcessDelay = 5000,
+  autoProcessDelay = 10000,
   placeholder = 'Type your transcription here...',
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
@@ -78,7 +78,7 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({
           ${isDisabled ? 'cursor-not-allowed opacity-60' : ''}
         `}
       />
-      
+
       {/* Processing overlay */}
       {isProcessing && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-lg backdrop-blur-sm">

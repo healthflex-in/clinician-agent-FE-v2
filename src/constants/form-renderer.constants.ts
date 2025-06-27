@@ -5,7 +5,7 @@ export const FORM_SECTIONS = {
     'recommendation',
     'subjectiveGoals',
     'clinicalDetails',
-    'objectiveAssessments',
+    'objectiveAssessment',
     'subjectiveAssessments',
   ],
   physio: ['tests'],

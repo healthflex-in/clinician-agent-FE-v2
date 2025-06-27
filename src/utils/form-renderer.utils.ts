@@ -158,3 +158,23 @@ export const updateLocalStorageAfterSubmission = (
     console.error('Error updating localStorage:', error);
   }
 };
+
+/**
+ * Normalize any form of objectiveAssessment to always be { tests: [...] }
+ */
+export function normalizeObjectiveAssessment(input: any): { tests: any[] } {
+  if (!input) return { tests: [] };
+  if (Array.isArray(input)) {
+    // If it's an array, use the first item's tests or treat as tests array
+    if (input.length > 0 && input[0].tests) {
+      return { tests: input[0].tests };
+    }
+    // If it's an array of tests directly
+    return { tests: input };
+  }
+  if (input.tests && Array.isArray(input.tests)) {
+    return { tests: input.tests };
+  }
+  // Fallback: treat as empty
+  return { tests: [] };
+}

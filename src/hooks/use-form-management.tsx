@@ -2,6 +2,7 @@ import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { graphqlRequest } from '@/utils/graphql-client';
 import { createAgentReport } from '../utils/api';
+import { normalizeObjectiveAssessment } from '@/utils/form-renderer.utils';
 
 type UseFormManagementProps = {
   formKey: string;
@@ -132,32 +133,21 @@ export const useFormManagement = ({
             console.log('Processing assessment form data...');
             const assessmentData = result.createAgentReport.assessment;
 
-            // FIXED: Handle objectiveAssessment array structure from API
-            let objectiveAssessmentData = {
-              tests: [],
-            };
-
-            // API returns objectiveAssessment as array, extract tests from first item
-            if (
-              Array.isArray(assessmentData.objectiveAssessment) &&
-              assessmentData.objectiveAssessment.length > 0
-            ) {
-              const firstObjectiveAssessment =
-                assessmentData.objectiveAssessment[0];
-              if (
-                firstObjectiveAssessment.tests &&
-                Array.isArray(firstObjectiveAssessment.tests)
-              ) {
-                objectiveAssessmentData.tests = firstObjectiveAssessment.tests;
+            // Inline normalization for objectiveAssessment
+            let objectiveAssessmentData: { tests: any[] } = { tests: [] };
+            const input = assessmentData.objectiveAssessment;
+            if (!input) {
+              objectiveAssessmentData = { tests: [] };
+            } else if (Array.isArray(input)) {
+              if (input.length > 0 && input[0].tests) {
+                objectiveAssessmentData = { tests: input[0].tests };
+              } else {
+                objectiveAssessmentData = { tests: input };
               }
-            }
-            // Fallback: if it's already an object with tests property
-            else if (
-              assessmentData.objectiveAssessment &&
-              assessmentData.objectiveAssessment.tests
-            ) {
-              objectiveAssessmentData.tests =
-                assessmentData.objectiveAssessment.tests;
+            } else if (input.tests && Array.isArray(input.tests)) {
+              objectiveAssessmentData = { tests: input.tests };
+            } else {
+              objectiveAssessmentData = { tests: [] };
             }
 
             // Transform the assessment data structure
@@ -199,7 +189,7 @@ export const useFormManagement = ({
                 assessment:
                   assessmentData.subjectiveAssessment?.assessment || '',
               },
-              objectiveAssessment: objectiveAssessmentData, // FIXED: Use the properly structured data
+              objectiveAssessment: objectiveAssessmentData,
               rpe: {
                 value: assessmentData.rpe?.value || 0,
               },

@@ -664,13 +664,19 @@ export const FormRenderer = React.forwardRef<
 
           // **EXTRACT FORM DATA**
           const actualFormData = llmData.formData.formData || llmData.formData;
+
+          // Normalize objectiveAssessment if present and not already normalized
+          if (actualFormData.objectiveAssessment && !actualFormData.objectiveAssessment.tests) {
+            if (Array.isArray(actualFormData.objectiveAssessment)) {
+              actualFormData.objectiveAssessment = { tests: actualFormData.objectiveAssessment };
+            }
+          }
+
+          llmData = { formData: actualFormData };
           console.log(
             'Extracted actualFormData:',
             JSON.stringify(actualFormData, null, 2)
           );
-
-          llmData = { formData: actualFormData };
-          console.log('Modified llmData:', JSON.stringify(llmData, null, 2));
 
           // Apply form data
           if (llmData.formData) {
@@ -717,6 +723,13 @@ export const FormRenderer = React.forwardRef<
             'Regular form data:',
             JSON.stringify(llmData.formData, null, 2)
           );
+
+          // Normalize objectiveAssessment if present and not already normalized
+          if (llmData.formData.objectiveAssessment && !llmData.formData.objectiveAssessment.tests) {
+            if (Array.isArray(llmData.formData.objectiveAssessment)) {
+              llmData.formData.objectiveAssessment = { tests: llmData.formData.objectiveAssessment };
+            }
+          }
 
           // Determine if this is a global or section-specific update
           const processingPath =

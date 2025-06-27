@@ -551,7 +551,7 @@ export function useWebSocket(options: WebSocketOptions) {
         assessment: apiData.subjectiveAssessments || '',
       },
       objectiveAssessment: {
-        // Transform API 'objectiveAssessments' array to form structure
+        // Transform API 'objectiveAssessment' array to form structure
         tests: Array.isArray(apiData.objectiveAssessment)
           ? apiData.objectiveAssessment.map((test: any) => ({
               testName: test.testName || '',

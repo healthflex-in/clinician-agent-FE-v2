@@ -28,7 +28,7 @@ const formSchemas = {
   //   patientAdvice: {
   //     adviceDetails: '',
   //   },
-  //   objectiveAssessments: {
+  //   objectiveAssessment: {
   //     tests: [
   //       {
   //         testName: '',

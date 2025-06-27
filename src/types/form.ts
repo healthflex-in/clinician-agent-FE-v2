@@ -72,7 +72,7 @@ export interface SncForm {
 
 export interface FirstAssessmentForm {
   clinicalDetails: ClinicalDetail;
-  objectiveAssessments: {
+  objectiveAssessment: {
     record: string;
     tests: TestValue[];
   };

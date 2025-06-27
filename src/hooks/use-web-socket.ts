@@ -438,7 +438,7 @@ export function useWebSocket(options: WebSocketOptions) {
                 },
               ],
         },
-        objectiveAssessments: hasObjectiveTests
+        objectiveAssessment: hasObjectiveTests
           ? formData.objectiveAssessment.tests.map((test: any) => ({
               testName: test.testName || '',
               unitName: test.unitName || '',
@@ -552,8 +552,8 @@ export function useWebSocket(options: WebSocketOptions) {
       },
       objectiveAssessment: {
         // Transform API 'objectiveAssessments' array to form structure
-        tests: Array.isArray(apiData.objectiveAssessments)
-          ? apiData.objectiveAssessments.map((test: any) => ({
+        tests: Array.isArray(apiData.objectiveAssessment)
+          ? apiData.objectiveAssessment.map((test: any) => ({
               testName: test.testName || '',
               unitName: test.unitName || '',
               value: test.value || 0,

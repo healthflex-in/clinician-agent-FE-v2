@@ -310,7 +310,7 @@ export function useWebSocket(options: WebSocketOptions) {
         userId,
         AppointmentId: appointmentId, // Note: Capital 'A'
         formKey,
-        mode: 'form_fill',
+        mode: 'transcribe_only',
         audio: audioData,
         formData: currentFormData
           ? transformFormDataForAPI(

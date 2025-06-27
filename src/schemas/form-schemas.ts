@@ -41,6 +41,7 @@ const formSchemas = {
   //     ],
   //   },
   // },
+
   // SNC Form
   // snc: {
   //   advice: '',
@@ -62,6 +63,7 @@ const formSchemas = {
   //     },
   //   ],
   // },
+
   // Physio Form
   // physio: {
   //   tests: [
@@ -75,6 +77,7 @@ const formSchemas = {
   //     },
   //   ],
   // },
+
   // Assessment Form
   assessment: {
     plan: {
@@ -83,11 +86,10 @@ const formSchemas = {
         {
           exercise: '',
           comments: '',
-          // Change set to sets and make it an array of objects
-          sets: [
+          set: [
             {
               repetitions: 0,
-              load: '', // Use string instead of number
+              load: '',
               unit: '',
             },
           ],

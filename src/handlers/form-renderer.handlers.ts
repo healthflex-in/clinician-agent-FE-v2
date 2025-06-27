@@ -537,13 +537,8 @@ export const useFormHandlers = (
     ]
   );
 
-  /**
-   * Prepare payload based on form schema/type
-   * @param formKey The form identifier
-   * @param formData The raw form data
-   * @returns Transformed payload for the specific schema
-   */
   // Dynamic payload preparation - works for both SNC and Assessment forms without conflicts
+
   const preparePayloadForSchema = React.useCallback(
     (formKey: string, formData: any): any => {
       console.log(`Preparing payload for formKey: ${formKey}`, formData);
@@ -649,6 +644,101 @@ export const useFormHandlers = (
     });
     return { assessment: assessmentObject };
   }
+
+  //
+  //   // SNC payload preparation (UNCHANGED - keeps working exactly as before)
+  //   function prepareSNCExercisePayload(formData: any) {
+  //     // Check if formData already has the correct snc structure
+  //     if (
+  //       formData.snc &&
+  //       typeof formData.snc === 'object' &&
+  //       !Array.isArray(formData.snc)
+  //     ) {
+  //       return { snc: formData.snc };
+  //     }
+  //
+  //     // Build SNC object from form fields
+  //     const sncObject = {
+  //       advice:
+  //         formData.advice ||
+  //         formData.snc?.advice ||
+  //         getFieldValue(formData, 'advice') ||
+  //         '',
+  //       plans: [],
+  //     };
+  //
+  //     // Look for plans data
+  //     const plans =
+  //       formData.plans || formData.snc?.plans || getFieldValue(formData, 'plans');
+  //
+  //     if (Array.isArray(plans) && plans.length > 0) {
+  //       sncObject.plans = plans.map((plan) => {
+  //         // FIXED: Preserve sets as array instead of converting to single set object
+  //         let setsData = [];
+  //
+  //         // Strategy 1: Check for "sets" array (your form uses this)
+  //         if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
+  //           setsData = plan.sets.map((set) => ({
+  //             repetitions: parseInt(set.repetitions) || 0,
+  //             load: set.load || '',
+  //             unit: set.unit || '',
+  //           }));
+  //         }
+  //         // Strategy 2: Check for "set" object (legacy API format) - convert to array
+  //         else if (plan.set && typeof plan.set === 'object') {
+  //           setsData = [
+  //             {
+  //               repetitions: parseInt(plan.set.repetitions) || 0,
+  //               load: plan.set.load || '',
+  //               unit: plan.set.unit || '',
+  //             },
+  //           ];
+  //         }
+  //         // Strategy 3: Individual fields at plan level - create single set in array
+  //         else {
+  //           setsData = [
+  //             {
+  //               repetitions:
+  //                 parseInt(plan.repetitions) || parseInt(plan.reps) || 0,
+  //               load: plan.load || plan.weight || '',
+  //               unit: plan.unit || '',
+  //             },
+  //           ];
+  //         }
+  //
+  //         return {
+  //           exercise: plan.exercise || '',
+  //           comments: plan.comments || '',
+  //           sets: setsData, // SNC uses "sets" array
+  //           duration: {
+  //             value: parseInt(plan.duration?.value) || 0,
+  //             unit: plan.duration?.unit || '',
+  //           },
+  //         };
+  //       });
+  //     } else {
+  //       // Default empty plan structure with sets array
+  //       sncObject.plans = [
+  //         {
+  //           exercise: '',
+  //           comments: '',
+  //           sets: [
+  //             {
+  //               repetitions: 0,
+  //               load: '',
+  //               unit: '',
+  //             },
+  //           ],
+  //           duration: {
+  //             value: 0,
+  //             unit: '',
+  //           },
+  //         },
+  //       ];
+  //     }
+  //
+  //     return { snc: sncObject };
+  //   }
 
   // FIXED: Reset form to initial state with proper cleanup
   const handleResetForm = React.useCallback(() => {

@@ -71,10 +71,12 @@ export function useWebSocket(options: WebSocketOptions) {
       setIsConnecting(true);
 
       const wsUrl = url;
+      console.log('WebSocket Connecting to:', wsUrl); // ADDED LOG
 
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
+        console.log('WebSocket Connected'); // ADDED LOG
         setIsConnected(true);
         setIsConnecting(false);
         setError(null);
@@ -110,6 +112,7 @@ export function useWebSocket(options: WebSocketOptions) {
       };
 
       wsRef.current.onclose = (event) => {
+        console.log('WebSocket Disconnected'); // ADDED LOG
         setIsConnected(false);
         setIsConnecting(false);
         clearHeartbeatTimer();
@@ -136,6 +139,7 @@ export function useWebSocket(options: WebSocketOptions) {
       wsRef.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('WebSocket Response:', JSON.stringify(data, null, 2)); // ADDED LOG
 
           // Handle heartbeat messages first
           if (data.type === 'pong') {
@@ -257,6 +261,7 @@ export function useWebSocket(options: WebSocketOptions) {
   ]);
 
   const disconnect = React.useCallback(() => {
+    console.log('WebSocket Disconnecting'); // ADDED LOG
     clearHeartbeatTimer();
     if (wsRef.current) {
       wsRef.current.close();
@@ -275,6 +280,10 @@ export function useWebSocket(options: WebSocketOptions) {
           '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };
 
+      console.log(
+        'WebSocket Payload:',
+        JSON.stringify(messageWithAuth, null, 2)
+      ); // ADDED LOG
       wsRef.current.send(JSON.stringify(messageWithAuth));
       return true;
     }
@@ -296,25 +305,30 @@ export function useWebSocket(options: WebSocketOptions) {
         }`;
       }
 
-      // Format for audio payload
-      const payload: WebSocketMessage = {
-        payloadType: 'audio',
-        audio: audioData,
+      // FIXED: Use the correct payload structure
+      const payload = {
         userId,
-        appointmentId,
+        AppointmentId: appointmentId, // Note: Capital 'A'
         formKey,
-        formIndex: 0, // Default to first form
-        storeInChat: true,
+        mode: 'form_fill',
+        audio: audioData,
+        formData: currentFormData
+          ? transformFormDataForAPI(currentFormData, formKey)
+          : undefined,
+        apiKey:
+          '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };
 
-      // If form data is provided, include it
-      if (currentFormData) {
-        payload.formData = currentFormData;
-      }
+      console.log('WebSocket Payload:', JSON.stringify(payload, null, 2));
 
-      return sendMessage(payload);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        setIsProcessing(true);
+        wsRef.current.send(JSON.stringify(payload));
+        return true;
+      }
+      return false;
     },
-    [sendMessage]
+    []
   );
 
   const processTranscription = React.useCallback(
@@ -324,25 +338,224 @@ export function useWebSocket(options: WebSocketOptions) {
       const appointmentId = localStorage.getItem('appointmentId') || '';
       const formKey = localStorage.getItem('formKey') || 'physio';
 
-      // Payload for text + form data
-      const payload: WebSocketMessage = {
-        payloadType: 'text',
-        text: transcriptionText,
+      // FIXED: Use the correct payload structure
+      const payload = {
         userId,
-        appointmentId,
+        AppointmentId: appointmentId, // Note: Capital 'A'
         formKey,
-        formIndex: 0, // Default to first form
+        mode: 'form_fill',
+        text: transcriptionText,
+        formData: currentFormData
+          ? transformFormDataForAPI(currentFormData, formKey)
+          : undefined,
+        apiKey:
+          '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };
 
-      // Include form data if available
-      if (currentFormData) {
-        payload.formData = currentFormData;
-      }
+      console.log('WebSocket Payload:', JSON.stringify(payload, null, 2));
 
-      return sendMessage(payload);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        setIsProcessing(true);
+        wsRef.current.send(JSON.stringify(payload));
+        return true;
+      }
+      return false;
     },
-    [sendMessage]
+    []
   );
+
+  // FIXED: Use exact form schema default values
+  const transformFormDataForAPI = (formData: any, formKey: string) => {
+    if (formKey === 'assessment') {
+      // Use exact schema defaults from form-schemas.ts
+      const schemaDefaults = {
+        plan: {
+          advice: '',
+          plans: [
+            {
+              exercise: '',
+              comments: '',
+              set: [
+                {
+                  repetitions: 0,
+                  load: '',
+                  unit: '',
+                },
+              ],
+              duration: {
+                value: 0,
+                unit: '',
+              },
+            },
+          ],
+        },
+        subjectiveAssessment: {
+          assessment: '',
+        },
+        objectiveAssessment: {
+          tests: [
+            {
+              testName: '',
+              unitName: '',
+              value: 0,
+              left: 0,
+              right: 0,
+              comments: '',
+            },
+          ],
+        },
+        rpe: {
+          value: 0,
+        },
+      };
+
+      // Transform to API format while preserving schema structure
+      const transformed = {
+        plan: {
+          advice: formData?.plan?.advice || schemaDefaults.plan.advice,
+          plans:
+            formData?.plan?.plans?.length > 0
+              ? formData.plan.plans.map((plan: any) => ({
+                  exercise: plan.exercise || '',
+                  set:
+                    plan.sets?.length > 0
+                      ? plan.sets.map((set: any) => ({
+                          repetitions: parseInt(set.repetitions) || 0,
+                          load: String(set.load || ''),
+                          unit: String(set.unit || ''),
+                        }))
+                      : schemaDefaults.plan.plans[0].set, // Use schema default set
+                  duration: {
+                    value: parseInt(plan.duration?.value) || 0,
+                    unit: String(plan.duration?.unit || ''),
+                  },
+                  comments: plan.comments || '',
+                }))
+              : schemaDefaults.plan.plans, // Use schema default plans
+        },
+        // Transform objectiveAssessment.tests to objectiveAssessments (API format)
+        objectiveAssessments:
+          formData?.objectiveAssessment?.tests?.length > 0
+            ? formData.objectiveAssessment.tests.map((test: any) => ({
+                testName: test.testName || '',
+                unitName: test.unitName || '',
+                value: parseFloat(test.value) || 0,
+                left: parseFloat(test.left) || 0,
+                right: parseFloat(test.right) || 0,
+                comments: test.comments || '',
+              }))
+            : schemaDefaults.objectiveAssessment.tests, // Use schema default tests
+        // Transform subjectiveAssessment.assessment to subjectiveAssessments (API format)
+        subjectiveAssessments:
+          formData?.subjectiveAssessment?.assessment ||
+          schemaDefaults.subjectiveAssessment.assessment,
+        // Transform rpe.value to rpe (API format)
+        rpe: parseInt(formData?.rpe?.value) || schemaDefaults.rpe.value,
+      };
+      return transformed;
+    }
+
+    if (formKey === 'snc') {
+      // Use exact schema defaults from form-schemas.ts
+      const schemaDefaults = {
+        advice: '',
+        plans: [
+          {
+            exercise: '',
+            comments: '',
+            sets: [
+              {
+                repetitions: 0,
+                load: '',
+                unit: '',
+              },
+            ],
+            duration: {
+              value: 0,
+              unit: '',
+            },
+          },
+        ],
+      };
+
+      const transformed = {
+        advice: formData?.advice || schemaDefaults.advice,
+        plans:
+          formData?.plans?.length > 0
+            ? formData.plans.map((plan: any) => ({
+                exercise: plan.exercise || '',
+                sets:
+                  plan.sets?.length > 0
+                    ? plan.sets.map((set: any) => ({
+                        repetitions: parseInt(set.repetitions) || 0,
+                        load: String(set.load || ''),
+                        unit: String(set.unit || ''),
+                      }))
+                    : schemaDefaults.plans[0].sets, // Use schema default sets
+                duration: {
+                  value: parseInt(plan.duration?.value) || 0,
+                  unit: String(plan.duration?.unit || ''),
+                },
+                comments: plan.comments || '',
+              }))
+            : schemaDefaults.plans, // Use schema default plans
+      };
+      return transformed;
+    }
+
+    // For other form types, return as-is
+    return formData || {};
+  };
+
+  // ADDED: Transform API response format to form format
+  const transformAPIResponseToFormFormat = (apiData: any) => {
+    // Transform API response structure to match form expectations
+    const transformed = {
+      plan: {
+        advice: apiData.plan?.advice || '',
+        plans:
+          apiData.plan?.plans?.map((plan: any) => ({
+            exercise: plan.exercise || '',
+            comments: plan.comments || '',
+            // Transform API 'set' array to form 'sets' array
+            sets: Array.isArray(plan.set)
+              ? plan.set.map((set: any) => ({
+                  repetitions: set.repetitions || 0,
+                  load: set.load || '',
+                  unit: set.unit || '',
+                }))
+              : [{ repetitions: 0, load: '', unit: '' }],
+            duration: {
+              value: plan.duration?.value || 0,
+              unit: plan.duration?.unit || '',
+            },
+          })) || [],
+      },
+      subjectiveAssessment: {
+        // Transform API 'subjectiveAssessments' string to form object
+        assessment: apiData.subjectiveAssessments || '',
+      },
+      objectiveAssessment: {
+        // Transform API 'objectiveAssessments' array to form structure
+        tests: Array.isArray(apiData.objectiveAssessments)
+          ? apiData.objectiveAssessments.map((test: any) => ({
+              testName: test.testName || '',
+              unitName: test.unitName || '',
+              value: test.value || 0,
+              left: test.left || 0,
+              right: test.right || 0,
+              comments: test.comments || '',
+            }))
+          : [],
+      },
+      rpe: {
+        // Transform API 'rpe' number to form object
+        value: apiData.rpe || 0,
+      },
+    };
+
+    return transformed;
+  };
 
   React.useEffect(() => {
     return () => {

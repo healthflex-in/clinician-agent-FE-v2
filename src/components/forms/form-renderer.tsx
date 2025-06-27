@@ -224,10 +224,8 @@ export const FormRenderer = React.forwardRef<
         formData.rpe;
 
       if (hasApiContent) {
-        console.log('FormRenderer: Initializing with API data:', formData);
         dispatch({ type: 'REPLACE_STATE', data: formData });
       } else {
-        console.log('FormRenderer: Initializing with schema defaults');
         dispatch({ type: 'REPLACE_STATE', data: schema });
       }
 
@@ -251,6 +249,7 @@ export const FormRenderer = React.forwardRef<
       // Instead, let the useEffect handle the submission with fresh state
     }, [autoSubmitOnLLMUpdate]);
 
+    // UPDATE: Auto-submit effect with longer delay
     React.useEffect(() => {
       if (isLLMUpdateInProgress.current && pendingAutoSubmit && isInitialized) {
         // Clear any existing timeout
@@ -258,14 +257,14 @@ export const FormRenderer = React.forwardRef<
           clearTimeout(autoSubmitTimeoutRef.current);
         }
 
-        // Schedule auto-submit with fresh state
+        // INCREASED DELAY: Schedule auto-submit with longer delay
         autoSubmitTimeoutRef.current = setTimeout(() => {
           // First, ensure the parent has the latest state
           if (onChange) {
             onChange(state);
           }
 
-          // Then submit the form with a small delay to ensure state propagation
+          // Then submit the form with delay to ensure state propagation
           setTimeout(() => {
             handleSubmitForm(true); // true = isAutoSubmit
 
@@ -273,8 +272,8 @@ export const FormRenderer = React.forwardRef<
             setPendingAutoSubmit(false);
             isLLMUpdateInProgress.current = false;
             autoSubmitTimeoutRef.current = null;
-          }, 200); // Small delay for state propagation
-        }, autoSubmitDelay);
+          }, 500); // Increased delay for state propagation
+        }, autoSubmitDelay + 1000); // Add extra 1 second to the configured delay
       }
     }, [
       state,
@@ -582,11 +581,20 @@ export const FormRenderer = React.forwardRef<
       ]
     );
 
-    // Update form with LLM data - ENHANCED WITH AUTO-SUBMIT
+    // Update form with LLM data - ENHANCED WITH DEBUG LOGGING
     const updateFormWithLLMData = React.useCallback(
       (llmData: any) => {
+        console.log('=== FORM RENDERER: updateFormWithLLMData called ===');
+        console.log('Input llmData:', JSON.stringify(llmData, null, 2));
+
         // Handle structured payload (global processing)
         if (llmData.payloadType === 'structured' && llmData.formData) {
+          console.log('=== STRUCTURED PAYLOAD PROCESSING ===');
+          console.log(
+            'Original structured data:',
+            JSON.stringify(llmData.formData, null, 2)
+          );
+
           // Clear all timeouts and processing state
           pathTimeoutsRef.current.forEach((timeout) => {
             clearTimeout(timeout);
@@ -625,23 +633,68 @@ export const FormRenderer = React.forwardRef<
             return resetKeys;
           });
 
-          // **FIX: Extract the actual form data from the nested structure**
+          // **EXTRACT FORM DATA**
           const actualFormData = llmData.formData.formData || llmData.formData;
+          console.log(
+            'Extracted actualFormData:',
+            JSON.stringify(actualFormData, null, 2)
+          );
 
           llmData = { formData: actualFormData };
+          console.log('Modified llmData:', JSON.stringify(llmData, null, 2));
 
-          // **TRIGGER AUTO-SUBMIT FOR STRUCTURED PAYLOADS**
-          triggerAutoSubmit();
+          // FIXED: Apply form data first, then trigger auto-submit with delay
+          if (llmData.formData) {
+            console.log('=== DISPATCHING MERGE_LLM_DATA ===');
+            console.log(
+              'Data being dispatched:',
+              JSON.stringify(llmData.formData, null, 2)
+            );
+
+            dispatch({
+              type: 'MERGE_LLM_DATA',
+              data: llmData.formData,
+              source: 'llm',
+            });
+
+            if (onLLMUpdate) {
+              console.log('=== CALLING onLLMUpdate ===');
+              console.log(
+                'Data passed to onLLMUpdate:',
+                JSON.stringify(llmData.formData, null, 2)
+              );
+              onLLMUpdate(llmData.formData);
+            }
+
+            // DELAY auto-submit to allow form data to be applied
+            setTimeout(() => {
+              console.log('=== TRIGGERING AUTO-SUBMIT (structured) ===');
+              triggerAutoSubmit();
+            }, 500); // 500ms delay to ensure form is updated
+          } else {
+            console.log('=== NO FORM DATA TO APPLY (structured) ===');
+          }
         }
 
         // Process suggestions
         if (llmData.suggestions) {
+          console.log('=== PROCESSING SUGGESTIONS ===');
+          console.log(
+            'Suggestions:',
+            JSON.stringify(llmData.suggestions, null, 2)
+          );
           setSuggestions(llmData.suggestions);
           setTimeout(() => setSuggestions(null), 7000);
         }
 
         // Process form data
-        if (llmData.formData) {
+        if (llmData.formData && !llmData.payloadType) {
+          console.log('=== REGULAR FORM DATA PROCESSING ===');
+          console.log(
+            'Regular form data:',
+            JSON.stringify(llmData.formData, null, 2)
+          );
+
           // Determine if this is a global or section-specific update
           const processingPath =
             llmData.currentlyProcessingPath || currentlyProcessingPath;
@@ -650,11 +703,20 @@ export const FormRenderer = React.forwardRef<
             llmData.recordingType === 'global' ||
             (!processingPath && selectedSections.size === 0);
 
+          console.log('Processing path:', processingPath);
+          console.log('Is global update:', isGlobalUpdate);
+          console.log('Selected sections:', Array.from(selectedSections));
+
           if (isGlobalUpdate) {
             // GLOBAL UPDATE: Apply to entire form or selected sections
 
             if (selectedSections.size === 0) {
               // No sections selected - update entire form
+              console.log('=== GLOBAL UPDATE - ENTIRE FORM ===');
+              console.log(
+                'Data being applied to entire form:',
+                JSON.stringify(llmData.formData, null, 2)
+              );
 
               dispatch({
                 type: 'MERGE_LLM_DATA',
@@ -662,9 +724,13 @@ export const FormRenderer = React.forwardRef<
                 source: 'llm',
               });
 
-              if (onLLMUpdate) onLLMUpdate(llmData.formData);
+              if (onLLMUpdate) {
+                console.log('=== CALLING onLLMUpdate (global) ===');
+                onLLMUpdate(llmData.formData);
+              }
             } else {
               // Apply only to selected sections
+              console.log('=== GLOBAL UPDATE - SELECTED SECTIONS ===');
 
               const selectedSectionsData: any = {};
               Object.keys(llmData.formData).forEach((key) => {
@@ -672,6 +738,11 @@ export const FormRenderer = React.forwardRef<
                   selectedSectionsData[key] = llmData.formData[key];
                 }
               });
+
+              console.log(
+                'Selected sections data:',
+                JSON.stringify(selectedSectionsData, null, 2)
+              );
 
               if (Object.keys(selectedSectionsData).length > 0) {
                 dispatch({
@@ -681,6 +752,7 @@ export const FormRenderer = React.forwardRef<
                 });
                 if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
               } else {
+                console.log('=== NO DATA FOR SELECTED SECTIONS ===');
                 toast({
                   title: 'No Updates for Selected Sections',
                   description:
@@ -689,6 +761,7 @@ export const FormRenderer = React.forwardRef<
               }
             }
           } else {
+            console.log('=== SECTION-SPECIFIC UPDATE ===');
             // Find the relevant data for this specific path
             const pathParts = processingPath.split('.');
             let relevantData: any = {};
@@ -729,6 +802,11 @@ export const FormRenderer = React.forwardRef<
               }
             }
 
+            console.log(
+              'Relevant data for section-specific update:',
+              JSON.stringify(relevantData, null, 2)
+            );
+
             if (Object.keys(relevantData).length > 0) {
               dispatch({
                 type: 'MERGE_LLM_DATA',
@@ -737,6 +815,7 @@ export const FormRenderer = React.forwardRef<
               });
               if (onLLMUpdate) onLLMUpdate(relevantData);
             } else {
+              console.log('=== NO RELEVANT DATA FOR SECTION ===');
               toast({
                 title: 'No Relevant Updates',
                 description:
@@ -749,6 +828,13 @@ export const FormRenderer = React.forwardRef<
               const isSection =
                 Object.keys(sectionTranscriptions).includes(processingPath) ||
                 processingPath.split('.').length === 1;
+
+              console.log(
+                'Clearing transcription for path:',
+                processingPath,
+                'isSection:',
+                isSection
+              );
 
               if (isSection) {
                 setSectionTranscriptions((prev) => ({
@@ -795,11 +881,14 @@ export const FormRenderer = React.forwardRef<
             }
           }
 
-          // **TRIGGER AUTO-SUBMIT FOR REGULAR FORM DATA UPDATES**
-          if (!llmData.payloadType) {
+          // FIXED: Delay auto-submit for regular form data updates too
+          setTimeout(() => {
+            console.log('=== TRIGGERING AUTO-SUBMIT (regular) ===');
             triggerAutoSubmit();
-          }
+          }, 300); // Shorter delay for regular updates
         }
+
+        console.log('=== END updateFormWithLLMData ===');
       },
       [
         onLLMUpdate,
@@ -890,12 +979,7 @@ export const FormRenderer = React.forwardRef<
     // FIX: Only notify parent component of form data changes after initialization - MINIMAL FIX
     React.useEffect(() => {
       if (onChange && isInitialized) {
-        // ADD: Debounce the onChange to prevent rapid state updates
-        const timeoutId = setTimeout(() => {
-          onChange(state);
-        }, 100); // 100ms debounce
-
-        return () => clearTimeout(timeoutId);
+        onChange(state);
       }
     }, [state, onChange, isInitialized]);
 
@@ -1222,7 +1306,7 @@ export const FormRenderer = React.forwardRef<
             </div>
 
             {/* Add transcription box for top-level sections */}
-            {isTopLevelSection && renderSectionTranscriptionBox(path)}
+            {/* {isTopLevelSection && renderSectionTranscriptionBox(path)} */}
 
             <div className="space-y-3">
               {value?.map((item: any, index: number) => {
@@ -1316,7 +1400,7 @@ export const FormRenderer = React.forwardRef<
               </div>
             )}
             {/* Add transcription box for top-level sections */}
-            {isTopLevelSection && renderSectionTranscriptionBox(path)}
+            {/* {isTopLevelSection && renderSectionTranscriptionBox(path)} */}
             <div
               className={parentIsArray ? '' : 'pl-2 border-l-2 border-border'}
             >
@@ -1399,8 +1483,8 @@ export const FormRenderer = React.forwardRef<
             <div className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
               <span className="text-sm text-blue-700">
-                Auto-submitting form in {Math.ceil(autoSubmitDelay / 1000)}{' '}
-                seconds...
+                Auto-submitting form in{' '}
+                {Math.ceil((autoSubmitDelay + 1000) / 1000)} seconds...
               </span>
               <Button
                 type="button"

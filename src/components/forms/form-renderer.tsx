@@ -78,6 +78,7 @@ export const FormRenderer = React.forwardRef<
     // FORM INITIALIZATION STATE - FIX FOR PRE-FILLED DATA
     const [isInitialized, setIsInitialized] = React.useState(false);
     const initializationRef = React.useRef(false);
+    const [isStateUpdated, setIsStateUpdated] = React.useState(false);
 
     // Use custom hook for form state management
     const formState = useFormRenderer(
@@ -205,6 +206,8 @@ export const FormRenderer = React.forwardRef<
       const isSame = JSON.stringify(state) === JSON.stringify(formData); // shallow equality is not enough
 
       if (isSame) {
+        setIsInitialized(true);
+
         return;
       }
 
@@ -233,55 +236,79 @@ export const FormRenderer = React.forwardRef<
       setIsInitialized(true);
     }, [formData, dispatch, schema, state]);
 
-    // AUTO-SUBMIT TRIGGER FUNCTION - FIX: Ensure auto-submit actually executes
+    // FIXED: Auto-submit trigger function - now directly executes the timeout
     const triggerAutoSubmit = React.useCallback(() => {
-      if (!autoSubmitOnLLMUpdate) return;
+      if (!autoSubmitOnLLMUpdate || !isInitialized) {
+        console.log(
+          '=== Auto-submit skipped - not enabled or not initialized ==='
+        );
+        return;
+      }
 
-      lastLLMUpdateRef.current = Date.now();
-      isLLMUpdateInProgress.current = true;
-      setPendingAutoSubmit(true);
+      console.log('=== triggerAutoSubmit called ===');
+      console.log(
+        '=== Checking state before auto-submit ===',
+        JSON.stringify(state, null, 2)
+      );
+
+      // Ensure that the form has valid data before submitting
+      if (
+        !state.plan?.plans?.some((plan) => plan.exercise) ||
+        !state.subjectiveAssessment?.assessment ||
+        !state.objectiveAssessment?.tests?.length
+      ) {
+        console.log('=== Form has empty fields, cannot submit ===');
+        toast({
+          title: 'Incomplete Form',
+          description: 'Please ensure all required fields are filled.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log('=== Proceeding with auto-submit ===');
 
       if (autoSubmitTimeoutRef.current) {
         clearTimeout(autoSubmitTimeoutRef.current);
       }
 
-      // Don't use state directly here - it's stale!
-      // Instead, let the useEffect handle the submission with fresh state
-    }, [autoSubmitOnLLMUpdate]);
+      lastLLMUpdateRef.current = Date.now();
+      isLLMUpdateInProgress.current = true;
+      setPendingAutoSubmit(true);
 
-    // UPDATE: Auto-submit effect with longer delay
-    React.useEffect(() => {
-      if (isLLMUpdateInProgress.current && pendingAutoSubmit && isInitialized) {
-        // Clear any existing timeout
-        if (autoSubmitTimeoutRef.current) {
-          clearTimeout(autoSubmitTimeoutRef.current);
-        }
+      // Proceed with the auto-submit process only if the state is correctly populated
+      setTimeout(async () => {
+        console.log('=== Auto-submit timeout executed ===');
 
-        // INCREASED DELAY: Schedule auto-submit with longer delay
-        autoSubmitTimeoutRef.current = setTimeout(() => {
-          // First, ensure the parent has the latest state
+        try {
           if (onChange) {
-            onChange(state);
+            console.log('=== Calling onChange with current state ===');
+            onChange(state); // Ensure latest state is passed to parent
           }
 
-          // Then submit the form with delay to ensure state propagation
-          setTimeout(() => {
-            handleSubmitForm(true); // true = isAutoSubmit
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
-            // Reset auto-submit flags
-            setPendingAutoSubmit(false);
-            isLLMUpdateInProgress.current = false;
-            autoSubmitTimeoutRef.current = null;
-          }, 500); // Increased delay for state propagation
-        }, autoSubmitDelay + 1000); // Add extra 1 second to the configured delay
-      }
+          console.log('=== Calling handleSubmitForm (auto-submit) ===');
+          await handleSubmitForm(true); // true = isAutoSubmit
+
+          console.log('=== Auto-submit completed successfully ===');
+        } catch (error) {
+          console.error('=== Auto-submit failed ===', error);
+        } finally {
+          setPendingAutoSubmit(false);
+          isLLMUpdateInProgress.current = false;
+          autoSubmitTimeoutRef.current = null;
+        }
+      }, 500); // Reduced delay to ensure state is propagated before submission
+
+      console.log(`=== Auto-submit scheduled for 500ms delay ===`);
     }, [
-      state,
-      pendingAutoSubmit,
+      autoSubmitOnLLMUpdate,
       isInitialized,
+      onChange,
+      state,
       handleSubmitForm,
       autoSubmitDelay,
-      onChange,
     ]);
 
     // CLEANUP TIMEOUT ON UNMOUNT
@@ -305,11 +332,13 @@ export const FormRenderer = React.forwardRef<
           pendingAutoSubmit &&
           timeSinceLastLLMUpdate < autoSubmitDelay + 1000
         ) {
+          console.log('=== Canceling auto-submit due to user interaction ===');
           setPendingAutoSubmit(false);
           if (autoSubmitTimeoutRef.current) {
             clearTimeout(autoSubmitTimeoutRef.current);
             autoSubmitTimeoutRef.current = null;
           }
+          isLLMUpdateInProgress.current = false;
         }
       },
       [handleChange, pendingAutoSubmit, autoSubmitDelay]
@@ -581,7 +610,7 @@ export const FormRenderer = React.forwardRef<
       ]
     );
 
-    // Update form with LLM data - ENHANCED WITH DEBUG LOGGING
+    // FIXED: Update form with LLM data - SINGLE AUTO-SUBMIT TRIGGER
     const updateFormWithLLMData = React.useCallback(
       (llmData: any) => {
         console.log('=== FORM RENDERER: updateFormWithLLMData called ===');
@@ -643,7 +672,7 @@ export const FormRenderer = React.forwardRef<
           llmData = { formData: actualFormData };
           console.log('Modified llmData:', JSON.stringify(llmData, null, 2));
 
-          // FIXED: Apply form data first, then trigger auto-submit with delay
+          // Apply form data
           if (llmData.formData) {
             console.log('=== DISPATCHING MERGE_LLM_DATA ===');
             console.log(
@@ -665,12 +694,6 @@ export const FormRenderer = React.forwardRef<
               );
               onLLMUpdate(llmData.formData);
             }
-
-            // DELAY auto-submit to allow form data to be applied
-            setTimeout(() => {
-              console.log('=== TRIGGERING AUTO-SUBMIT (structured) ===');
-              triggerAutoSubmit();
-            }, 500); // 500ms delay to ensure form is updated
           } else {
             console.log('=== NO FORM DATA TO APPLY (structured) ===');
           }
@@ -880,15 +903,24 @@ export const FormRenderer = React.forwardRef<
               }
             }
           }
+        }
 
-          // FIXED: Delay auto-submit for regular form data updates too
+        // FIXED: Single auto-submit trigger at the end - with immediate execution
+        if (
+          llmData.formData ||
+          (llmData.payloadType === 'structured' && llmData.formData)
+        ) {
+          console.log('=== LLM data processed, triggering auto-submit ===');
+
+          // Use setTimeout to ensure state has been updated first
           setTimeout(() => {
-            console.log('=== TRIGGERING AUTO-SUBMIT (regular) ===');
+            console.log('=== Delayed auto-submit trigger ===');
             triggerAutoSubmit();
-          }, 300); // Shorter delay for regular updates
+          }, 200); // Slightly longer delay to ensure dispatch completes
         }
 
         console.log('=== END updateFormWithLLMData ===');
+        setIsStateUpdated(true);
       },
       [
         onLLMUpdate,
@@ -918,6 +950,14 @@ export const FormRenderer = React.forwardRef<
         triggerAutoSubmit,
       ]
     );
+
+    React.useEffect(() => {
+      if (isStateUpdated) {
+        console.log('=== Triggering auto-submit after state update ===');
+        triggerAutoSubmit(); // Trigger auto-submit after state is updated
+        setIsStateUpdated(false); // Reset state update flag
+      }
+    }, [isStateUpdated]);
 
     // 2. Add a cleanup function for resetting processed states
     const resetProcessedState = React.useCallback(
@@ -1483,15 +1523,17 @@ export const FormRenderer = React.forwardRef<
             <div className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
               <span className="text-sm text-blue-700">
-                Auto-submitting form in{' '}
-                {Math.ceil((autoSubmitDelay + 1000) / 1000)} seconds...
+                Auto-submitting form in {Math.ceil(autoSubmitDelay / 1000)}{' '}
+                seconds...
               </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  console.log('=== Auto-submit cancelled by user ===');
                   setPendingAutoSubmit(false);
+                  isLLMUpdateInProgress.current = false;
                   if (autoSubmitTimeoutRef.current) {
                     clearTimeout(autoSubmitTimeoutRef.current);
                     autoSubmitTimeoutRef.current = null;

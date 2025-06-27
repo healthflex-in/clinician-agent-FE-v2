@@ -47,6 +47,47 @@ export async function graphqlRequest<T = any>(
   }
 }
 
+function convertToRequiredPayload(inputData: any) {
+  return {
+    assessment: {
+      plan: {
+        advice: inputData.plan?.advice || '', // Use received data or empty string
+        plans:
+          inputData.plan?.plans?.map((plan: any) => ({
+            exercise: plan.exercise || '', // Ensure valid exercise name
+            comments: plan.comments || '', // Ensure valid comments
+            set: plan.set?.map((set: any) => ({
+              repetitions: set.repetitions || 0, // Ensure it's a number (default 0)
+              load: set.load || '', // Default to empty string if not available
+              unit: set.unit || '', // Default to empty string if not available
+            })),
+            duration: {
+              value: plan.duration?.value || 0, // Ensure it's a number (default 0)
+              unit: plan.duration?.unit || '', // Default to empty if not available
+            },
+          })) || [],
+      },
+      subjectiveAssessment: {
+        assessment: inputData.subjectiveAssessment?.assessment || '', // Default to empty if not available
+      },
+      objectiveAssessment: {
+        tests:
+          inputData.objectiveAssessment?.tests?.map((test: any) => ({
+            testName: test.testName || '', // Ensure valid test name
+            unitName: test.unitName || '', // Ensure valid unit name
+            value: parseFloat(test.value) || 0, // Ensure this is a Float (default 0)
+            left: parseFloat(test.left) || 0, // Ensure this is a Float (default 0)
+            right: parseFloat(test.right) || 0, // Ensure this is a Float (default 0)
+            comments: test.comments || '', // Default to empty if not available
+          })) || [],
+      },
+      rpe: {
+        value: parseFloat(inputData.rpe?.value) || 0, // Ensure this is a Float (default 0)
+      },
+    },
+  };
+}
+
 /**
  * Update agent report with form data
  * @param input Update agent report input
@@ -59,6 +100,14 @@ export async function updateAgentReport(input: {
   formKey?: string;
   input: any;
 }) {
+  console.log('=== Validating form data before sending to API ===');
+  console.log(
+    'Input data being sent to the server:',
+    JSON.stringify(input.input, null, 2)
+  ); // Log the input data
+
+  const convertedData = convertToRequiredPayload(input.input);
+
   const query = `
     mutation updateAgentReport( $appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
       updateAgentReport(appointmentId: $appointmentId, input: $input) {
@@ -69,7 +118,7 @@ export async function updateAgentReport(input: {
 
   return graphqlRequest(query, {
     appointmentId: input.appointmentId,
-    input: input.input,
+    input: convertedData,
   });
 }
 

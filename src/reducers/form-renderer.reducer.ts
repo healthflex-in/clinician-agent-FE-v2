@@ -98,6 +98,7 @@ export const formReducer = (
       return action.data;
 
     case 'MERGE_LLM_DATA': {
+      // Track differences between state and new data
       const differences = findDifferences(state, action.data);
 
       if (action.source === 'llm' && differences.length > 0) {
@@ -113,6 +114,7 @@ export const formReducer = (
         });
       }
 
+      // Deep merge function - merge data recursively
       const mergeDeep = (target: any, source: any): any => {
         if (typeof source !== 'object' || source === null) return target;
 
@@ -123,14 +125,21 @@ export const formReducer = (
             !Array.isArray(source[key])
           ) {
             target[key] = mergeDeep({ ...(target[key] || {}) }, source[key]);
-          } else {
+          } else if (source[key] !== undefined && source[key] !== null) {
             target[key] = source[key];
           }
         }
         return target;
       };
 
+      // Create a deep copy of state to avoid mutations, and merge LLM data
       const newState = mergeDeep({ ...state }, action.data);
+
+      // Log the state to inspect if merge is correct
+      console.log(
+        '=== New merged state ===',
+        JSON.stringify(newState, null, 2)
+      );
 
       return newState;
     }

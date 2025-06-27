@@ -305,7 +305,7 @@ export function useWebSocket(options: WebSocketOptions) {
         }`;
       }
 
-      // FIXED: Use the correct payload structure
+      // FIXED: Use actual form data from currentFormData parameter
       const payload = {
         userId,
         AppointmentId: appointmentId, // Note: Capital 'A'
@@ -313,8 +313,11 @@ export function useWebSocket(options: WebSocketOptions) {
         mode: 'form_fill',
         audio: audioData,
         formData: currentFormData
-          ? transformFormDataForAPI(currentFormData, formKey)
-          : undefined,
+          ? transformFormDataForAPI(
+              currentFormData.formData || currentFormData,
+              formKey
+            )
+          : undefined, // Only send if we have actual form data
         apiKey:
           '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };
@@ -338,7 +341,7 @@ export function useWebSocket(options: WebSocketOptions) {
       const appointmentId = localStorage.getItem('appointmentId') || '';
       const formKey = localStorage.getItem('formKey') || 'physio';
 
-      // FIXED: Use the correct payload structure
+      // FIXED: Use actual form data from currentFormData parameter
       const payload = {
         userId,
         AppointmentId: appointmentId, // Note: Capital 'A'
@@ -346,8 +349,11 @@ export function useWebSocket(options: WebSocketOptions) {
         mode: 'form_fill',
         text: transcriptionText,
         formData: currentFormData
-          ? transformFormDataForAPI(currentFormData, formKey)
-          : undefined,
+          ? transformFormDataForAPI(
+              currentFormData.formData || currentFormData,
+              formKey
+            )
+          : undefined, // Only send if we have actual form data
         apiKey:
           '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };
@@ -364,146 +370,155 @@ export function useWebSocket(options: WebSocketOptions) {
     []
   );
 
-  // FIXED: Use exact form schema default values
+  // FIXED: transformFormDataForAPI function to send prefilled values when they exist, defaults when they don't
   const transformFormDataForAPI = (formData: any, formKey: string) => {
     if (formKey === 'assessment') {
-      // Use exact schema defaults from form-schemas.ts
-      const schemaDefaults = {
-        plan: {
-          advice: '',
-          plans: [
-            {
-              exercise: '',
-              comments: '',
-              set: [
-                {
-                  repetitions: 0,
-                  load: '',
-                  unit: '',
-                },
-              ],
-              duration: {
-                value: 0,
-                unit: '',
-              },
-            },
-          ],
-        },
-        subjectiveAssessment: {
-          assessment: '',
-        },
-        objectiveAssessment: {
-          tests: [
-            {
-              testName: '',
-              unitName: '',
-              value: 0,
-              left: 0,
-              right: 0,
-              comments: '',
-            },
-          ],
-        },
-        rpe: {
-          value: 0,
-        },
-      };
-
-      // Transform to API format while preserving schema structure
-      const transformed = {
-        plan: {
-          advice: formData?.plan?.advice || schemaDefaults.plan.advice,
-          plans:
-            formData?.plan?.plans?.length > 0
-              ? formData.plan.plans.map((plan: any) => ({
-                  exercise: plan.exercise || '',
-                  set:
-                    plan.sets?.length > 0
-                      ? plan.sets.map((set: any) => ({
-                          repetitions: parseInt(set.repetitions) || 0,
-                          load: String(set.load || ''),
-                          unit: String(set.unit || ''),
-                        }))
-                      : schemaDefaults.plan.plans[0].set, // Use schema default set
-                  duration: {
-                    value: parseInt(plan.duration?.value) || 0,
-                    unit: String(plan.duration?.unit || ''),
-                  },
-                  comments: plan.comments || '',
-                }))
-              : schemaDefaults.plan.plans, // Use schema default plans
-        },
-        // Transform objectiveAssessment.tests to objectiveAssessments (API format)
-        objectiveAssessments:
-          formData?.objectiveAssessment?.tests?.length > 0
-            ? formData.objectiveAssessment.tests.map((test: any) => ({
-                testName: test.testName || '',
-                unitName: test.unitName || '',
-                value: parseFloat(test.value) || 0,
-                left: parseFloat(test.left) || 0,
-                right: parseFloat(test.right) || 0,
-                comments: test.comments || '',
-              }))
-            : schemaDefaults.objectiveAssessment.tests, // Use schema default tests
-        // Transform subjectiveAssessment.assessment to subjectiveAssessments (API format)
-        subjectiveAssessments:
-          formData?.subjectiveAssessment?.assessment ||
-          schemaDefaults.subjectiveAssessment.assessment,
-        // Transform rpe.value to rpe (API format)
-        rpe: parseInt(formData?.rpe?.value) || schemaDefaults.rpe.value,
-      };
-      return transformed;
-    }
-
-    if (formKey === 'snc') {
-      // Use exact schema defaults from form-schemas.ts
-      const schemaDefaults = {
-        advice: '',
-        plans: [
-          {
-            exercise: '',
-            comments: '',
-            sets: [
-              {
-                repetitions: 0,
-                load: '',
-                unit: '',
-              },
-            ],
-            duration: {
-              value: 0,
-              unit: '',
-            },
-          },
-        ],
-      };
+      // Check if form has actual data vs empty/default state
+      const hasAdvice =
+        formData?.plan?.advice && formData.plan.advice.trim() !== '';
+      const hasPlans =
+        formData?.plan?.plans?.length > 0 &&
+        formData.plan.plans.some(
+          (plan: any) =>
+            (plan.exercise && plan.exercise.trim() !== '') ||
+            (plan.comments && plan.comments.trim() !== '') ||
+            (plan.sets?.length > 0 &&
+              plan.sets.some(
+                (set: any) =>
+                  set.repetitions > 0 ||
+                  (set.load && set.load.trim() !== '') ||
+                  (set.unit && set.unit.trim() !== '')
+              )) ||
+            plan.duration?.value > 0 ||
+            (plan.duration?.unit && plan.duration.unit.trim() !== '')
+        );
+      const hasObjectiveTests =
+        formData?.objectiveAssessment?.tests?.length > 0 &&
+        formData.objectiveAssessment.tests.some(
+          (test: any) =>
+            (test.testName && test.testName.trim() !== '') ||
+            (test.unitName && test.unitName.trim() !== '') ||
+            test.value > 0 ||
+            test.left > 0 ||
+            test.right > 0 ||
+            (test.comments && test.comments.trim() !== '')
+        );
+      const hasSubjectiveAssessment =
+        formData?.subjectiveAssessment?.assessment &&
+        formData.subjectiveAssessment.assessment.trim() !== '';
+      const hasRPE = formData?.rpe?.value && formData.rpe.value > 0;
 
       const transformed = {
-        advice: formData?.advice || schemaDefaults.advice,
-        plans:
-          formData?.plans?.length > 0
-            ? formData.plans.map((plan: any) => ({
+        plan: {
+          advice: hasAdvice ? formData.plan.advice : '', // Send prefilled or empty
+          plans: hasPlans
+            ? formData.plan.plans.map((plan: any) => ({
                 exercise: plan.exercise || '',
-                sets:
+                set:
                   plan.sets?.length > 0
                     ? plan.sets.map((set: any) => ({
                         repetitions: parseInt(set.repetitions) || 0,
                         load: String(set.load || ''),
                         unit: String(set.unit || ''),
                       }))
-                    : schemaDefaults.plans[0].sets, // Use schema default sets
+                    : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no sets
                 duration: {
                   value: parseInt(plan.duration?.value) || 0,
                   unit: String(plan.duration?.unit || ''),
                 },
                 comments: plan.comments || '',
               }))
-            : schemaDefaults.plans, // Use schema default plans
+            : [
+                {
+                  // Send default plan structure if no actual plans
+                  exercise: '',
+                  set: [{ repetitions: 0, load: '', unit: '' }],
+                  duration: { value: 0, unit: '' },
+                  comments: '',
+                },
+              ],
+        },
+        objectiveAssessments: hasObjectiveTests
+          ? formData.objectiveAssessment.tests.map((test: any) => ({
+              testName: test.testName || '',
+              unitName: test.unitName || '',
+              value: parseFloat(test.value) || 0,
+              left: parseFloat(test.left) || 0,
+              right: parseFloat(test.right) || 0,
+              comments: test.comments || '',
+            }))
+          : [
+              {
+                // Send default test structure if no actual tests
+                testName: '',
+                unitName: '',
+                value: 0,
+                left: 0,
+                right: 0,
+                comments: '',
+              },
+            ],
+        subjectiveAssessments: hasSubjectiveAssessment
+          ? formData.subjectiveAssessment.assessment
+          : '', // Send prefilled or empty
+        rpe: hasRPE ? parseInt(formData.rpe.value) : 0, // Send prefilled or 0
       };
       return transformed;
     }
 
-    // For other form types, return as-is
+    if (formKey === 'snc') {
+      // Check if form has actual data vs empty/default state
+      const hasAdvice = formData?.advice && formData.advice.trim() !== '';
+      const hasPlans =
+        formData?.plans?.length > 0 &&
+        formData.plans.some(
+          (plan: any) =>
+            (plan.exercise && plan.exercise.trim() !== '') ||
+            (plan.comments && plan.comments.trim() !== '') ||
+            (plan.sets?.length > 0 &&
+              plan.sets.some(
+                (set: any) =>
+                  set.repetitions > 0 ||
+                  (set.load && set.load.trim() !== '') ||
+                  (set.unit && set.unit.trim() !== '')
+              )) ||
+            plan.duration?.value > 0 ||
+            (plan.duration?.unit && plan.duration.unit.trim() !== '')
+        );
+
+      const transformed = {
+        advice: hasAdvice ? formData.advice : '', // Send prefilled or empty
+        plans: hasPlans
+          ? formData.plans.map((plan: any) => ({
+              exercise: plan.exercise || '',
+              sets:
+                plan.sets?.length > 0
+                  ? plan.sets.map((set: any) => ({
+                      repetitions: parseInt(set.repetitions) || 0,
+                      load: String(set.load || ''),
+                      unit: String(set.unit || ''),
+                    }))
+                  : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no sets
+              duration: {
+                value: parseInt(plan.duration?.value) || 0,
+                unit: String(plan.duration?.unit || ''),
+              },
+              comments: plan.comments || '',
+            }))
+          : [
+              {
+                // Send default plan structure if no actual plans
+                exercise: '',
+                sets: [{ repetitions: 0, load: '', unit: '' }],
+                duration: { value: 0, unit: '' },
+                comments: '',
+              },
+            ],
+      };
+      return transformed;
+    }
+
+    // For other form types, return actual data or empty object
     return formData || {};
   };
 

@@ -33,7 +33,7 @@ type FormPageParams = {
 const FormPage = () => {
   const { toast } = useToast();
   const {
-    formKey = 'physio',
+    formKey = 'assessment', // CHANGED: from 'physio' to 'assessment'
     patientId,
     appointmentId,
   } = useParams<FormPageParams>();
@@ -42,7 +42,7 @@ const FormPage = () => {
 
   // Initialize schema based on formKey
   const schema =
-    formSchemas[formKey as keyof typeof formSchemas] || formSchemas.physio;
+    formSchemas[formKey as keyof typeof formSchemas] || formSchemas.assessment; // CHANGED: fallback from physio to assessment
 
   // PHASE 1: Permission Management
   const {
@@ -59,6 +59,7 @@ const FormPage = () => {
     isSubmitting,
     reportId,
     patientName,
+    isInitialLoadComplete, // ADDED: Get loading state from hook
     handleFormChange,
     handleFormSubmit,
     handleFormReset,
@@ -68,31 +69,6 @@ const FormPage = () => {
     patientId: patientId || '',
     appointmentId: appointmentId || '',
   });
-
-  // FIX: Add loading state to prevent FormRenderer from initializing too early
-  const [isFormDataReady, setIsFormDataReady] = React.useState(false);
-
-  // Track when formData is actually ready (either with API data, null, or confirmed empty)
-  React.useEffect(() => {
-    // Check if useFormManagement has completed its initial load
-    const checkFormDataReady = () => {
-      // If formData is not undefined (it's either data, null, or empty object)
-      if (formData !== undefined) {
-        setIsFormDataReady(true);
-        return true;
-      }
-      return false;
-    };
-
-    if (!checkFormDataReady()) {
-      // Wait a bit for API call to complete
-      const timer = setTimeout(() => {
-        setIsFormDataReady(true);
-      }, 3000); // Wait 3 seconds for API data
-
-      return () => clearTimeout(timer);
-    }
-  }, [formData]);
 
   // PHASE 2: Voice Recorder Management - FIXED: Added formRendererRef
   const {
@@ -166,14 +142,17 @@ const FormPage = () => {
     );
   }
 
-  // FIX: Show loading state while waiting for form data
-  if (!isFormDataReady) {
+  // FIXED: Use isInitialLoadComplete from useFormManagement instead of custom state
+  if (!isInitialLoadComplete) {
     return (
       <ThemeProvider>
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background">
           <div className="text-center space-y-4">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
             <p className="text-muted-foreground">Loading form data...</p>
+            <p className="text-xs text-muted-foreground">
+              Fetching patient information and initializing report...
+            </p>
           </div>
         </div>
       </ThemeProvider>

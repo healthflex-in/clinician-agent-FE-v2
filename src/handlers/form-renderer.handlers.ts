@@ -543,32 +543,112 @@ export const useFormHandlers = (
    * @param formData The raw form data
    * @returns Transformed payload for the specific schema
    */
+  // Dynamic payload preparation - works for both SNC and Assessment forms without conflicts
   const preparePayloadForSchema = React.useCallback(
     (formKey: string, formData: any): any => {
+      console.log(`Preparing payload for formKey: ${formKey}`, formData);
+
       switch (formKey) {
         case 'physio':
           return preparePhysioAssessmentPayload(formData);
 
         case 'snc': {
+          // SNC form handling - completely separate from assessment
           const data = prepareSNCExercisePayload(formData);
+          console.log('SNC payload prepared:', data);
           return data;
         }
-        //       case 'doctor-consultation':
-        //         return prepareDoctorConsultationPayload(formData);
-        //
-        //       case 'patient-intake':
-        //         return preparePatientIntakePayload(formData);
+
+        case 'assessment': {
+          // Assessment form handling - completely separate from SNC
+          const data = prepareAssessmentPayload(formData);
+          console.log('Assessment payload prepared:', data);
+          return data;
+        }
 
         default:
-          // Default: return the form data as-is
+          // Default: return the form data as-is for other form types
           console.warn(
             `No specific payload preparation for formKey: ${formKey}`
           );
-          return formData;
+          return { [formKey]: formData };
       }
     },
     []
   );
+
+  // Assessment payload preparation (NEW - only affects assessment forms)
+  function prepareAssessmentPayload(formData: any) {
+    console.log('prepareAssessmentPayload input:', formData);
+
+    // Build assessment object exactly matching the required API format
+    const assessmentObject = {
+      plan: {
+        advice: formData.plan?.advice || '',
+        plans: [],
+      },
+      subjectiveAssessment: {
+        assessment: formData.subjectiveAssessment?.assessment || '',
+      },
+      objectiveAssessment: {
+        tests: Array.isArray(formData.objectiveAssessment?.tests)
+          ? formData.objectiveAssessment.tests.map((test) => ({
+              testName: test.testName || '',
+              unitName: test.unitName || '',
+              value: parseInt(test.value) || 0,
+              left: parseInt(test.left) || 0,
+              right: parseInt(test.right) || 0,
+              comments: test.comments || '',
+            }))
+          : [],
+      },
+      rpe: {
+        value: parseInt(formData.rpe?.value) || 0,
+      },
+    };
+
+    // Process plans data - convert 'sets' array back to 'set' array for API
+    const plans = formData.plan?.plans || [];
+
+    if (Array.isArray(plans) && plans.length > 0) {
+      assessmentObject.plan.plans = plans.map((plan) => {
+        // Convert 'sets' array back to 'set' array for API compatibility
+        let setArray = [];
+
+        if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
+          setArray = plan.sets.map((set) => ({
+            repetitions: parseInt(set.repetitions) || 0,
+            load: String(set.load || ''),
+            unit: String(set.unit || ''),
+          }));
+        } else {
+          // Default single set if no sets provided
+          setArray = [
+            {
+              repetitions: 0,
+              load: '',
+              unit: '',
+            },
+          ];
+        }
+
+        return {
+          exercise: String(plan.exercise || ''),
+          comments: String(plan.comments || ''),
+          set: setArray, // Assessment uses "set" array (different from SNC)
+          duration: {
+            value: parseInt(plan.duration?.value) || 0,
+            unit: String(plan.duration?.unit || ''),
+          },
+        };
+      });
+    }
+
+    console.log('prepareAssessmentPayload output:', {
+      assessment: assessmentObject,
+    });
+    return { assessment: assessmentObject };
+  }
 
   // FIXED: Reset form to initial state with proper cleanup
   const handleResetForm = React.useCallback(() => {

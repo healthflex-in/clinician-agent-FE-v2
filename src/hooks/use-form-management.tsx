@@ -14,6 +14,7 @@ type UseFormManagementReturn = {
   patientName: string;
   isSubmitting: boolean;
   reportId: string | null;
+  isInitialLoadComplete: boolean;
 
   handleFormReset: () => void;
   setFormData: (data: any) => void;
@@ -32,6 +33,7 @@ export const useFormManagement = ({
   const [patientName, setPatientName] = React.useState<string>('Patient');
   const [isInitialLoadComplete, setIsInitialLoadComplete] =
     React.useState(false);
+
   const { toast } = useToast();
 
   // Store formKey, patientId and appointmentId in localStorage for WebSocket access
@@ -41,47 +43,34 @@ export const useFormManagement = ({
     if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
   }, [formKey, patientId, appointmentId]);
 
-  // Fetch patient name and create initial report
+  // FAST: Get patient name from localStorage immediately (no API call needed)
   React.useEffect(() => {
-    const fetchPatientName = async () => {
-      if (!patientId) return;
-
+    const storedPatient = localStorage.getItem('selectedPatient');
+    if (storedPatient) {
       try {
-        const storedPatient = localStorage.getItem('selectedPatient');
-        if (storedPatient) {
-          const patientData = JSON.parse(storedPatient);
-          if (patientData && patientData.name) {
-            setPatientName(patientData.name);
-            return;
-          }
+        const patientData = JSON.parse(storedPatient);
+        if (patientData && patientData.name) {
+          setPatientName(patientData.name);
         }
-
-        const query = `
-          query GetPatientById($patientId: ObjectID!) {
-            getPatientById(patientId: $patientId) {
-              _id
-              name
-            }
-          }
-        `;
-
-        const variables = { patientId };
-        const result = await graphqlRequest(query, variables);
-        if (result && result.getPatientById && result.getPatientById.name) {
-          setPatientName(result.getPatientById.name);
-        }
-      } catch (error) {
-        console.error('Error fetching patient name:', error);
+      } catch (e) {
+        console.warn('Failed to parse stored patient data');
       }
-    };
+    }
+  }, []);
 
+  // MAIN: Create initial report (only API call we need to wait for)
+  React.useEffect(() => {
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) {
         setFormData(null); // null means use schema defaults
         setIsInitialLoadComplete(true);
         return;
       }
+
       try {
+        console.log('Starting createAgentReport API call...');
+        const startTime = Date.now();
+
         const centerId =
           localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
         const variables = {
@@ -89,7 +78,13 @@ export const useFormManagement = ({
           center: centerId,
           appointment: appointmentId,
         };
+
         const result = await createAgentReport(variables);
+        console.log(
+          `API response received in ${Date.now() - startTime}ms:`,
+          result
+        );
+
         if (
           result &&
           result.createAgentReport &&
@@ -100,11 +95,14 @@ export const useFormManagement = ({
             title: 'Report Created',
             description: 'New report initialized successfully',
           });
+
+          // Handle SNC form data transformation
           if (
             formKey === 'snc' &&
             result.createAgentReport.assessment &&
             result.createAgentReport.assessment.plan
           ) {
+            console.log('Processing SNC form data...');
             // Transform 'set' to 'sets' for each plan
             const plan = result.createAgentReport.assessment.plan;
             const transformedPlan = {
@@ -123,19 +121,109 @@ export const useFormManagement = ({
                   })
                 : [],
             };
+            console.log('Setting SNC form data:', transformedPlan);
             setFormData(transformedPlan);
-          } else if (result.createAgentReport[formKey]) {
-            setFormData(result.createAgentReport[formKey]);
-          } else if (
-            result.createAgentReport.assessment &&
-            formKey === 'assessment'
+          }
+          // Handle assessment form data transformation
+          else if (
+            formKey === 'assessment' &&
+            result.createAgentReport.assessment
           ) {
-            setFormData(result.createAgentReport.assessment);
+            console.log('Processing assessment form data...');
+            const assessmentData = result.createAgentReport.assessment;
+
+            // FIXED: Handle objectiveAssessment array structure from API
+            let objectiveAssessmentData = {
+              tests: [],
+            };
+
+            // API returns objectiveAssessment as array, extract tests from first item
+            if (
+              Array.isArray(assessmentData.objectiveAssessment) &&
+              assessmentData.objectiveAssessment.length > 0
+            ) {
+              const firstObjectiveAssessment =
+                assessmentData.objectiveAssessment[0];
+              if (
+                firstObjectiveAssessment.tests &&
+                Array.isArray(firstObjectiveAssessment.tests)
+              ) {
+                objectiveAssessmentData.tests = firstObjectiveAssessment.tests;
+              }
+            }
+            // Fallback: if it's already an object with tests property
+            else if (
+              assessmentData.objectiveAssessment &&
+              assessmentData.objectiveAssessment.tests
+            ) {
+              objectiveAssessmentData.tests =
+                assessmentData.objectiveAssessment.tests;
+            }
+
+            // Transform the assessment data structure
+            const transformedAssessment = {
+              plan: {
+                advice: assessmentData.plan?.advice || '',
+                plans: Array.isArray(assessmentData.plan?.plans)
+                  ? assessmentData.plan.plans.map((p) => {
+                      let sets = [];
+                      // Transform 'set' array to 'sets' array
+                      if (Array.isArray(p.set)) {
+                        sets = p.set;
+                      } else if (p.set) {
+                        sets = [p.set];
+                      }
+                      // Remove 'set' and add 'sets'
+                      const { set, ...rest } = p;
+                      return { ...rest, sets };
+                    })
+                  : [
+                      {
+                        exercise: '',
+                        comments: '',
+                        sets: [
+                          {
+                            repetitions: 0,
+                            load: '',
+                            unit: '',
+                          },
+                        ],
+                        duration: {
+                          value: 0,
+                          unit: '',
+                        },
+                      },
+                    ],
+              },
+              subjectiveAssessment: {
+                assessment:
+                  assessmentData.subjectiveAssessment?.assessment || '',
+              },
+              objectiveAssessment: objectiveAssessmentData, // FIXED: Use the properly structured data
+              rpe: {
+                value: assessmentData.rpe?.value || 0,
+              },
+            };
+
+            console.log('Setting assessment form data:', transformedAssessment);
+            setFormData(transformedAssessment);
+          }
+          // Handle other form types
+          else if (result.createAgentReport[formKey]) {
+            console.log(
+              `Setting ${formKey} form data:`,
+              result.createAgentReport[formKey]
+            );
+            setFormData(result.createAgentReport[formKey]);
           } else {
+            console.log(
+              'No data returned for this form key, using schema defaults'
+            );
             // No data returned for this form key, set to null so FormRenderer uses schema
             setFormData(null);
           }
         } else {
+          console.log('No report created, using schema defaults');
           // No report created, set to null so FormRenderer uses schema
           setFormData(null);
         }
@@ -149,17 +237,15 @@ export const useFormManagement = ({
           variant: 'destructive',
         });
       } finally {
+        console.log('Form initialization complete');
         setIsInitialLoadComplete(true);
       }
     };
 
-    fetchPatientName();
     createInitialReport();
   }, [patientId, appointmentId, toast, formKey]);
 
-  // Log formKey on every render
-
-  // Handle form data changes - FIX: Simplified to work for both cases
+  // Handle form data changes
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
 
@@ -175,7 +261,7 @@ export const useFormManagement = ({
     }
   };
 
-  // Submit form data - FIX: Use current formData state
+  // Submit form data
   const handleFormSubmit = async () => {
     if (!reportId || !appointmentId) {
       toast({
@@ -186,7 +272,6 @@ export const useFormManagement = ({
       return;
     }
 
-    // FIX: Use the current formData state, not a potentially stale closure
     const currentFormData = formData;
 
     if (!currentFormData) {
@@ -238,13 +323,59 @@ export const useFormManagement = ({
         return result;
       };
 
-      const input: any = {};
-      input[formKey] = processData(formDataCopy);
+      // FIXED: Prepare input based on form type
+      let input: any = {};
+
+      if (formKey === 'assessment') {
+        // For assessment forms, wrap data under 'assessment' key and convert sets to set
+        const processedFormData = processData(formDataCopy);
+
+        // Convert 'sets' arrays back to 'set' arrays for API compatibility
+        if (processedFormData.plan && processedFormData.plan.plans) {
+          processedFormData.plan.plans = processedFormData.plan.plans.map(
+            (plan: any) => {
+              if (plan.sets && Array.isArray(plan.sets)) {
+                const { sets, ...rest } = plan;
+                return {
+                  ...rest,
+                  set: sets, // Convert 'sets' back to 'set' for API
+                };
+              }
+              return plan;
+            }
+          );
+        }
+
+        input.assessment = processedFormData;
+      } else if (formKey === 'snc') {
+        // For SNC forms, convert sets to set and wrap under snc key
+        const processedFormData = processData(formDataCopy);
+
+        if (processedFormData.plans) {
+          processedFormData.plans = processedFormData.plans.map((plan: any) => {
+            if (plan.sets && Array.isArray(plan.sets)) {
+              const { sets, ...rest } = plan;
+              return {
+                ...rest,
+                set: sets, // Convert 'sets' back to 'set' for API
+              };
+            }
+            return plan;
+          });
+        }
+
+        input.snc = processedFormData;
+      } else {
+        // For other form types, use as is
+        input[formKey] = processData(formDataCopy);
+      }
 
       const variables = {
         appointmentId,
         input,
       };
+
+      console.log('Submitting with variables:', variables);
 
       await graphqlRequest(mutation, variables);
 
@@ -296,6 +427,7 @@ export const useFormManagement = ({
     isSubmitting,
     reportId,
     patientName,
+    isInitialLoadComplete,
     handleFormChange,
     handleFormSubmit,
     handleFormReset,

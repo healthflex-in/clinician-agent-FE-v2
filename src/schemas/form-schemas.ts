@@ -41,29 +41,27 @@ const formSchemas = {
   //     ],
   //   },
   // },
-
   // SNC Form
-  snc: {
-    advice: '',
-    plans: [
-      {
-        exercise: '',
-        comments: '',
-        sets: [
-          {
-            repetitions: 0,
-            load: '',
-            unit: '',
-          },
-        ],
-        duration: {
-          value: 0,
-          unit: '',
-        },
-      },
-    ],
-  },
-
+  // snc: {
+  //   advice: '',
+  //   plans: [
+  //     {
+  //       exercise: '',
+  //       comments: '',
+  //       sets: [
+  //         {
+  //           repetitions: 0,
+  //           load: '',
+  //           unit: '',
+  //         },
+  //       ],
+  //       duration: {
+  //         value: 0,
+  //         unit: '',
+  //       },
+  //     },
+  //   ],
+  // },
   // Physio Form
   // physio: {
   //   tests: [
@@ -77,49 +75,48 @@ const formSchemas = {
   //     },
   //   ],
   // },
-
   // Assessment Form
-  // assessment: {
-  //   plan: {
-  //     advice: '',
-  //     plans: [
-  //       {
-  //         exercise: '',
-  //         comments: '',
-  //         // Change set to sets and make it an array of objects
-  //         sets: [
-  //           {
-  //             repetitions: 0,
-  //             load: '', // Use string instead of number
-  //             unit: '',
-  //           },
-  //         ],
-  //         duration: {
-  //           value: 0,
-  //           unit: '',
-  //         },
-  //       },
-  //     ],
-  //   },
-  //   subjectiveAssessment: {
-  //     assessment: '',
-  //   },
-  //   objectiveAssessment: {
-  //     tests: [
-  //       {
-  //         testName: '',
-  //         unitName: '',
-  //         value: 0,
-  //         left: 0,
-  //         right: 0,
-  //         comments: '',
-  //       },
-  //     ],
-  //   },
-  //   rpe: {
-  //     value: 0,
-  //   },
-  // },
+  assessment: {
+    plan: {
+      advice: '',
+      plans: [
+        {
+          exercise: '',
+          comments: '',
+          // Change set to sets and make it an array of objects
+          sets: [
+            {
+              repetitions: 0,
+              load: '', // Use string instead of number
+              unit: '',
+            },
+          ],
+          duration: {
+            value: 0,
+            unit: '',
+          },
+        },
+      ],
+    },
+    subjectiveAssessment: {
+      assessment: '',
+    },
+    objectiveAssessment: {
+      tests: [
+        {
+          testName: '',
+          unitName: '',
+          value: 0,
+          left: 0,
+          right: 0,
+          comments: '',
+        },
+      ],
+    },
+    rpe: {
+      value: 0,
+    },
+  },
 };
 
 export default formSchemas;

@@ -216,11 +216,18 @@ export const FormRenderer = React.forwardRef<
               plan.exercise ||
               plan.comments ||
               (plan.set && (plan.set.repetitions || plan.set.load))
-          ));
+          )) ||
+        // ADD: Check for assessment form content
+        formData.plan ||
+        formData.subjectiveAssessment ||
+        formData.objectiveAssessment ||
+        formData.rpe;
 
       if (hasApiContent) {
+        console.log('FormRenderer: Initializing with API data:', formData);
         dispatch({ type: 'REPLACE_STATE', data: formData });
       } else {
+        console.log('FormRenderer: Initializing with schema defaults');
         dispatch({ type: 'REPLACE_STATE', data: schema });
       }
 
@@ -883,7 +890,12 @@ export const FormRenderer = React.forwardRef<
     // FIX: Only notify parent component of form data changes after initialization - MINIMAL FIX
     React.useEffect(() => {
       if (onChange && isInitialized) {
-        onChange(state);
+        // ADD: Debounce the onChange to prevent rapid state updates
+        const timeoutId = setTimeout(() => {
+          onChange(state);
+        }, 100); // 100ms debounce
+
+        return () => clearTimeout(timeoutId);
       }
     }, [state, onChange, isInitialized]);
 

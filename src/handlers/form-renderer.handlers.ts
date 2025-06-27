@@ -647,6 +647,9 @@ export const useFormHandlers = (
       }
 
       try {
+        // FIXED: Ensure loading state is set immediately
+        setIsSubmitting(true);
+
         const updateInput = {
           // patientId,
           appointmentId: appointmentId || '',
@@ -675,6 +678,7 @@ export const useFormHandlers = (
           variant: 'destructive',
         });
       } finally {
+        // FIXED: Always reset loading state
         setIsSubmitting(false);
       }
     },
@@ -720,38 +724,43 @@ export const useFormHandlers = (
 
     if (Array.isArray(plans) && plans.length > 0) {
       sncObject.plans = plans.map((plan) => {
-        // Extract set data - FIXED to handle "sets" array
-        let setData = {
-          repetitions: 0,
-          load: '',
-          unit: '',
-        };
+        // FIXED: Preserve sets as array instead of converting to single set object
+        let setsData = [];
 
         // Strategy 1: Check for "sets" array (your form uses this)
         if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
-          const firstSet = plan.sets[0]; // Take the first set
-          setData.repetitions = parseInt(firstSet.repetitions) || 0;
-          setData.load = firstSet.load || '';
-          setData.unit = firstSet.unit || '';
+          setsData = plan.sets.map((set) => ({
+            repetitions: parseInt(set.repetitions) || 0,
+            load: set.load || '',
+            unit: set.unit || '',
+          }));
         }
-        // Strategy 2: Check for "set" object (API format)
+        // Strategy 2: Check for "set" object (legacy API format) - convert to array
         else if (plan.set && typeof plan.set === 'object') {
-          setData.repetitions = parseInt(plan.set.repetitions) || 0;
-          setData.load = plan.set.load || '';
-          setData.unit = plan.set.unit || '';
+          setsData = [
+            {
+              repetitions: parseInt(plan.set.repetitions) || 0,
+              load: plan.set.load || '',
+              unit: plan.set.unit || '',
+            },
+          ];
         }
-        // Strategy 3: Individual fields at plan level
+        // Strategy 3: Individual fields at plan level - create single set in array
         else {
-          setData.repetitions =
-            parseInt(plan.repetitions) || parseInt(plan.reps) || 0;
-          setData.load = plan.load || plan.weight || '';
-          setData.unit = plan.unit || '';
+          setsData = [
+            {
+              repetitions:
+                parseInt(plan.repetitions) || parseInt(plan.reps) || 0,
+              load: plan.load || plan.weight || '',
+              unit: plan.unit || '',
+            },
+          ];
         }
 
         return {
           exercise: plan.exercise || '',
           comments: plan.comments || '',
-          set: setData, // Note: API expects "set" (singular)
+          set: setsData,
           duration: {
             value: parseInt(plan.duration?.value) || 0,
             unit: plan.duration?.unit || '',
@@ -759,16 +768,18 @@ export const useFormHandlers = (
         };
       });
     } else {
-      // Default empty plan structure
+      // Default empty plan structure with sets array
       sncObject.plans = [
         {
           exercise: '',
           comments: '',
-          set: {
-            repetitions: 0,
-            load: '',
-            unit: '',
-          },
+          set: [
+            {
+              repetitions: 0,
+              load: '',
+              unit: '',
+            },
+          ],
           duration: {
             value: 0,
             unit: '',

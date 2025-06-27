@@ -402,7 +402,7 @@ export const PlanTranscriptionBox: React.FC<PlanTranscriptionBoxProps> = ({
         isThisPlanLoading ? 'bg-yellow-50 border-yellow-300' : 'bg-purple-50'
       }`}
     >
-      Hi
+      {/* REMOVED: The errant "Hi" text that was causing the error */}
       <div className="flex flex-wrap justify-between items-center mb-1 sm:mb-2 gap-2">
         <div className="flex items-center gap-1 sm:gap-2">
           <span

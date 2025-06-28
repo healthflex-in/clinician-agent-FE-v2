@@ -346,7 +346,7 @@ export function useWebSocket(options: WebSocketOptions) {
         userId,
         AppointmentId: appointmentId, // Note: Capital 'A'
         formKey,
-        mode: 'form_fill',
+        mode: 'transcribe_only',
         text: transcriptionText,
         formData: currentFormData
           ? transformFormDataForAPI(
@@ -382,8 +382,8 @@ export function useWebSocket(options: WebSocketOptions) {
           (plan: any) =>
             (plan.exercise && plan.exercise.trim() !== '') ||
             (plan.comments && plan.comments.trim() !== '') ||
-            (plan.sets?.length > 0 &&
-              plan.sets.some(
+            (plan.set?.length > 0 &&
+              plan.set.some(
                 (set: any) =>
                   set.repetitions > 0 ||
                   (set.load && set.load.trim() !== '') ||
@@ -415,13 +415,13 @@ export function useWebSocket(options: WebSocketOptions) {
             ? formData.plan.plans.map((plan: any) => ({
                 exercise: plan.exercise || '',
                 set:
-                  plan.sets?.length > 0
-                    ? plan.sets.map((set: any) => ({
+                  plan.set?.length > 0
+                    ? plan.set.map((set: any) => ({
                         repetitions: parseInt(set.repetitions) || 0,
                         load: String(set.load || ''),
                         unit: String(set.unit || ''),
                       }))
-                    : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no sets
+                    : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no set
                 duration: {
                   value: parseInt(plan.duration?.value) || 0,
                   unit: String(plan.duration?.unit || ''),
@@ -475,8 +475,8 @@ export function useWebSocket(options: WebSocketOptions) {
           (plan: any) =>
             (plan.exercise && plan.exercise.trim() !== '') ||
             (plan.comments && plan.comments.trim() !== '') ||
-            (plan.sets?.length > 0 &&
-              plan.sets.some(
+            (plan.set?.length > 0 &&
+              plan.set.some(
                 (set: any) =>
                   set.repetitions > 0 ||
                   (set.load && set.load.trim() !== '') ||
@@ -491,14 +491,14 @@ export function useWebSocket(options: WebSocketOptions) {
         plans: hasPlans
           ? formData.plans.map((plan: any) => ({
               exercise: plan.exercise || '',
-              sets:
-                plan.sets?.length > 0
-                  ? plan.sets.map((set: any) => ({
+              set:
+                plan.set?.length > 0
+                  ? plan.set.map((set: any) => ({
                       repetitions: parseInt(set.repetitions) || 0,
                       load: String(set.load || ''),
                       unit: String(set.unit || ''),
                     }))
-                  : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no sets
+                  : [{ repetitions: 0, load: '', unit: '' }], // Default single set if no set
               duration: {
                 value: parseInt(plan.duration?.value) || 0,
                 unit: String(plan.duration?.unit || ''),
@@ -509,7 +509,7 @@ export function useWebSocket(options: WebSocketOptions) {
               {
                 // Send default plan structure if no actual plans
                 exercise: '',
-                sets: [{ repetitions: 0, load: '', unit: '' }],
+                set: [{ repetitions: 0, load: '', unit: '' }],
                 duration: { value: 0, unit: '' },
                 comments: '',
               },
@@ -532,8 +532,8 @@ export function useWebSocket(options: WebSocketOptions) {
           apiData.plan?.plans?.map((plan: any) => ({
             exercise: plan.exercise || '',
             comments: plan.comments || '',
-            // Transform API 'set' array to form 'sets' array
-            sets: Array.isArray(plan.set)
+            // Transform API 'set' array to form 'set' array
+            set: Array.isArray(plan.set)
               ? plan.set.map((set: any) => ({
                   repetitions: set.repetitions || 0,
                   load: set.load || '',

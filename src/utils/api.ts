@@ -56,11 +56,7 @@ function convertToRequiredPayload(inputData: any) {
           inputData.plan?.plans?.map((plan: any) => ({
             exercise: plan.exercise || '', // Ensure valid exercise name
             comments: plan.comments || '', // Ensure valid comments
-            set: plan.set?.map((set: any) => ({
-              repetitions: set.repetitions || 0, // Ensure it's a number (default 0)
-              load: set.load || '', // Default to empty string if not available
-              unit: set.unit || '', // Default to empty string if not available
-            })),
+            set: plan.set,
             duration: {
               value: plan.duration?.value || 0, // Ensure it's a number (default 0)
               unit: plan.duration?.unit || '', // Default to empty if not available

@@ -610,8 +610,8 @@ export const useFormHandlers = (
         // Convert 'sets' array back to 'set' array for API compatibility
         let setArray = [];
 
-        if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
-          setArray = plan.sets.map((set) => ({
+        if (plan.set && Array.isArray(plan.set) && plan.set.length > 0) {
+          setArray = plan.set.map((set) => ({
             repetitions: parseInt(set.repetitions) || 0,
             load: String(set.load || ''),
             unit: String(set.unit || ''),
@@ -803,8 +803,8 @@ export const useFormHandlers = (
         let setsData = [];
 
         // Strategy 1: Check for "sets" array (your form uses this)
-        if (plan.sets && Array.isArray(plan.sets) && plan.sets.length > 0) {
-          setsData = plan.sets.map((set) => ({
+        if (plan.set && Array.isArray(plan.set) && plan.set.length > 0) {
+          setsData = plan.set.map((set) => ({
             repetitions: parseInt(set.repetitions) || 0,
             load: set.load || '',
             unit: set.unit || '',

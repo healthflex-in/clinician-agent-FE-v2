@@ -171,7 +171,7 @@ export const useFormManagement = ({
                       {
                         exercise: '',
                         comments: '',
-                        sets: [
+                        set: [
                           {
                             repetitions: 0,
                             load: '',
@@ -317,18 +317,18 @@ export const useFormManagement = ({
       let input: any = {};
 
       if (formKey === 'assessment') {
-        // For assessment forms, wrap data under 'assessment' key and convert sets to set
+        // For assessment forms, wrap data under 'assessment' key and convert set to set
         const processedFormData = processData(formDataCopy);
 
-        // Convert 'sets' arrays back to 'set' arrays for API compatibility
+        // Convert 'set' arrays back to 'set' arrays for API compatibility
         if (processedFormData.plan && processedFormData.plan.plans) {
           processedFormData.plan.plans = processedFormData.plan.plans.map(
             (plan: any) => {
-              if (plan.sets && Array.isArray(plan.sets)) {
-                const { sets, ...rest } = plan;
+              if (plan.set && Array.isArray(plan.set)) {
+                const { set, ...rest } = plan;
                 return {
                   ...rest,
-                  set: sets, // Convert 'sets' back to 'set' for API
+                  set: set, // Convert 'set' back to 'set' for API
                 };
               }
               return plan;
@@ -343,11 +343,11 @@ export const useFormManagement = ({
 
         if (processedFormData.plans) {
           processedFormData.plans = processedFormData.plans.map((plan: any) => {
-            if (plan.sets && Array.isArray(plan.sets)) {
-              const { sets, ...rest } = plan;
+            if (plan.set && Array.isArray(plan.set)) {
+              const { set, ...rest } = plan;
               return {
                 ...rest,
-                set: sets, // Convert 'sets' back to 'set' for API
+                set: set, // Convert 'set' back to 'set' for API
               };
             }
             return plan;

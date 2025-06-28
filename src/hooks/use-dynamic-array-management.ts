@@ -103,10 +103,10 @@ export const useDynamicArrayManagement = ({
         return {
           exercise: '',
           comments: '',
-          sets: [{ repetitions: 0, load: '', unit: '' }],
+          set: [{ repetitions: 0, load: '', unit: '' }],
           duration: { value: 0, unit: '' },
         };
-      } else if (arrayPath.includes('sets')) {
+      } else if (arrayPath.includes('set')) {
         return { repetitions: 0, load: '', unit: '' };
       } else if (arrayPath.includes('tests')) {
         return {

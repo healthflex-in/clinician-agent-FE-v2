@@ -74,6 +74,7 @@ export const FormRenderer = React.forwardRef<
     const autoSubmitTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const lastLLMUpdateRef = React.useRef<number>(0);
     const isLLMUpdateInProgress = React.useRef(false);
+    const isAutoSubmittingRef = React.useRef(false);
 
     // FORM INITIALIZATION STATE - FIX FOR PRE-FILLED DATA
     const [isInitialized, setIsInitialized] = React.useState(false);
@@ -200,35 +201,90 @@ export const FormRenderer = React.forwardRef<
       });
 
     // FIX: Initialize form state when formData is received from API
+    // FIX: Initialize form state when formData is received from API
     React.useEffect(() => {
       if (!formData || initializationRef.current) return;
 
-      const isSame = JSON.stringify(state) === JSON.stringify(formData); // shallow equality is not enough
+      // Handle nested API response structure
+      let actualFormData = formData;
+
+      // If data is nested (from createAgentReport response)
+      if (formData.createAgentReport?.assessment) {
+        actualFormData = formData.createAgentReport.assessment;
+      } else if (formData.assessment) {
+        actualFormData = formData.assessment;
+      }
+
+      // Transform API data to match schema structure
+      const normalizedFormData = JSON.parse(JSON.stringify(actualFormData)); // Deep clone
+
+      // CRITICAL FIX: Convert 'sets' to 'set' to match schema
+      if (normalizedFormData.plan?.plans) {
+        normalizedFormData.plan.plans = normalizedFormData.plan.plans.map(
+          (plan: any) => {
+            const transformedPlan = { ...plan };
+
+            // Convert sets to set (API uses 'sets', schema uses 'set')
+            if (plan.sets) {
+              transformedPlan.set = plan.sets;
+              delete transformedPlan.sets; // Remove the old field
+            } else if (plan.set) {
+              transformedPlan.set = plan.set; // Keep as is if already 'set'
+            } else {
+              transformedPlan.set = []; // Default empty array
+            }
+
+            return transformedPlan;
+          }
+        );
+      }
+
+      // Handle objectiveAssessment array format
+      if (Array.isArray(normalizedFormData.objectiveAssessment)) {
+        normalizedFormData.objectiveAssessment = {
+          tests: normalizedFormData.objectiveAssessment[0]?.tests || [],
+        };
+      }
+
+      console.log('=== Form data transformation ===');
+      console.log(
+        'Original API data:',
+        JSON.stringify(actualFormData, null, 2)
+      );
+      console.log(
+        'Transformed for form:',
+        JSON.stringify(normalizedFormData, null, 2)
+      );
+
+      const isSame =
+        JSON.stringify(state) === JSON.stringify(normalizedFormData);
 
       if (isSame) {
         setIsInitialized(true);
-
         return;
       }
 
       const hasApiContent =
-        formData.advice ||
-        (formData.plans &&
-          formData.plans.some(
+        normalizedFormData.advice ||
+        (normalizedFormData.plan?.plans &&
+          normalizedFormData.plan.plans.some(
             (plan: any) =>
               plan.exercise ||
               plan.comments ||
-              (plan.set && (plan.set.repetitions || plan.set.load))
+              (plan.set && plan.set.length > 0)
           )) ||
-        // ADD: Check for assessment form content
-        formData.plan ||
-        formData.subjectiveAssessment ||
-        formData.objectiveAssessment ||
-        formData.rpe;
+        normalizedFormData.plan ||
+        normalizedFormData.subjectiveAssessment ||
+        normalizedFormData.objectiveAssessment ||
+        normalizedFormData.rpe;
 
       if (hasApiContent) {
-        dispatch({ type: 'REPLACE_STATE', data: formData });
+        console.log(
+          '=== Dispatching REPLACE_STATE with transformed API data ==='
+        );
+        dispatch({ type: 'REPLACE_STATE', data: normalizedFormData });
       } else {
+        console.log('=== Dispatching REPLACE_STATE with schema ===');
         dispatch({ type: 'REPLACE_STATE', data: schema });
       }
 
@@ -666,9 +722,14 @@ export const FormRenderer = React.forwardRef<
           const actualFormData = llmData.formData.formData || llmData.formData;
 
           // Normalize objectiveAssessment if present and not already normalized
-          if (actualFormData.objectiveAssessment && !actualFormData.objectiveAssessment.tests) {
+          if (
+            actualFormData.objectiveAssessment &&
+            !actualFormData.objectiveAssessment.tests
+          ) {
             if (Array.isArray(actualFormData.objectiveAssessment)) {
-              actualFormData.objectiveAssessment = { tests: actualFormData.objectiveAssessment };
+              actualFormData.objectiveAssessment = {
+                tests: actualFormData.objectiveAssessment,
+              };
             }
           }
 
@@ -725,9 +786,14 @@ export const FormRenderer = React.forwardRef<
           );
 
           // Normalize objectiveAssessment if present and not already normalized
-          if (llmData.formData.objectiveAssessment && !llmData.formData.objectiveAssessment.tests) {
+          if (
+            llmData.formData.objectiveAssessment &&
+            !llmData.formData.objectiveAssessment.tests
+          ) {
             if (Array.isArray(llmData.formData.objectiveAssessment)) {
-              llmData.formData.objectiveAssessment = { tests: llmData.formData.objectiveAssessment };
+              llmData.formData.objectiveAssessment = {
+                tests: llmData.formData.objectiveAssessment,
+              };
             }
           }
 
@@ -925,11 +991,11 @@ export const FormRenderer = React.forwardRef<
         ) {
           console.log('=== LLM data processed, triggering auto-submit ===');
 
-          // Use setTimeout to ensure state has been updated first
-          setTimeout(() => {
-            console.log('=== Delayed auto-submit trigger ===');
-            triggerAutoSubmit();
-          }, 200); // Slightly longer delay to ensure dispatch completes
+          // // Use setTimeout to ensure state has been updated first
+          // setTimeout(() => {
+          //   console.log('=== Delayed auto-submit trigger ===');
+          //   triggerAutoSubmit();
+          // }, 200); // Slightly longer delay to ensure dispatch completes
         }
 
         console.log('=== END updateFormWithLLMData ===');
@@ -965,12 +1031,12 @@ export const FormRenderer = React.forwardRef<
     );
 
     React.useEffect(() => {
-      if (isStateUpdated) {
+      if (isStateUpdated && !isAutoSubmittingRef.current) {
         console.log('=== Triggering auto-submit after state update ===');
         triggerAutoSubmit(); // Trigger auto-submit after state is updated
         setIsStateUpdated(false); // Reset state update flag
       }
-    }, [isStateUpdated]);
+    }, [isStateUpdated, triggerAutoSubmit]);
 
     // 2. Add a cleanup function for resetting processed states
     const resetProcessedState = React.useCallback(

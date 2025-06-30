@@ -1,24 +1,32 @@
 /**
  * Generates initial default state from a schema
- * Preserves structure while initializing with empty/zero values
+ * Preserves structure while initializing with proper default values
  */
 export function defaultStateFromSchema(schema: any): any {
   if (schema === null || schema === undefined) return null;
 
   // Handle primitive types
-  if (typeof schema !== 'object') return schema;
+  if (typeof schema !== 'object') {
+    // Return appropriate defaults for primitive types
+    if (typeof schema === 'string') return '';
+    if (typeof schema === 'number') return 0;
+    if (typeof schema === 'boolean') return false;
+    return schema;
+  }
 
   // Handle arrays
   if (Array.isArray(schema)) {
     if (schema.length === 0) return [];
-    // Use first item as template for array items
+    // Create a single default item using the first schema element
     return [defaultStateFromSchema(schema[0])];
   }
 
   // Handle objects
   const result: Record<string, any> = {};
   for (const key in schema) {
-    result[key] = defaultStateFromSchema(schema[key]);
+    if (schema.hasOwnProperty(key)) {
+      result[key] = defaultStateFromSchema(schema[key]);
+    }
   }
   return result;
 }

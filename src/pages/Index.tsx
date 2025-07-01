@@ -46,11 +46,15 @@ const Index = () => {
   const { patients, loadingPatients, searchPatients, clearPatients } =
     usePatients(centerId);
   const {
-    appointments,
-    appointmentId,
-    loadingAppointments,
-    handleAppointmentChange,
-    clearAppointments,
+    appointments: events,
+    appointmentId: eventId,
+    loadingAppointments: loadingEvents,
+    handleAppointmentChange: handleEventChange,
+    clearAppointments: clearEvents,
+    searchTerm,
+    updateSearchTerm,
+    handleSearch: handleAppointmentSearch,
+    clearSearch: clearAppointmentSearch,
   } = useAppointments(patientId);
 
   // Set viewport for mobile
@@ -103,9 +107,9 @@ const Index = () => {
         }
       }
 
-      // Only restore appointmentId if patientId exists
+      // Only restore formKey if appointmentId exists, otherwise keep default 'snc'
       if (savedPatientId && savedAppointmentId) {
-        // Only restore formKey if appointmentId exists
+        // Only restore formKey if appointmentId exists and formKey is saved
         if (savedAppointmentId && savedFormKey) {
           setFormKey(savedFormKey);
         }
@@ -122,6 +126,20 @@ const Index = () => {
       return () => clearTimeout(delaySearch);
     }
   }, [centerId, patientSearch, searchPatients]);
+
+  // Debounced appointment search - only search if 3+ characters
+  React.useEffect(() => {
+    if (patientId && searchTerm !== undefined) {
+      const delaySearch = setTimeout(() => {
+        // Only make API call if search term has 3+ characters or is empty (to clear)
+        if (searchTerm.trim().length >= 3 || searchTerm.trim().length === 0) {
+          handleAppointmentSearch(searchTerm);
+        }
+      }, 500);
+
+      return () => clearTimeout(delaySearch);
+    }
+  }, [searchTerm, patientId, handleAppointmentSearch]);
 
   // Select a patient from search results
   const selectPatient = (patient: Patient) => {
@@ -142,7 +160,7 @@ const Index = () => {
     setPatientName('');
     setPatientSearch('');
     clearPatients();
-    clearAppointments();
+    clearEvents();
   };
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -167,7 +185,7 @@ const Index = () => {
       return;
     }
 
-    if (!appointmentId) {
+    if (!eventId) {
       toast({
         title: 'Appointment Required',
         description: 'Please select an appointment',
@@ -187,7 +205,7 @@ const Index = () => {
 
     // Store in localStorage
     localStorage.setItem('userId', patientId);
-    localStorage.setItem('appointmentId', appointmentId);
+    localStorage.setItem('appointmentId', eventId);
     localStorage.setItem('formKey', formKey);
     localStorage.setItem('centerId', centerId);
     localStorage.setItem(
@@ -196,14 +214,14 @@ const Index = () => {
     );
 
     // Navigate to form page
-    navigate(`/${formKey}/${patientId}/${appointmentId}`);
+    navigate(`/${formKey}/${patientId}/${eventId}`);
   };
 
   // Get progress step count
   const getProgressStep = () => {
     if (!centerId) return 1;
     if (!patientId) return 2;
-    if (!appointmentId) return 3;
+    if (!eventId) return 3;
     return 4;
   };
 
@@ -337,42 +355,80 @@ const Index = () => {
               >
                 <Calendar className="h-4 w-4 mr-1.5 text-black" />
                 Appointment
-                {loadingAppointments && (
+                {loadingEvents && (
                   <Loader2 className="h-3 w-3 animate-spin ml-2 text-gray-500" />
                 )}
               </Label>
+
+              {/* Appointment Search Input */}
+              {!loadingEvents && (
+                <div className="relative mb-2">
+                  <Input
+                    value={searchTerm}
+                    onChange={(e) => updateSearchTerm(e.target.value)}
+                    placeholder="Search appointments by patient name (min 3 chars)"
+                    disabled={!patientId}
+                    className="h-8 text-xs pr-8"
+                  />
+                  {searchTerm && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-0.5 h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+                      onClick={() => {
+                        updateSearchTerm('');
+                        clearAppointmentSearch();
+                      }}
+                    >
+                      ×
+                    </Button>
+                  )}
+                </div>
+              )}
+
               <Select
-                value={appointmentId}
-                onValueChange={handleAppointmentChange}
-                disabled={!patientId || loadingAppointments}
+                value={eventId}
+                onValueChange={handleEventChange}
+                disabled={!patientId || loadingEvents}
               >
                 <SelectTrigger className="h-10 text-sm">
                   <SelectValue
                     placeholder={
-                      loadingAppointments
+                      loadingEvents
                         ? 'Loading appointments...'
                         : 'Select an appointment'
                     }
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {loadingAppointments ? (
+                  {loadingEvents ? (
                     <div className="flex items-center justify-center p-2">
                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
                       <span className="text-sm">Loading appointments...</span>
                     </div>
-                  ) : appointments.length > 0 ? (
-                    appointments.map((appointment) => (
+                  ) : events.length > 0 ? (
+                    events.map((event) => (
                       <SelectItem
-                        key={appointment._id}
-                        value={appointment._id}
+                        key={event._id}
+                        value={event._id}
                         className="text-sm"
                       >
-                        {`#${appointment.seqNo} (${new Date(
-                          appointment.createdAt
-                        ).toLocaleDateString()})`}
+                        {`#${event.appointment?.seqNo || 'N/A'} - ${
+                          event.attendees?.[0]?.profileData?.firstName || ''
+                        } ${
+                          event.attendees?.[0]?.profileData?.lastName || ''
+                        } (${new Date(event.startTime).toLocaleDateString()})`}
                       </SelectItem>
                     ))
+                  ) : searchTerm && searchTerm.trim().length < 3 ? (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      Type at least 3 characters to search
+                    </div>
+                  ) : searchTerm ? (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      No appointments found matching "{searchTerm}"
+                    </div>
                   ) : (
                     <div className="p-2 text-sm text-gray-500 text-center">
                       No appointments found
@@ -394,7 +450,7 @@ const Index = () => {
               <Select
                 value={formKey}
                 onValueChange={setFormKey}
-                disabled={!appointmentId}
+                disabled={!eventId}
               >
                 <SelectTrigger className="h-10 text-sm">
                   <SelectValue placeholder="Select a form type" />

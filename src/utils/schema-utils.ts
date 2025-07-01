@@ -24,7 +24,7 @@ export function defaultStateFromSchema(schema: any): any {
   // Handle objects
   const result: Record<string, any> = {};
   for (const key in schema) {
-    if (schema.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(schema, key)) {
       result[key] = defaultStateFromSchema(schema[key]);
     }
   }

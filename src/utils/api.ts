@@ -67,7 +67,7 @@ function filterEmptyValuesForAPI(obj: any): any {
     let hasValidValues = false;
 
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         // Skip 'record' fields completely
         if (key === 'record') continue;
 
@@ -326,18 +326,33 @@ export async function searchUsers(
  * @param filter Appointment filter
  * @returns Promise with appointments data
  */
-export async function fetchAppointments(filter: any) {
+export async function fetchAppointments<T = any>(
+  filter: any,
+  search?: string
+): Promise<T> {
   const query = `
-    query Appointments($filter: AppointmentFilter!) {
-      appointments(filter: $filter) {
-        _id
-        seqNo
-        createdAt
+    query Events($filter: EventFilter!, $search: String) {
+      events(filter: $filter, search: $search) {
+        ... on AppointmentEvent {
+          _id
+          startTime
+          attendees {
+            profileData {
+              ... on Patient {
+                firstName
+                lastName
+              }
+            }
+          }
+          appointment {
+            seqNo
+          }
+        }
       }
     }
   `;
 
-  return graphqlRequest(query, { filter });
+  return graphqlRequest(query, { filter, search });
 }
 
 export async function createAgentReport(input: any) {

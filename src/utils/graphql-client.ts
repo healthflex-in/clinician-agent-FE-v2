@@ -209,18 +209,25 @@ export async function searchUsers<T = any>(
 /**
  * Fetch appointments for a patient
  */
-export async function fetchAppointments<T = any>(filter: any): Promise<T> {
+export async function fetchAppointments<T = any>(
+  filter: any,
+  search?: string
+): Promise<T> {
   const query = `
-    query Appointments($filter: AppointmentFilter!) {
-      appointments(filter: $filter) {
-        _id
-        seqNo
-        createdAt
+    query Events($filter: EventFilter!, $search: String) {
+      events(filter: $filter, search: $search) {
+        ... on AppointmentEvent {
+          _id
+          startTime
+          appointment {
+            seqNo
+          }
+        }
       }
     }
   `;
 
-  return graphqlRequest(query, { filter });
+  return graphqlRequest(query, { filter, search });
 }
 
 // Export everything for centralized access

@@ -13,12 +13,12 @@ import { Button } from '@/components/ui/button';
 import { FormRendererRef, FormRendererProps } from '@/types';
 
 // Import the modular handlers
-import { useFormSubmitHandlers } from '../../handlers/form-submit-handlers';
-import { useFormInitialization } from '../../utils/form-initialization';
-import { useTranscriptionHandlers } from '../../handlers/form-transcription-handlers';
-import { useLLMUpdateHandler } from '../../handlers/form-llm-update-handler';
 import { useFieldRenderers } from './form-field-renderers';
+import { useFormInitialization } from '../../utils/form-initialization';
+import { useFormSubmitHandlers } from '../../handlers/form-submit-handlers';
 import { useTranscriptionRenderers } from './form-transcription-renderers';
+import { useLLMUpdateHandler } from '../../handlers/form-llm-update-handler';
+import { useTranscriptionHandlers } from '../../handlers/form-transcription-handlers';
 
 // Enhanced FormRendererProps interface with auto-submit options
 interface EnhancedFormRendererProps extends FormRendererProps {

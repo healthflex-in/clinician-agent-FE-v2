@@ -13,6 +13,7 @@ export type Appointment = {
     };
   }>;
   appointment: {
+    _id: string;
     seqNo: string;
   };
 };
@@ -191,7 +192,7 @@ export const useAppointments = (patientId: string) => {
           if (savedPatientId === currentPatientId && savedAppointmentId) {
             // Restore from localStorage if the appointment exists in the list
             const appointmentExists = sortedAppointments.find(
-              (apt) => apt._id === savedAppointmentId
+              (apt) => apt.appointment._id === savedAppointmentId
             );
             if (appointmentExists) {
               isAutoSelectingRef.current = true;
@@ -203,8 +204,9 @@ export const useAppointments = (patientId: string) => {
           // Auto-select the most recent appointment
           if (sortedAppointments.length > 0) {
             const mostRecentAppointment = sortedAppointments[0];
+            console.log('@@ mostRecentAppointment: ', mostRecentAppointment);
             isAutoSelectingRef.current = true;
-            setAppointmentId(mostRecentAppointment._id);
+            setAppointmentId(mostRecentAppointment.appointment._id);
           }
         }
       } catch (error) {

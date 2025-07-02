@@ -220,6 +220,7 @@ export async function fetchAppointments<T = any>(
           _id
           startTime
           appointment {
+            _id
             seqNo
           }
         }

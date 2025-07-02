@@ -47,9 +47,9 @@ const Index = () => {
     usePatients(centerId);
   const {
     appointments: events,
-    appointmentId: eventId,
+    appointmentId,
     loadingAppointments: loadingEvents,
-    handleAppointmentChange: handleEventChange,
+    handleAppointmentChange,
     clearAppointments: clearEvents,
     searchTerm,
     updateSearchTerm,
@@ -185,7 +185,7 @@ const Index = () => {
       return;
     }
 
-    if (!eventId) {
+    if (!appointmentId) {
       toast({
         title: 'Appointment Required',
         description: 'Please select an appointment',
@@ -205,7 +205,7 @@ const Index = () => {
 
     // Store in localStorage
     localStorage.setItem('userId', patientId);
-    localStorage.setItem('appointmentId', eventId);
+    localStorage.setItem('appointmentId', appointmentId);
     localStorage.setItem('formKey', formKey);
     localStorage.setItem('centerId', centerId);
     localStorage.setItem(
@@ -214,14 +214,14 @@ const Index = () => {
     );
 
     // Navigate to form page
-    navigate(`/${formKey}/${patientId}/${eventId}`);
+    navigate(`/${formKey}/${patientId}/${appointmentId}`);
   };
 
   // Get progress step count
   const getProgressStep = () => {
     if (!centerId) return 1;
     if (!patientId) return 2;
-    if (!eventId) return 3;
+    if (!appointmentId) return 3;
     return 4;
   };
 
@@ -388,8 +388,8 @@ const Index = () => {
               )}
 
               <Select
-                value={eventId}
-                onValueChange={handleEventChange}
+                value={appointmentId}
+                onValueChange={handleAppointmentChange}
                 disabled={!patientId || loadingEvents}
               >
                 <SelectTrigger className="h-10 text-sm">
@@ -411,7 +411,7 @@ const Index = () => {
                     events.map((event) => (
                       <SelectItem
                         key={event._id}
-                        value={event._id}
+                        value={event.appointment?._id || event._id}
                         className="text-sm"
                       >
                         {`#${event.appointment?.seqNo || 'N/A'} - ${
@@ -450,7 +450,7 @@ const Index = () => {
               <Select
                 value={formKey}
                 onValueChange={setFormKey}
-                disabled={!eventId}
+                disabled={!appointmentId}
               >
                 <SelectTrigger className="h-10 text-sm">
                   <SelectValue placeholder="Select a form type" />

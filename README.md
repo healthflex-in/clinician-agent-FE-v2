@@ -71,3 +71,16 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+# stance.api
+
+components/forms/
+├── form-renderer.tsx (300 lines) - Main component
+├── form-initialization.ts (200 lines) - API data handling
+├── form-transcription-handlers.ts (400 lines) - Transcription logic
+├── form-llm-update-handler.ts (600 lines) - LLM processing
+├── form-field-renderers.tsx (600 lines) - Field rendering
+├── form-transcription-renderers.tsx (400 lines) - Transcription UI
+├── form-submit-handlers.ts (300 lines) - Submit logic
+├── form-submission.ts (150 lines) - Pure submission
+└── auto-submit-manager.ts (250 lines) - Auto-submit timing

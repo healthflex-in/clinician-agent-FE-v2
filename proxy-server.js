@@ -1,11 +1,12 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const app = express();
+
 const PORT = 3001;
+const app = express();
 
 const apiProxy = createProxyMiddleware({
-  target: 'https://devapi.stance.health',
   changeOrigin: true,
+  target: 'https://api.stance.health',
   pathRewrite: {
     '^/api/graphql': '/graphql',
   },

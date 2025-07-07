@@ -1,6 +1,4 @@
-// Store API key in environment variable in production
-const API_KEY =
-  'b90718a058accf0130e62c030ef919b3eabbbff85b81bb70985d6ab87995333a';
+import { API_KEY, API_URL } from './api-config';
 
 /**
  * CORS-friendly GraphQL client using a public CORS proxy
@@ -12,14 +10,14 @@ export async function graphqlRequest<T = any>(
   query: string,
   variables: Record<string, any> = {}
 ): Promise<T> {
-  const apiEndpoint = 'https://devapi.stance.health/graphql';
+  const apiEndpoint = API_URL;
 
   try {
     const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'x-api-key': API_KEY,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query, variables }),
     });

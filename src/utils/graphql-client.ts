@@ -207,28 +207,33 @@ export async function searchUsers<T = any>(
 }
 
 /**
- * Fetch appointments for a patient
+ * Fetch appointments for a patient using Reports query
  */
 export async function fetchAppointments<T = any>(
-  filter: any,
-  search?: string
+  patientId: string
 ): Promise<T> {
+  // Ensure patientId is provided
+  if (!patientId) {
+    throw new Error('Patient ID is required');
+  }
+
   const query = `
-    query Events($filter: EventFilter!, $search: String) {
-      events(filter: $filter, search: $search) {
-        ... on AppointmentEvent {
+    query Reports($patientId: ObjectID!) {
+      reports(patientId: $patientId) {
+        _id
+        appointment {
           _id
-          startTime
-          appointment {
-            _id
-            seqNo
+          seqNo
+          event {
+            startTime
+            endTime
           }
         }
       }
     }
   `;
 
-  return graphqlRequest(query, { filter, search });
+  return graphqlRequest(query, { patientId });
 }
 
 // Export everything for centralized access

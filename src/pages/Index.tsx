@@ -51,11 +51,7 @@ const Index = () => {
     loadingAppointments: loadingEvents,
     handleAppointmentChange,
     clearAppointments: clearEvents,
-    searchTerm,
-    updateSearchTerm,
-    handleSearch: handleAppointmentSearch,
-    clearSearch: clearAppointmentSearch,
-  } = useAppointments(patientId);
+  } = useAppointments(patientId || '');
 
   // Set viewport for mobile
   React.useEffect(() => {
@@ -126,20 +122,6 @@ const Index = () => {
       return () => clearTimeout(delaySearch);
     }
   }, [centerId, patientSearch, searchPatients]);
-
-  // Debounced appointment search - only search if 3+ characters
-  React.useEffect(() => {
-    if (patientId && searchTerm !== undefined) {
-      const delaySearch = setTimeout(() => {
-        // Only make API call if search term has 3+ characters or is empty (to clear)
-        if (searchTerm.trim().length >= 3 || searchTerm.trim().length === 0) {
-          handleAppointmentSearch(searchTerm);
-        }
-      }, 500);
-
-      return () => clearTimeout(delaySearch);
-    }
-  }, [searchTerm, patientId, handleAppointmentSearch]);
 
   // Select a patient from search results
   const selectPatient = (patient: Patient) => {
@@ -360,33 +342,6 @@ const Index = () => {
                 )}
               </Label>
 
-              {/* Appointment Search Input */}
-              {!loadingEvents && (
-                <div className="relative mb-2">
-                  <Input
-                    value={searchTerm}
-                    onChange={(e) => updateSearchTerm(e.target.value)}
-                    placeholder="Search appointments by patient name (min 3 chars)"
-                    disabled={!patientId}
-                    className="h-8 text-xs pr-8"
-                  />
-                  {searchTerm && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-0.5 h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
-                      onClick={() => {
-                        updateSearchTerm('');
-                        clearAppointmentSearch();
-                      }}
-                    >
-                      ×
-                    </Button>
-                  )}
-                </div>
-              )}
-
               <Select
                 value={appointmentId}
                 onValueChange={handleAppointmentChange}
@@ -414,21 +369,11 @@ const Index = () => {
                         value={event.appointment?._id || event._id}
                         className="text-sm"
                       >
-                        {`#${event.appointment?.seqNo || 'N/A'} - ${
-                          event.attendees?.[0]?.profileData?.firstName || ''
-                        } ${
-                          event.attendees?.[0]?.profileData?.lastName || ''
-                        } (${new Date(event.startTime).toLocaleDateString()})`}
+                        {`#${event.appointment?.seqNo || 'N/A'} - ${new Date(
+                          event.appointment?.event?.startTime
+                        ).toLocaleDateString()}`}
                       </SelectItem>
                     ))
-                  ) : searchTerm && searchTerm.trim().length < 3 ? (
-                    <div className="p-2 text-sm text-gray-500 text-center">
-                      Type at least 3 characters to search
-                    </div>
-                  ) : searchTerm ? (
-                    <div className="p-2 text-sm text-gray-500 text-center">
-                      No appointments found matching "{searchTerm}"
-                    </div>
                   ) : (
                     <div className="p-2 text-sm text-gray-500 text-center">
                       No appointments found

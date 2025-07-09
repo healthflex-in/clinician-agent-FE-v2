@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     port: 9000,
     proxy: {
       '/api/graphql': {
-        target: 'https://devapi.stance.health',
+        target: 'https://api.stance.health',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/graphql/, '/graphql'),
         configure: (proxy) => {

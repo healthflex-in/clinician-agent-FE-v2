@@ -13,6 +13,12 @@ export async function graphqlRequest<T = any>(
   const apiEndpoint = API_URL;
 
   try {
+    console.log(
+      'Making GraphQL request with API key:',
+      API_KEY ? 'Present' : 'Missing'
+    );
+    console.log('API URL:', apiEndpoint);
+
     const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
@@ -29,6 +35,7 @@ export async function graphqlRequest<T = any>(
     const data = await response.json();
 
     if (data.errors) {
+      console.error('GraphQL errors:', data.errors);
       throw new Error(data.errors.map((e: any) => e.message).join('\n'));
     }
 
@@ -287,9 +294,9 @@ export async function fetchCenters() {
 }
 
 /**
- * Search users by name, type, and center
+ * Search users by name, type, and center with pagination
  * @param userType User type (e.g. PATIENT)
- * @param centerId Center ID
+ * @param centerId Center ID array
  * @param search Search term
  * @returns Promise with users data
  */
@@ -299,58 +306,235 @@ export async function searchUsers(
   search?: string
 ) {
   const query = `
-    query Users($userType: UserType, $centerId: [ObjectID!]!, $search: String) {
-      users(userType: $userType, centerId: $centerId, search: $search) {
-        _id
-        profileData {
-          ... on Patient {
-            firstName
-            lastName
+    query Users(
+      $userType: UserType!
+      $centerId: [ObjectID!]!
+      $search: String
+      $filter: UserFilterInput
+      $pagination: CursorPaginationInput
+      $sort: UserSortInput
+    ) {
+      users(
+        userType: $userType
+        centerId: $centerId
+        search: $search
+        filter: $filter
+        pagination: $pagination
+        sort: $sort
+      ) {
+        data {
+          _id
+          seqNo
+          phone
+          email
+          isActive
+          userType
+          profileData {
+            ... on Patient {
+              firstName
+              lastName
+              dob
+              bio
+              gender
+              profilePicture
+              status
+              category
+              cohort
+              patientType
+              __typename
+            }
+            __typename
           }
+          __typename
         }
+        pagination {
+          nextCursor
+          prevCursor
+          hasNext
+          hasPrevious
+          limit
+          __typename
+        }
+        __typename
       }
     }
   `;
 
-  return graphqlRequest(query, {
+  const variables = {
     userType,
     centerId,
-    search,
-  });
+    search: search || null,
+    filter: null,
+    pagination: {
+      limit: 200,
+      direction: 'FORWARD',
+    },
+    sort: {
+      field: 'CREATED_AT',
+      order: 'DESC',
+    },
+  };
+
+  console.log('GraphQL Query:', query);
+  console.log('GraphQL Variables:', JSON.stringify(variables, null, 2));
+
+  return graphqlRequest(query, variables);
+}
+
+/**
+ * NEW: Search users with pagination - temporary function to avoid caching issues
+ */
+export async function searchUsersWithPagination(
+  userType: string,
+  centerId: string[],
+  search?: string
+) {
+  const query = `
+    query Users(
+      $userType: UserType!
+      $centerId: [ObjectID!]!
+      $search: String
+      $filter: UserFilterInput
+      $pagination: CursorPaginationInput
+      $sort: UserSortInput
+    ) {
+      users(
+        userType: $userType
+        centerId: $centerId
+        search: $search
+        filter: $filter
+        pagination: $pagination
+        sort: $sort
+      ) {
+        data {
+          _id
+          seqNo
+          phone
+          email
+          isActive
+          userType
+          profileData {
+            ... on Patient {
+              firstName
+              lastName
+              dob
+              bio
+              gender
+              profilePicture
+              status
+              category
+              cohort
+              patientType
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+        pagination {
+          nextCursor
+          prevCursor
+          hasNext
+          hasPrevious
+          limit
+          __typename
+        }
+        __typename
+      }
+    }
+  `;
+
+  const variables = {
+    userType,
+    centerId,
+    search: search || null,
+    filter: null,
+    pagination: {
+      limit: 200,
+      direction: 'FORWARD',
+    },
+    sort: {
+      field: 'CREATED_AT',
+      order: 'DESC',
+    },
+  };
+
+  console.log('NEW GraphQL Query:', query);
+  console.log('NEW GraphQL Variables:', JSON.stringify(variables, null, 2));
+
+  return graphqlRequest(query, variables);
 }
 
 /**
  * Fetch appointments for a patient
- * @param filter Appointment filter
- * @returns Promise with appointments data
+ * @param patientId Patient ID
+ * @returns Promise with reports data
  */
 export async function fetchAppointments<T = any>(
-  filter: any,
-  search?: string
+  patientId: string
 ): Promise<T> {
   const query = `
-    query Events($filter: EventFilter!, $search: String) {
-      events(filter: $filter, search: $search) {
-        ... on AppointmentEvent {
+    query Reports($patientId: ObjectID!) {
+      reports(patientId: $patientId) {
+        _id
+        createdAt
+        updatedAt
+        version
+        isActive
+        seqNo
+        pdf
+        isFirstAssessment
+        appointment {
           _id
-          startTime
-          attendees {
+          status
+          event {
+            startTime
+            endTime
+          }
+          consultant {
+            email
             profileData {
-              ... on Patient {
+              ... on Consultant {
+                bio
+                designation
                 firstName
                 lastName
+                profilePicture
+                specialization
               }
             }
           }
-          appointment {
-            seqNo
+          isActive
+          medium
+          notes
+        }
+        agentReport {
+          _id
+          isAccepted
+        }
+        records {
+          plan {
+            advice
+            plans {
+              exercise
+              set {
+                repetitions
+                load
+                unit
+              }
+              duration {
+                value
+                unit
+              }
+              comments
+            }
           }
         }
       }
     }
   `;
 
-  return graphqlRequest(query, { filter, search });
+  return graphqlRequest(query, { patientId });
 }
 
 export async function createAgentReport(input: any) {

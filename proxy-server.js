@@ -6,7 +6,7 @@ const app = express();
 
 const apiProxy = createProxyMiddleware({
   changeOrigin: true,
-  target: VITE_API_URL || 'http://localhost:8080/graphql',
+  target: 'https://api.stance.health',
   pathRewrite: {
     '^/api/graphql': '/graphql',
   },

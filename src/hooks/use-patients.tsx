@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { searchUsers } from '@/utils/graphql-client';
+import { searchUsersWithPagination } from '@/utils/api';
 import { useToast } from '@/components/ui/use-toast';
 
 export type Patient = {
@@ -29,10 +29,16 @@ export const usePatients = (centerId: string) => {
 
       try {
         setLoadingPatients(true);
-        const response = await searchUsers('PATIENT', [centerId], searchTerm);
+        console.log('Calling searchUsersWithPagination...');
+        const response = await searchUsersWithPagination(
+          'PATIENT',
+          [centerId],
+          searchTerm
+        );
+        console.log('Response received:', response);
 
-        if (response && response.users) {
-          setPatients(response.users);
+        if (response && response.users && response.users.data) {
+          setPatients(response.users.data);
         }
       } catch (error) {
         console.error('Error searching patients:', error);

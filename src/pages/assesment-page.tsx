@@ -137,7 +137,16 @@ const AssessmentPage = () => {
   useEffect(() => {
     // Fetch patient details as soon as the component mounts
     const fetchPatientName = async () => {
-      setPatientName(localStorage.getItem('userName'));
+      const storedName = localStorage.getItem('userName');
+      if (storedName) {
+        setPatientName(storedName);
+      } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const nameFromUrl = urlParams.get('name');
+        if (nameFromUrl) {
+          setPatientName(decodeURIComponent(nameFromUrl));
+        }
+      }
     };
 
     const createInitialReport = async () => {

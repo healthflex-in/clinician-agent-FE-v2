@@ -1,7 +1,7 @@
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { graphqlRequest } from '@/utils/graphql-client';
-import { createAgentReport } from '../utils/api';
+import { createAgentReport, fetchUserById } from '../utils/api';
 import { normalizeObjectiveAssessment } from '@/utils/form-renderer.utils';
 
 type UseFormManagementProps = {
@@ -44,20 +44,26 @@ export const useFormManagement = ({
     if (appointmentId) localStorage.setItem('appointmentId', appointmentId);
   }, [formKey, patientId, appointmentId]);
 
-  // FAST: Get patient name from localStorage immediately (no API call needed)
+  // Fetch patient name using patientId
   React.useEffect(() => {
-    const storedPatient = localStorage.getItem('selectedPatient');
-    if (storedPatient) {
+    const fetchPatientName = async () => {
+      if (!patientId) return;
+      
       try {
-        const patientData = JSON.parse(storedPatient);
-        if (patientData && patientData.name) {
-          setPatientName(patientData.name);
+        const result = await fetchUserById(patientId);
+        if (result?.user?.profileData) {
+          const { firstName, lastName } = result.user.profileData;
+          const fullName = `${firstName || ''} ${lastName || ''}`.trim() || 'Patient';
+          setPatientName(fullName);
         }
-      } catch (e) {
-        console.warn('Failed to parse stored patient data');
+      } catch (error) {
+        console.error('Error fetching patient name:', error);
+        setPatientName('Patient');
       }
-    }
-  }, []);
+    };
+    
+    fetchPatientName();
+  }, [patientId]);
 
   // MAIN: Create initial report (only API call we need to wait for)
   React.useEffect(() => {

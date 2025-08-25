@@ -13,7 +13,7 @@ import SuggestionBox from '@/components/ui/suggestion-box';
 import AudioRecorder from '@/components/audio/audio-recorder';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { createAgentReport, fetchUserById } from '../utils/api';
+import { createAgentReport } from '../utils/api';
 
 interface SetType {
   repetitions: string;
@@ -135,25 +135,6 @@ const AssessmentPage = () => {
 
   // Create agent report on initial load
   useEffect(() => {
-    // Fetch patient details from API
-    const fetchPatientName = async () => {
-      if (!patientId) return;
-      
-      try {
-        const result = await fetchUserById(patientId);
-        if (result?.user?.profileData) {
-          const { firstName, lastName } = result.user.profileData;
-          const fullName = `${firstName || ''} ${lastName || ''}`.trim() || 'Patient';
-          setPatientName(fullName);
-        } else {
-          setPatientName('Patient');
-        }
-      } catch (error) {
-        console.error('Error fetching patient details:', error);
-        setPatientName('Patient');
-      }
-    };
-
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
       try {
@@ -189,7 +170,6 @@ const AssessmentPage = () => {
       }
     };
 
-    fetchPatientName();
     createInitialReport();
   }, [patientId, appointmentId, toast]);
 

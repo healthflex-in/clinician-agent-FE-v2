@@ -537,6 +537,32 @@ export async function fetchAppointments<T = any>(
   return graphqlRequest(query, { patientId });
 }
 
+/**
+ * Fetch user by ID
+ * @param userId User ID
+ * @returns Promise with user data
+ */
+export async function fetchUserById(userId: string) {
+  const query = `
+    query User($userId: ObjectID!) {
+      user(userId: $userId) {
+        _id
+        profileData {
+          ... on Patient {
+            firstName
+            lastName
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+    }
+  `;
+
+  return graphqlRequest(query, { userId });
+}
+
 export async function createAgentReport(input: any) {
   const mutation = `
     mutation CreateAgentReport($input: CreateAgentReportInput!) {

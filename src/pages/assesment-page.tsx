@@ -135,11 +135,6 @@ const AssessmentPage = () => {
 
   // Create agent report on initial load
   useEffect(() => {
-    // Fetch patient details as soon as the component mounts
-    const fetchPatientName = async () => {
-      setPatientName(localStorage.getItem('userName'));
-    };
-
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) return;
       try {
@@ -175,7 +170,6 @@ const AssessmentPage = () => {
       }
     };
 
-    fetchPatientName();
     createInitialReport();
   }, [patientId, appointmentId, toast]);
 

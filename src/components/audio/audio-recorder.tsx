@@ -373,21 +373,21 @@ export const Recorder: React.FC<RecorderProps> = ({
   // Determine button state and styling
   const getButtonState = () => {
     if (isProcessing || isProcessingAudioRef.current) {
-      return { icon: Loader, className: 'bg-gray-500', spinning: true };
+      return { icon: Loader, className: 'bg-stance-steel/40', spinning: true };
     }
 
     if (isPermissionGranted === false) {
-      return { icon: MicOff, className: 'bg-red-500 hover:bg-red-600' };
+      return { icon: MicOff, className: 'bg-stance-steel/30 hover:bg-stance-steel/40' };
     }
 
     if (state === 'recording') {
       return {
         icon: MicOff,
-        className: 'bg-red-600 hover:bg-red-700 animate-pulse',
+        className: 'bg-red-500 hover:bg-red-600 animate-pulse shadow-[0_0_16px_rgba(239,68,68,0.4)]',
       };
     }
 
-    return { icon: Mic, className: 'bg-green-500 hover:bg-green-600' };
+    return { icon: Mic, className: 'bg-stance-neon hover:bg-stance-neon/90 shadow-[0_2px_12px_rgba(221,254,113,0.35)]' };
   };
 
   const {
@@ -430,7 +430,11 @@ export const Recorder: React.FC<RecorderProps> = ({
           }`}
         >
           <IconComponent
-            className={`${getIconSize()} ${spinning ? 'animate-spin' : ''}`}
+            className={`${getIconSize()} ${spinning ? 'animate-spin' : ''} ${
+              state !== 'recording' && !isProcessing && isPermissionGranted !== false
+                ? 'text-stance-steel'
+                : 'text-white'
+            }`}
           />
         </Button>
       </div>

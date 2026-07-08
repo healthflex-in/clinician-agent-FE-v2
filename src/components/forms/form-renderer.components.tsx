@@ -541,7 +541,9 @@ export const InputField: React.FC<InputFieldProps> = ({
   onChange,
   onRejectLLMChange,
 }) => {
-  const baseClassName = isLLMUpdated ? 'border-yellow-400 bg-yellow-50' : '';
+  const baseClassName = isLLMUpdated
+    ? 'border-yellow-400 bg-yellow-50'
+    : 'border-stance-steel/12 bg-white focus-visible:ring-stance-steel/20 focus-visible:ring-1 text-stance-steel/80 placeholder:text-stance-steel/25 rounded-xl';
 
   switch (type) {
     case 'number':
@@ -621,35 +623,34 @@ export const FormActionButtons: React.FC<FormActionButtonsProps> = ({
   isSubmitting,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 py-2 px-3 flex justify-between gap-3 z-10 form-bottom-bar shadow-md safe-area-bottom">
-      <Button
-        variant="outline"
-        onClick={onResetForm}
-        disabled={isSubmitting}
-        className="flex-1 h-10 flex items-center justify-center gap-1 text-xs form-button touch-manipulation"
-      >
-        <RefreshCw className="h-4 w-4" />
-        Reset
-      </Button>
+    <div className="fixed bottom-0 left-0 right-0 z-10 bg-[#F0F3F8] border-t border-stance-steel/8 safe-area-bottom">
+      <div className="max-w-3xl mx-auto px-6 py-3 flex gap-2.5">
+        <Button
+          variant="ghost"
+          onClick={onResetForm}
+          disabled={isSubmitting}
+          className="w-28 h-11 flex items-center justify-center gap-1.5 text-sm font-medium text-stance-steel/50 hover:text-stance-steel/80 hover:bg-stance-steel/6 rounded-xl touch-manipulation shrink-0"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Reset
+        </Button>
 
-      <Button
-        variant="default"
-        onClick={onSubmitForm}
-        disabled={isSubmitting}
-        className="flex-1 h-10 flex items-center justify-center gap-1 text-xs form-button touch-manipulation"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            Submitting...
-          </>
-        ) : (
-          <>
-            <Save className="h-4 w-4" />
-            Submit
-          </>
-        )}
-      </Button>
+        <Button
+          variant="default"
+          onClick={onSubmitForm}
+          disabled={isSubmitting}
+          className="flex-1 h-11 flex items-center justify-center gap-2 text-sm font-bold bg-stance-steel text-white hover:bg-stance-steel/90 active:scale-[0.98] rounded-xl touch-manipulation shadow-md ring-2 ring-stance-neon ring-offset-2 ring-offset-[#F0F3F8] transition-all"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Assessment'
+          )}
+        </Button>
+      </div>
     </div>
   );
 };

@@ -1,121 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47.4% 11.2%;
- 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
- 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
- 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
- 
+    /* Surfaces */
+    --background: 216 20% 96%;
+    --foreground: 240 3% 19%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
- 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
- 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
- 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
- 
-    --destructive: 0 100% 50%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --ring: 215 20.2% 65.1%;
- 
-    --radius: 0.5rem;
+    --card-foreground: 240 3% 19%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 3% 19%;
 
-    --parrot-50: 143 73% 97%;
-    --parrot-100: 140 65% 94%;
-    --parrot-200: 134 60% 86%;
-    --parrot-300: 130 58% 75%;
-    --parrot-400: 132 49% 63%;
-    --parrot-500: 134 46% 51%;
-    --parrot-600: 135 54% 41%;
-    --parrot-700: 136 60% 32%;
-    --parrot-800: 135 57% 26%;
-    --parrot-900: 135 56% 22%;
-    --parrot-950: 136 56% 12%;
+    /* Primary = Steel Blue */
+    --primary: 217 56% 17%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Accent = Neon Green */
+    --accent: 74 99% 72%;
+    --accent-foreground: 240 3% 19%;
+
+    /* Secondary = Light Smoke */
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 240 3% 19%;
+
+    --muted: 0 0% 93%;
+    --muted-foreground: 240 3% 40%;
+
+    --destructive: 20 99% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 217 56% 17%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 217 56% 17%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 74 99% 72%;
+    --sidebar-primary-foreground: 240 3% 19%;
+    --sidebar-accent: 217 56% 22%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 217 35% 28%;
+    --sidebar-ring: 74 99% 72%;
   }
- 
+
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
- 
-    --muted: 223 47% 11%;
-    --muted-foreground: 215.4 16.3% 56.9%;
- 
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 98%;
- 
-    --popover: 224 71% 4%;
-    --popover-foreground: 215 20.2% 65.1%;
- 
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
- 
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
- 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 1.2%;
- 
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
- 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --ring: 216 34% 17%;
- 
-    --radius: 0.5rem;
+    --background: 217 56% 9%;
+    --foreground: 0 0% 96%;
+    --card: 217 50% 13%;
+    --card-foreground: 0 0% 96%;
+    --popover: 217 50% 13%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 74 99% 72%;
+    --primary-foreground: 240 3% 12%;
+    --secondary: 217 35% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 217 35% 18%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 74 99% 72%;
+    --accent-foreground: 240 3% 12%;
+    --destructive: 20 99% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 30% 22%;
+    --input: 217 30% 22%;
+    --ring: 74 99% 72%;
+    --sidebar-background: 217 56% 9%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 74 99% 72%;
+    --sidebar-primary-foreground: 240 3% 12%;
+    --sidebar-accent: 217 35% 18%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 217 30% 22%;
+    --sidebar-ring: 74 99% 72%;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  * {
+    @apply border-border;
+  }
+
+  html, body {
+    background-color: #132644;
     min-height: 100vh;
     overflow-y: auto;
   }
-}
- 
-@layer base {
-  * {
-    @apply border-border;
+
+  body {
+    @apply text-foreground font-sans;
   }
 }
 
 @keyframes pulse-ring {
-  0% {
-    opacity: 0.8;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(1.1);
-  }
-  100% {
-    opacity: 0.8;
-    transform: scale(0.9);
-  }
+  0% { opacity: 0.8; transform: scale(0.9); }
+  50% { opacity: 0.4; transform: scale(1.1); }
+  100% { opacity: 0.8; transform: scale(0.9); }
 }
 
 @keyframes bounce-soft {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 .animate-pulse-ring {

@@ -18,6 +18,10 @@ export default {
 				'2xl': '1400px'
 			}
 		},
+		fontFamily: {
+			sans: ['"DM Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+			display: ['"Unbounded"', '"DM Sans"', 'system-ui', 'sans-serif'],
+		},
 		extend: {
 			colors: {
 				border: 'hsl(var(--border))',
@@ -26,7 +30,7 @@ export default {
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
 				primary: {
-					DEFAULT: '#DDFE71',
+					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
@@ -63,19 +67,18 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Add our custom parrot green colors
-				parrot: {
-					'50': '#f2ffe6',
-					'100': '#e0ffc9',
-					'200': '#c2ff99',
-					'300': '#9bff5a',
-					'400': '#78f924',
-					'500': '#67e310',
-					'600': '#4fb805',
-					'700': '#3d8d09',
-					'800': '#326f0f',
-					'900': '#2b6010',
-					'950': '#133700',
+				// Stance Health brand tokens
+				stance: {
+					neon: '#DDFE71',
+					stone: '#ADDCEC',
+					steel: '#132644',
+					grey: '#2F2F32',
+					smoke: '#ECECEC',
+					latte: '#FBF9ED',
+					lava: '#F8DBD3',
+					sun: '#FE7833',
+					purple: '#E4DAFC',
+					mint: '#203A37',
 				},
 			},
 			borderRadius: {
@@ -101,12 +104,18 @@ export default {
 					"0%, 100%": { transform: "translateY(0)" },
 					"50%": { transform: "translateY(-5px)" },
 				},
+				"slide-progress": {
+					"0%": { transform: "translateX(-100%)" },
+					"50%": { transform: "translateX(200%)" },
+					"100%": { transform: "translateX(-100%)" },
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.24, 0, 0.38, 1) infinite',
-				'bounce-soft': 'bounce-soft 2s infinite ease-in-out'
+				'bounce-soft': 'bounce-soft 2s infinite ease-in-out',
+				'slide-progress': 'slide-progress 1.5s ease-in-out infinite',
 			}
 		}
 	},

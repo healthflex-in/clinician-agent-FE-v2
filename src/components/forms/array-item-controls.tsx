@@ -42,17 +42,11 @@ export const ArrayItemControls: React.FC<ArrayItemControlsProps> = ({
         <Button
           type="button"
           variant="outline"
-          size={isCompact ? 'sm' : 'sm'}
+          size="sm"
           onClick={() => onAdd(arrayPath)}
-          className={`flex items-center gap-1 ${
-            isCompact ? 'h-8 text-xs' : 'h-8'
-          } touch-manipulation`}
+          className={`flex items-center gap-1 h-8 text-xs font-semibold border-stance-steel/15 text-stance-steel/60 hover:text-stance-steel hover:border-stance-steel/30 hover:bg-stance-steel/5 rounded-xl touch-manipulation`}
         >
-          {isCompact ? (
-            <PlusCircle className="w-4 h-4" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
+          <Plus className="w-3.5 h-3.5" />
           <span>{addButtonText}</span>
         </Button>
       )}
@@ -61,24 +55,15 @@ export const ArrayItemControls: React.FC<ArrayItemControlsProps> = ({
       {!showOnlyAdd && (
         <Button
           type="button"
-          variant={isCompact ? 'ghost' : 'outline'}
+          variant="ghost"
           size="sm"
           onClick={() => onRemove(itemPath)}
           disabled={!canRemove}
-          className={`flex items-center gap-1 ${
-            isCompact ? 'h-8 w-8 p-0' : 'h-8'
-          } touch-manipulation`}
-          title={
-            !canRemove ? 'At least one item is required' : removeButtonText
-          }
+          className="h-7 w-7 p-0 rounded-full text-stance-steel/25 hover:text-red-400 hover:bg-red-50 touch-manipulation disabled:opacity-30"
+          title={!canRemove ? 'At least one item is required' : removeButtonText}
         >
-          {isCompact ? (
-            <MinusCircle className="w-4 h-4" />
-          ) : (
-            <Minus className="w-4 h-4" />
-          )}
-          {!isCompact && <span>{removeButtonText}</span>}
-          {isCompact && <span className="sr-only">{removeButtonText}</span>}
+          <Minus className="w-3.5 h-3.5" />
+          <span className="sr-only">{removeButtonText}</span>
         </Button>
       )}
 

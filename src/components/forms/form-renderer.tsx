@@ -405,14 +405,6 @@ export const FormRenderer = React.forwardRef<
           {fieldRenderers.renderField(schema, '', 'root')}
         </div>
 
-        {/* Form action buttons */}
-        <FormActionButtons
-          isSubmitting={
-            formState.isSubmitting || submitHandlers.pendingAutoSubmit
-          }
-          onResetForm={handlers.handleResetForm}
-          onSubmitForm={() => submitHandlers.handleSubmitForm(false)}
-        />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import {
   ArrowRight,
   CheckCircle,
   ClipboardList,
+  Mic,
 } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
@@ -23,19 +24,11 @@ import {
   SelectContent,
   SelectTrigger,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardTitle,
-  CardHeader,
-  CardFooter,
-  CardContent,
-} from '@/components/ui/card';
 
 const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Form state
   const [centerId, setCenterId] = React.useState<string>('');
   const [formKey, setFormKey] = React.useState<string>('snc');
   const [patientId, setPatientId] = React.useState<string>('');
@@ -53,22 +46,18 @@ const Index = () => {
     clearAppointments: clearEvents,
   } = useAppointments(patientId || '');
 
-  // Set viewport for mobile
   React.useEffect(() => {
-    // Set viewport meta tag for mobile
     const meta = document.createElement('meta');
     meta.name = 'viewport';
     meta.content =
       'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
     document.getElementsByTagName('head')[0].appendChild(meta);
 
-    // Status bar color for PWA
     const statusBarMeta = document.createElement('meta');
     statusBarMeta.name = 'apple-mobile-web-app-status-bar-style';
     statusBarMeta.content = 'black-translucent';
     document.getElementsByTagName('head')[0].appendChild(statusBarMeta);
 
-    // Set web app capable
     const webAppMeta = document.createElement('meta');
     webAppMeta.name = 'apple-mobile-web-app-capable';
     webAppMeta.content = 'yes';
@@ -81,7 +70,6 @@ const Index = () => {
     };
   }, []);
 
-  // Get previous values from localStorage
   React.useEffect(() => {
     const savedFormKey = localStorage.getItem('formKey');
     const savedPatientId = localStorage.getItem('userId');
@@ -90,12 +78,9 @@ const Index = () => {
 
     if (savedCenterId) setCenterId(savedCenterId);
 
-    // Only restore these values if centerId exists
     if (savedCenterId) {
       if (savedPatientId) {
         setPatientId(savedPatientId);
-
-        // Restore patient name from localStorage if available
         const savedPatient = localStorage.getItem('selectedPatient');
         if (savedPatient) {
           const parsedPatient = JSON.parse(savedPatient);
@@ -103,9 +88,7 @@ const Index = () => {
         }
       }
 
-      // Only restore formKey if appointmentId exists, otherwise keep default 'snc'
       if (savedPatientId && savedAppointmentId) {
-        // Only restore formKey if appointmentId exists and formKey is saved
         if (savedAppointmentId && savedFormKey) {
           setFormKey(savedFormKey);
         }
@@ -123,7 +106,6 @@ const Index = () => {
     }
   }, [centerId, patientSearch, searchPatients]);
 
-  // Select a patient from search results
   const selectPatient = (patient: Patient) => {
     setPatientId(patient._id);
     setPatientName(
@@ -133,11 +115,8 @@ const Index = () => {
     clearPatients();
   };
 
-  // Handle center change
   const handleCenterChange = (newCenterId: string) => {
     setCenterId(newCenterId);
-
-    // Clear downstream selections
     setPatientId('');
     setPatientName('');
     setPatientSearch('');
@@ -148,58 +127,32 @@ const Index = () => {
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Validate entire flow
     if (!centerId) {
-      toast({
-        title: 'Center Required',
-        description: 'Please select a center first',
-        variant: 'destructive',
-      });
+      toast({ title: 'Center Required', description: 'Please select a center first', variant: 'destructive' });
       return;
     }
-
     if (!patientId) {
-      toast({
-        title: 'Patient Required',
-        description: 'Please select a patient',
-        variant: 'destructive',
-      });
+      toast({ title: 'Patient Required', description: 'Please select a patient', variant: 'destructive' });
       return;
     }
-
     if (!appointmentId) {
-      toast({
-        title: 'Appointment Required',
-        description: 'Please select an appointment',
-        variant: 'destructive',
-      });
+      toast({ title: 'Appointment Required', description: 'Please select an appointment', variant: 'destructive' });
       return;
     }
-
     if (!formKey) {
-      toast({
-        title: 'Form Selection Required',
-        description: 'Please select a form type',
-        variant: 'destructive',
-      });
+      toast({ title: 'Form Selection Required', description: 'Please select a form type', variant: 'destructive' });
       return;
     }
 
-    // Store in localStorage
     localStorage.setItem('userId', patientId);
     localStorage.setItem('appointmentId', appointmentId);
     localStorage.setItem('formKey', formKey);
     localStorage.setItem('centerId', centerId);
-    localStorage.setItem(
-      'selectedPatient',
-      JSON.stringify({ id: patientId, name: patientName })
-    );
+    localStorage.setItem('selectedPatient', JSON.stringify({ id: patientId, name: patientName }));
 
-    // Navigate to form page
     navigate(`/${formKey}/${patientId}/${appointmentId}`);
   };
 
-  // Get progress step count
   const getProgressStep = () => {
     if (!centerId) return 1;
     if (!patientId) return 2;
@@ -207,57 +160,80 @@ const Index = () => {
     return 4;
   };
 
+  const steps = ['Center', 'Patient', 'Appointment', 'Form'];
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/10 to-background px-4 py-6 safe-area-top safe-area-bottom">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-center text-xl font-bold">
-            Stance AI Agent
-          </CardTitle>
+    <div
+      className="min-h-screen bg-stance-steel flex flex-col items-center justify-center px-4 py-8"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {/* Background accents */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 left-1/4 w-96 h-96 bg-stance-neon/10 rounded-full blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-stance-stone/10 rounded-full blur-[96px]" />
+      </div>
 
-          {/* Progress indicator for mobile */}
-          <div className="flex justify-center mt-2">
-            <div className="flex items-center space-x-2">
-              {[1, 2, 3, 4].map((step) => (
-                <div
-                  key={step}
-                  className={`w-2 h-2 rounded-full ${
-                    step <= getProgressStep() ? 'bg-primary' : 'bg-gray-200'
-                  }`}
-                />
-              ))}
-            </div>
+      <div className="relative w-full max-w-md space-y-6">
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="h-16 w-16 rounded-[20px] bg-stance-steel border border-white/10 flex items-center justify-center mx-auto shadow-[0_8px_32px_rgba(14,27,42,0.4)]">
+            <Mic className="h-7 w-7 text-stance-neon" />
           </div>
-        </CardHeader>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/35 font-sans">
+              Stance Health · Clinician Agent
+            </p>
+            <h1 className="font-display text-2xl font-bold text-white mt-1">
+              Start a Session
+            </h1>
+            <p className="text-white/40 text-sm mt-1">
+              Select center, patient and appointment to begin
+            </p>
+          </div>
+        </div>
 
-        <CardContent className="pt-4">
-          <form onSubmit={handleFormSubmit} className="space-y-5">
+        {/* Step indicators */}
+        <div className="flex items-center gap-2">
+          {steps.map((step, i) => {
+            const stepNum = i + 1;
+            const isActive = stepNum === getProgressStep();
+            const isDone = stepNum < getProgressStep();
+            return (
+              <React.Fragment key={step}>
+                <div className="flex flex-col items-center gap-1 flex-1">
+                  <div className={`h-1.5 w-full rounded-full transition-all ${isDone || isActive ? 'bg-stance-neon' : 'bg-white/10'}`} />
+                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isDone || isActive ? 'text-stance-neon' : 'text-white/25'}`}>
+                    {step}
+                  </span>
+                </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Form card */}
+        <div className="bg-[#F0F3F8] rounded-[28px] p-6 shadow-[0_8px_48px_rgba(0,0,0,0.3)] space-y-5">
+          <form onSubmit={handleFormSubmit} className="space-y-4">
+
             {/* Center Selection */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="center"
-                className="flex items-center text-sm font-medium"
-              >
-                <Building className="h-4 w-4 mr-1.5 text-black" />
-                Select Center
+              <Label htmlFor="center" className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stance-steel/60">
+                <Building className="h-3.5 w-3.5" />
+                Center
               </Label>
               <Select value={centerId} onValueChange={handleCenterChange}>
-                <SelectTrigger className="w-full h-10 text-sm">
+                <SelectTrigger className="h-11 bg-white border-stance-steel/10 rounded-xl text-stance-grey text-sm focus:ring-stance-steel/20">
                   <SelectValue placeholder="Select a center" />
                 </SelectTrigger>
                 <SelectContent>
                   {loadingCenters ? (
-                    <div className="flex items-center justify-center p-2">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm">Loading centers...</span>
+                    <div className="flex items-center justify-center p-3 gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-stance-steel/40" />
+                      <span className="text-sm text-stance-steel/50">Loading centers...</span>
                     </div>
                   ) : (
                     centers.map((center) => (
-                      <SelectItem
-                        key={center._id}
-                        value={center._id}
-                        className="text-sm"
-                      >
+                      <SelectItem key={center._id} value={center._id} className="text-sm">
                         {center.name}
                       </SelectItem>
                     ))
@@ -268,11 +244,8 @@ const Index = () => {
 
             {/* Patient Search */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="patientSearch"
-                className="flex items-center text-sm font-medium"
-              >
-                <User className="h-4 w-4 mr-1.5 text-black" />
+              <Label htmlFor="patientSearch" className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stance-steel/60">
+                <User className="h-3.5 w-3.5" />
                 Patient
               </Label>
               <div className="relative">
@@ -280,104 +253,80 @@ const Index = () => {
                   id="patientSearch"
                   value={patientSearch}
                   onChange={(e) => setPatientSearch(e.target.value)}
-                  placeholder="Search patients by name"
+                  placeholder="Search by name..."
                   disabled={!centerId}
-                  className="h-10 text-sm"
+                  className="h-11 bg-white border-stance-steel/10 rounded-xl text-stance-grey text-sm placeholder:text-stance-grey/30 focus-visible:ring-stance-steel/20"
                 />
                 {loadingPatients && (
-                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin" />
+                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-stance-steel/30" />
                 )}
               </div>
 
-              {/* Patient Search Results */}
               {patients.length > 0 && (
-                <div className="bg-white border rounded-md mt-1 max-h-40 overflow-y-auto shadow-md z-10">
+                <div className="bg-white border border-stance-steel/10 rounded-xl mt-1 max-h-40 overflow-y-auto shadow-lg z-10">
                   {patients.map((patient) => (
                     <div
                       key={patient._id}
-                      className="px-3 py-2.5 hover:bg-gray-100 active:bg-gray-200 cursor-pointer text-sm border-b last:border-0 flex items-center touch-manipulation transition-colors"
+                      className="px-4 py-3 hover:bg-stance-steel/5 active:bg-stance-steel/10 cursor-pointer text-sm border-b border-stance-steel/5 last:border-0 flex items-center gap-2.5 transition-colors"
                       onClick={() => selectPatient(patient)}
                     >
-                      <User className="h-3.5 w-3.5 mr-2 text-black" />
-                      {patient.profileData.firstName}{' '}
-                      {patient.profileData.lastName}
+                      <div className="h-6 w-6 rounded-full bg-stance-steel/10 flex items-center justify-center flex-shrink-0">
+                        <User className="h-3 w-3 text-stance-steel/50" />
+                      </div>
+                      <span className="text-stance-grey">
+                        {patient.profileData.firstName} {patient.profileData.lastName}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Selected Patient Display */}
               {patientId && patientName && (
-                <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md flex justify-between items-center">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-1.5" />
-                    <span className="text-sm font-medium">{patientName}</span>
+                <div className="mt-1 px-4 py-2.5 bg-stance-neon/10 border border-stance-neon/30 rounded-xl flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-stance-steel" />
+                    <span className="text-sm font-semibold text-stance-steel">{patientName}</span>
                   </div>
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => {
-                      setPatientId('');
-                      setPatientName('');
-                    }}
+                    className="text-xs text-stance-steel/50 hover:text-stance-steel transition-colors px-2 py-1 rounded-lg hover:bg-stance-steel/5"
+                    onClick={() => { setPatientId(''); setPatientName(''); }}
                   >
                     Change
-                  </Button>
+                  </button>
                 </div>
               )}
             </div>
 
             {/* Appointment Selection */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="appointmentId"
-                className="flex items-center text-sm font-medium"
-              >
-                <Calendar className="h-4 w-4 mr-1.5 text-black" />
+              <Label htmlFor="appointmentId" className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stance-steel/60">
+                <Calendar className="h-3.5 w-3.5" />
                 Appointment
-                {loadingEvents && (
-                  <Loader2 className="h-3 w-3 animate-spin ml-2 text-gray-500" />
-                )}
+                {loadingEvents && <Loader2 className="h-3 w-3 animate-spin text-stance-steel/30" />}
               </Label>
-
               <Select
                 value={appointmentId}
                 onValueChange={handleAppointmentChange}
                 disabled={!patientId || loadingEvents}
               >
-                <SelectTrigger className="h-10 text-sm">
-                  <SelectValue
-                    placeholder={
-                      loadingEvents
-                        ? 'Loading appointments...'
-                        : 'Select an appointment'
-                    }
-                  />
+                <SelectTrigger className="h-11 bg-white border-stance-steel/10 rounded-xl text-stance-grey text-sm focus:ring-stance-steel/20">
+                  <SelectValue placeholder={loadingEvents ? 'Loading appointments...' : 'Select an appointment'} />
                 </SelectTrigger>
                 <SelectContent>
                   {loadingEvents ? (
-                    <div className="flex items-center justify-center p-2">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-sm">Loading appointments...</span>
+                    <div className="flex items-center justify-center p-3 gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-stance-steel/40" />
+                      <span className="text-sm text-stance-steel/50">Loading...</span>
                     </div>
                   ) : events.length > 0 ? (
                     events.map((event) => (
-                      <SelectItem
-                        key={event._id}
-                        value={event.appointment?._id || event._id}
-                        className="text-sm"
-                      >
-                        {`#${event.appointment?.seqNo || 'N/A'} - ${new Date(
-                          event.appointment?.event?.startTime
-                        ).toLocaleDateString()}`}
+                      <SelectItem key={event._id} value={event.appointment?._id || event._id} className="text-sm">
+                        {`#${event.appointment?.seqNo || 'N/A'} – ${new Date(event.appointment?.event?.startTime).toLocaleDateString()}`}
                       </SelectItem>
                     ))
                   ) : (
-                    <div className="p-2 text-sm text-gray-500 text-center">
-                      No appointments found
-                    </div>
+                    <div className="p-3 text-sm text-stance-steel/40 text-center">No appointments found</div>
                   )}
                 </SelectContent>
               </Select>
@@ -385,19 +334,12 @@ const Index = () => {
 
             {/* Form Type Selection */}
             <div className="space-y-1.5">
-              <Label
-                htmlFor="formKey"
-                className="flex items-center text-sm font-medium"
-              >
-                <ClipboardList className="h-4 w-4 mr-1.5 text-black" />
+              <Label htmlFor="formKey" className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-stance-steel/60">
+                <ClipboardList className="h-3.5 w-3.5" />
                 Form Type
               </Label>
-              <Select
-                value={formKey}
-                onValueChange={setFormKey}
-                disabled={!appointmentId}
-              >
-                <SelectTrigger className="h-10 text-sm">
+              <Select value={formKey} onValueChange={setFormKey} disabled={!appointmentId}>
+                <SelectTrigger className="h-11 bg-white border-stance-steel/10 rounded-xl text-stance-grey text-sm focus:ring-stance-steel/20">
                   <SelectValue placeholder="Select a form type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -410,22 +352,20 @@ const Index = () => {
               </Select>
             </div>
 
-            <Button
+            <button
               type="submit"
-              className="w-full h-11 mt-4 bg-primary border border-black hover:bg-primary/90 text-black font-medium flex items-center justify-center touch-manipulation active:scale-[0.98] transition-transform"
+              className="w-full h-12 mt-2 bg-stance-steel text-white font-semibold text-sm rounded-2xl flex items-center justify-center gap-2 hover:bg-stance-steel/90 active:scale-[0.98] transition-all shadow-[0_4px_24px_rgba(14,27,42,0.2)] ring-2 ring-stance-neon ring-offset-2 ring-offset-[#F0F3F8]"
             >
               Start Session
-              <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Button>
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </form>
-        </CardContent>
+        </div>
 
-        <CardFooter className="flex-col gap-1 pt-0 pb-4">
-          <p className="text-xs text-muted-foreground text-center">
-            Select a center, patient, appointment and form type to continue.
-          </p>
-        </CardFooter>
-      </Card>
+        <p className="text-center text-[11px] text-white/25">
+          Stance Health · Clinician Portal
+        </p>
+      </div>
     </div>
   );
 };

@@ -2,7 +2,6 @@ import React from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { getNestedValue } from '@/utils/schema-utils';
 import { FORM_SECTIONS } from '@/constants';
 import { InputField } from './form-renderer.components';
@@ -133,22 +132,19 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
               isLLMUpdated ? 'p-2 border-2 border-yellow-300 rounded' : ''
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+            <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
               <div className="flex items-center gap-2">
-                <Label className="text-base font-semibold">
+                <span className="text-xs font-bold uppercase tracking-[0.15em] text-stance-steel/50">
                   {arrayPlaceholder}
-                </Label>
-                <Button
+                </span>
+                <button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0 rounded-full touch-manipulation"
+                  className="h-5 w-5 flex items-center justify-center rounded-full text-stance-steel/30 hover:text-stance-steel/60 hover:bg-stance-steel/8 transition-colors"
                   onClick={() => handleResetField(path)}
                   title="Reset this section"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="sr-only">Reset section</span>
-                </Button>
+                  <RefreshCw className="h-3 w-3" />
+                </button>
               </div>
 
               {/* UPDATED: Use new ArrayItemControls for adding */}
@@ -173,10 +169,10 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
                 const isItemTest = isTestPath(itemPath, formKey);
 
                 return (
-                  <Card key={index} className="overflow-hidden">
-                    <CardContent className="p-2 form-card-content">
+                  <div key={index} className="rounded-xl bg-white border border-stance-steel/8 overflow-hidden mb-2">
+                    <div className="p-3">
                       <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-medium text-xs">
+                        <h3 className="text-[10px] font-bold uppercase tracking-wider text-stance-steel/50">
                           {arrayPlaceholder} {index + 1}
                         </h3>
 
@@ -211,8 +207,8 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
                           )
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 );
               })}
 
@@ -240,26 +236,21 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
             }`}
           >
             {!parentIsArray && (
-              <div className="flex items-center gap-2 mb-2">
-                <Label className="text-base font-semibold block">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-bold uppercase tracking-[0.15em] text-stance-steel/50">
                   {sectionName}
-                </Label>
-                <Button
+                </span>
+                <button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0 rounded-full touch-manipulation"
+                  className="h-5 w-5 flex items-center justify-center rounded-full text-stance-steel/30 hover:text-stance-steel/60 hover:bg-stance-steel/8 transition-colors"
                   onClick={() => handleResetField(path)}
                   title="Reset this section"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="sr-only">Reset section</span>
-                </Button>
+                  <RefreshCw className="h-3 w-3" />
+                </button>
               </div>
             )}
-            <div
-              className={parentIsArray ? '' : 'pl-2 border-l-2 border-border'}
-            >
+            <div>
               {Object.entries(fieldSchema).map(([key, nestedSchema]) => (
                 <div key={key} className="mb-2">
                   {renderField(
@@ -289,9 +280,9 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
             }`}
             key={`field-${path}`} // Stable key to prevent recreation
           >
-            <Label htmlFor={path} className="block mb-1 text-sm">
+            <label htmlFor={path} className="block mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-stance-steel/50">
               {labelText}
-            </Label>
+            </label>
 
             {fieldName.toLowerCase().includes('comment') ||
             fieldName.toLowerCase().includes('advice') ||

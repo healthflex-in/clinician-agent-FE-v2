@@ -5,13 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import SectionTranscriptionBox from './section-transcription-box';
 import SectionAudioRecorder from '../audio/section-audio-recorder';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card';
 
 interface AssessmentFormSectionProps {
   title: string;
@@ -65,61 +58,53 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
   };
 
   return (
-    <Card
-      className={`mb-6 border border-border bg-card ${
-        isArrayItem ? 'ml-4' : ''
-      }`}
-    >
-      <CardHeader className={`pb-2 ${isArrayItem ? 'bg-background/50' : ''}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {selectable && (
-              <Checkbox
-                checked={selected}
-                onCheckedChange={(checked) => {
-                  if (onSelectChange)
-                    onSelectChange(sectionId, checked === true);
-                }}
-                id={`section-checkbox-${sectionId}`}
-                className="h-4 w-4"
-              />
-            )}
-            <CardTitle className="text-lg font-semibold">
-              {isArrayItem && itemIndex !== undefined
-                ? `${title} ${itemIndex + 1}`
-                : title}
-            </CardTitle>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {showAudioControls && (
-              <SectionAudioRecorder
-                sectionId={sectionId}
-                onAudioEncoded={handleAudioEncoded}
-                isProcessing={isProcessing}
-                size="sm"
-                label={`Record for ${title}`}
-              />
-            )}
-
-            {isArrayItem && onRemoveItem && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRemoveItem}
-                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-              >
-                <Minus className="h-4 w-4" />
-                <span className="sr-only">Remove Item</span>
-              </Button>
-            )}
-          </div>
+    <div className={`mb-4 rounded-2xl bg-white border border-stance-steel/8 shadow-sm overflow-hidden ${isArrayItem ? 'ml-4' : ''}`}>
+      {/* Section header */}
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b border-stance-steel/6 ${isArrayItem ? 'bg-stance-steel/5' : 'bg-stance-steel/[0.03]'}`}>
+        <div className="flex items-center gap-2">
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(checked) => {
+                if (onSelectChange)
+                  onSelectChange(sectionId, checked === true);
+              }}
+              id={`section-checkbox-${sectionId}`}
+              className="h-3.5 w-3.5"
+            />
+          )}
+          <span className="text-xs font-bold uppercase tracking-[0.15em] text-stance-steel/60">
+            {isArrayItem && itemIndex !== undefined
+              ? `${title} ${itemIndex + 1}`
+              : title}
+          </span>
         </div>
-      </CardHeader>
 
-      <CardContent className="pt-2">
+        <div className="flex items-center gap-2">
+          {showAudioControls && (
+            <SectionAudioRecorder
+              sectionId={sectionId}
+              onAudioEncoded={handleAudioEncoded}
+              isProcessing={isProcessing}
+              size="sm"
+              label={`Record for ${title}`}
+            />
+          )}
+
+          {isArrayItem && onRemoveItem && (
+            <button
+              onClick={onRemoveItem}
+              className="h-6 w-6 flex items-center justify-center rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-3">
         {showAudioControls && (
-          <div className="mb-4">
+          <div className="mb-3">
             <SectionTranscriptionBox
               value={transcription}
               onChange={setTranscription}
@@ -135,48 +120,48 @@ const AssessmentFormSection: React.FC<AssessmentFormSectionProps> = ({
         )}
 
         <div className="form-fields">{children}</div>
-      </CardContent>
+      </div>
 
-      <CardFooter className="flex justify-end space-x-2 py-2">
-        {onAddItem && !isArrayItem && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onAddItem}
-            className="mr-auto flex items-center gap-1 border-dashed border-primary"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Item</span>
-          </Button>
-        )}
+      {(onAddItem || onSectionReset || onSectionSubmit) && (
+        <div className="flex items-center justify-between px-4 py-2 border-t border-stance-steel/6 bg-stance-steel/[0.02]">
+          {onAddItem && !isArrayItem ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddItem}
+              className="flex items-center gap-1 h-7 text-xs border-dashed border-stance-steel/30 text-stance-steel/60 hover:text-stance-steel"
+            >
+              <Plus className="h-3 w-3" />
+              Add Item
+            </Button>
+          ) : <div />}
 
-        {(onSectionReset || onSectionSubmit) && (
-          <div>
+          <div className="flex gap-2">
             {onSectionReset && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onSectionReset(sectionId)}
-                className="flex items-center gap-1 mr-2"
+                className="flex items-center gap-1 h-7 text-xs"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>Reset</span>
+                <RefreshCw className="h-3 w-3" />
+                Reset
               </Button>
             )}
             {onSectionSubmit && (
               <Button
                 size="sm"
                 onClick={() => onSectionSubmit(sectionId)}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 h-7 text-xs bg-stance-steel text-white"
               >
-                <Save className="h-3.5 w-3.5" />
-                <span>Submit</span>
+                <Save className="h-3 w-3" />
+                Submit
               </Button>
             )}
           </div>
-        )}
-      </CardFooter>
-    </Card>
+        </div>
+      )}
+    </div>
   );
 };
 

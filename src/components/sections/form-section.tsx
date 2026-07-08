@@ -4,7 +4,6 @@ import { RecordingMode } from '@/hooks';
 import { FormRenderer } from '@/components/forms';
 import { FormRendererRef } from '@/types/form-renderer.types';
 import { isPlanPath, isTestPath } from '@/utils/form-renderer.utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 type FormSectionProps = {
   schema: any;
@@ -116,41 +115,35 @@ export const FormSection: React.FC<FormSectionProps> = ({
   ]);
 
   return (
-    <Card className="w-full shadow-md">
-      <CardHeader>
-        <CardTitle className="text-center">
-          {formKey.charAt(0).toUpperCase() + formKey.slice(1)} Form -{' '}
-          {patientName}
-        </CardTitle>
-      </CardHeader>
+    <div className="space-y-4">
+      {/* Section label */}
+      <span className="text-xs font-bold uppercase tracking-[0.18em] text-stance-steel/40">
+        {formKey.charAt(0).toUpperCase() + formKey.slice(1)} Form
+      </span>
 
-      <CardContent className="px-2">
-        <div className="pb-2">
-          <FormRenderer
-            schema={schema}
-            formKey={formKey}
-            formData={formData}
-            ref={formRendererRef}
-            patientId={patientId}
-            isProcessing={isProcessing}
-            recordingMode={recordingMode}
-            appointmentId={appointmentId}
-            recordingStates={recordingStates}
-            isWebSocketConnected={isConnected}
-            activeSectionPath={activeSectionPath}
-            onChange={onFormChange}
-            onLLMUpdate={onFormChange}
-            onAudioRecorded={onAudioRecorded}
-            onRecordingStop={onRecordingStop}
-            onRecordingStart={onRecordingStart}
-            onTranscriptionProcess={onTranscriptionProcess}
-            onPlanTranscriptionClear={onPlanTranscriptionClear}
-            onSectionTranscriptionClear={onSectionTranscriptionClear}
-            autoSubmitOnLLMUpdate={autoSubmitOnLLMUpdate}
-            autoSubmitDelay={autoSubmitDelay}
-          />
-        </div>
-      </CardContent>
-    </Card>
+      <FormRenderer
+        schema={schema}
+        formKey={formKey}
+        formData={formData}
+        ref={formRendererRef}
+        patientId={patientId}
+        isProcessing={isProcessing}
+        recordingMode={recordingMode}
+        appointmentId={appointmentId}
+        recordingStates={recordingStates}
+        isWebSocketConnected={isConnected}
+        activeSectionPath={activeSectionPath}
+        onChange={onFormChange}
+        onLLMUpdate={onFormChange}
+        onAudioRecorded={onAudioRecorded}
+        onRecordingStop={onRecordingStop}
+        onRecordingStart={onRecordingStart}
+        onTranscriptionProcess={onTranscriptionProcess}
+        onPlanTranscriptionClear={onPlanTranscriptionClear}
+        onSectionTranscriptionClear={onSectionTranscriptionClear}
+        autoSubmitOnLLMUpdate={autoSubmitOnLLMUpdate}
+        autoSubmitDelay={autoSubmitDelay}
+      />
+    </div>
   );
 };

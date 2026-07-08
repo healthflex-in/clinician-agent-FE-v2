@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import { Save, RefreshCw } from 'lucide-react';
 
-import {
-  Card,
-  CardTitle,
-  CardHeader,
-  CardFooter,
-  CardContent,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import SectionTranscriptionBox from './section-transcription-box';
@@ -57,41 +50,40 @@ const FormSection: React.FC<FormSectionProps> = ({
   };
 
   return (
-    <Card className="mb-6 border border-border bg-card">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {selectable && (
-              <Checkbox
-                checked={selected}
-                onCheckedChange={(checked) => {
-                  if (onSelectChange)
-                    onSelectChange(sectionId, checked === true);
-                }}
-                id={`section-checkbox-${sectionId}`}
-                className="h-4 w-4"
-              />
-            )}
-            <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-          </div>
-
-          {showAudioControls && (
-            <div className="flex items-center gap-2">
-              <SectionAudioRecorder
-                sectionId={sectionId}
-                onAudioEncoded={handleAudioEncoded}
-                isProcessing={isProcessing}
-                size="sm"
-                label={`Record for ${title}`}
-              />
-            </div>
+    <div className="mb-4 rounded-2xl bg-white border border-stance-steel/8 shadow-sm overflow-hidden">
+      {/* Section header */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-stance-steel/6 bg-stance-steel/[0.03]">
+        <div className="flex items-center gap-2">
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={(checked) => {
+                if (onSelectChange)
+                  onSelectChange(sectionId, checked === true);
+              }}
+              id={`section-checkbox-${sectionId}`}
+              className="h-3.5 w-3.5"
+            />
           )}
+          <span className="text-xs font-bold uppercase tracking-[0.15em] text-stance-steel/60">
+            {title}
+          </span>
         </div>
-      </CardHeader>
 
-      <CardContent className="pt-2">
         {showAudioControls && (
-          <div className="mb-4">
+          <SectionAudioRecorder
+            sectionId={sectionId}
+            onAudioEncoded={handleAudioEncoded}
+            isProcessing={isProcessing}
+            size="sm"
+            label={`Record for ${title}`}
+          />
+        )}
+      </div>
+
+      <div className="px-4 py-3">
+        {showAudioControls && (
+          <div className="mb-3">
             <SectionTranscriptionBox
               value={transcription}
               onChange={setTranscription}
@@ -107,34 +99,34 @@ const FormSection: React.FC<FormSectionProps> = ({
         )}
 
         <div className="form-fields">{children}</div>
-      </CardContent>
+      </div>
 
       {(onSectionSubmit || onSectionReset) && (
-        <CardFooter className="flex justify-end space-x-2 py-2">
+        <div className="flex justify-end gap-2 px-4 py-2 border-t border-stance-steel/6">
           {onSectionReset && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onSectionReset(sectionId)}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 h-7 text-xs"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>Reset</span>
+              <RefreshCw className="h-3 w-3" />
+              Reset
             </Button>
           )}
           {onSectionSubmit && (
             <Button
               size="sm"
               onClick={() => onSectionSubmit(sectionId)}
-              className="flex items-center gap-1"
+              className="flex items-center gap-1 h-7 text-xs bg-stance-steel text-white"
             >
-              <Save className="h-3.5 w-3.5" />
-              <span>Submit</span>
+              <Save className="h-3 w-3" />
+              Submit
             </Button>
           )}
-        </CardFooter>
+        </div>
       )}
-    </Card>
+    </div>
   );
 };
 

@@ -1,6 +1,6 @@
 import './App.css';
 
-import IndexPage from './pages';
+import IndexPage from './pages/Index';
 import FormPage from './pages/form-page';
 import NotFoundPage from './pages/not-found';
 

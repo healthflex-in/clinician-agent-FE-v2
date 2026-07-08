@@ -164,55 +164,48 @@ const Index = () => {
 
   return (
     <div
-      className="min-h-screen bg-stance-steel flex flex-col items-center justify-center px-4 py-8"
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="h-[100dvh] bg-stance-steel flex flex-col overflow-hidden"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* Background accents */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-24 left-1/4 w-96 h-96 bg-stance-neon/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-stance-stone/10 rounded-full blur-[96px]" />
-      </div>
-
-      <div className="relative w-full max-w-md space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-3">
-          <div className="h-16 w-16 rounded-[20px] bg-stance-steel border border-white/10 flex items-center justify-center mx-auto shadow-[0_8px_32px_rgba(14,27,42,0.4)]">
-            <Mic className="h-7 w-7 text-stance-neon" />
+      {/* Header bar — stays in steel */}
+      <header className="bg-stance-steel/80 backdrop-blur-md shrink-0">
+        <div className="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
+          <div className="flex flex-col leading-none">
+            <span className="text-[9px] uppercase tracking-[0.18em] text-white/35 font-semibold">Stance Health</span>
+            <span className="font-display text-base font-bold text-white mt-0.5">Clinician Agent</span>
           </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/35 font-sans">
-              Stance Health · Clinician Agent
-            </p>
-            <h1 className="font-display text-2xl font-bold text-white mt-1">
-              Start a Session
-            </h1>
-            <p className="text-white/40 text-sm mt-1">
-              Select center, patient and appointment to begin
-            </p>
+          <div className="h-8 w-8 rounded-xl bg-white/8 flex items-center justify-center">
+            <Mic className="h-4 w-4 text-stance-neon" />
           </div>
         </div>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-2">
+        {/* Step progress bar */}
+        <div className="flex gap-1 px-5 pb-3">
           {steps.map((step, i) => {
             const stepNum = i + 1;
             const isActive = stepNum === getProgressStep();
             const isDone = stepNum < getProgressStep();
             return (
-              <React.Fragment key={step}>
-                <div className="flex flex-col items-center gap-1 flex-1">
-                  <div className={`h-1.5 w-full rounded-full transition-all ${isDone || isActive ? 'bg-stance-neon' : 'bg-white/10'}`} />
-                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isDone || isActive ? 'text-stance-neon' : 'text-white/25'}`}>
-                    {step}
-                  </span>
-                </div>
-              </React.Fragment>
+              <div key={step} className="flex flex-col items-start gap-0.5 flex-1">
+                <div className={`h-1 w-full rounded-full transition-all ${isDone || isActive ? 'bg-stance-neon' : 'bg-white/10'}`} />
+                <span className={`text-[8px] font-bold uppercase tracking-wider ${isDone || isActive ? 'text-stance-neon/70' : 'text-white/20'}`}>
+                  {step}
+                </span>
+              </div>
             );
           })}
         </div>
+      </header>
 
-        {/* Form card */}
-        <div className="bg-[#F0F3F8] rounded-[28px] p-6 shadow-[0_8px_48px_rgba(0,0,0,0.3)] space-y-5">
+      {/* Full-width #F0F3F8 card with rounded top corners only */}
+      <div className="flex-1 min-h-0 bg-[#F0F3F8] rounded-t-[32px] md:rounded-t-[48px] mt-2 overflow-y-auto shadow-[0_-8px_32px_rgba(0,0,0,0.2)]">
+        <div className="max-w-lg mx-auto px-6 py-8 space-y-5">
+          {/* Page title */}
+          <div className="space-y-1">
+            <h1 className="font-display text-xl font-bold text-stance-steel">Start a Session</h1>
+            <p className="text-stance-steel/40 text-sm">Select center, patient and appointment to begin</p>
+          </div>
+
           <form onSubmit={handleFormSubmit} className="space-y-4">
 
             {/* Center Selection */}
@@ -360,11 +353,11 @@ const Index = () => {
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-[11px] text-white/25">
-          Stance Health · Clinician Portal
-        </p>
+          <p className="text-center text-[11px] text-stance-steel/25 pb-8">
+            Stance Health · Clinician Portal
+          </p>
+        </div>
       </div>
     </div>
   );

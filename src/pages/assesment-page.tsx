@@ -401,7 +401,7 @@ const AssessmentPage = () => {
   };
 
   // Process transcription text
-  const handleProcessTranscription = () => {
+  const handleProcessTranscription = useCallback(() => {
     if (!transcriptText.trim()) {
       toast({
         title: 'Empty transcription',
@@ -410,6 +410,8 @@ const AssessmentPage = () => {
       });
       return;
     }
+
+    console.log('[AutoFill] handleProcessTranscription called, text:', transcriptText.substring(0, 50));
 
     // Prepare data based on selected sections or all data
     const formData: any = {};
@@ -431,8 +433,8 @@ const AssessmentPage = () => {
         }
       });
     } else {
-      // Include all form data
-      formData.assessment = assessment;
+      // Spread assessment directly so transformFormDataForAPI finds plan/subjectiveAssessment/etc at top level
+      Object.assign(formData, assessment);
     }
 
     // Send transcription with form data
@@ -445,7 +447,7 @@ const AssessmentPage = () => {
         variant: 'destructive',
       });
     }
-  };
+  }, [transcriptText, selectedSections, assessment, processTranscription, toast]);
 
   // Process section-specific transcription
   const handleSectionTranscriptProcess = (text: string, sectionId: string) => {

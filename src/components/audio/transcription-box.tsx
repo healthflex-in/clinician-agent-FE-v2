@@ -42,7 +42,9 @@ export const TranscriptionBox: React.FC<TranscriptionBoxProps> = ({
     }
 
     if (value.trim() && autoProcess && !isProcessing) {
+      console.log('[AutoFill] TranscriptionBox: scheduling autoProcess in', autoProcessDelay, 'ms');
       timeoutRef.current = setTimeout(() => {
+        console.log('[AutoFill] TranscriptionBox: firing autoProcess');
         autoProcess();
       }, autoProcessDelay);
     }

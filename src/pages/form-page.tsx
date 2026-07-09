@@ -183,6 +183,8 @@ const FormPage = () => {
         <header className="bg-stance-steel/80 backdrop-blur-md z-10">
           <div className="max-w-5xl mx-auto px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <img src="/logo-white.png" alt="Stance Health" className="h-7 w-auto" />
+              <div className="w-px h-5 bg-white/15" />
               <div className="flex flex-col leading-none">
                 <span className="text-[9px] uppercase tracking-[0.18em] text-white/35 font-semibold">Clinician Agent</span>
                 <span className="font-display text-base font-bold text-white mt-0.5">

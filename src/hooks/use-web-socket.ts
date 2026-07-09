@@ -33,6 +33,7 @@ export function useWebSocket(options: WebSocketOptions) {
   const lastServerPingRef = React.useRef<number>(0);
   const reconnectAttemptsRef = React.useRef<number>(0);
   const heartbeatIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const connectRef = React.useRef<() => void>(() => {});
 
   // Clear heartbeat timer
   const clearHeartbeatTimer = React.useCallback(() => {
@@ -124,7 +125,8 @@ export function useWebSocket(options: WebSocketOptions) {
             1000 * Math.pow(1.5, reconnectAttemptsRef.current),
             10000
           );
-          setTimeout(() => connect(), delay);
+          // Use ref so we always call the latest connect (avoids stale closure)
+          setTimeout(() => connectRef.current(), delay);
         } else if (onClose) onClose();
       };
 
@@ -571,6 +573,11 @@ export function useWebSocket(options: WebSocketOptions) {
 
     return transformed;
   };
+
+  // Keep ref pointing to latest connect so setTimeout callbacks are never stale
+  React.useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   React.useEffect(() => {
     return () => {

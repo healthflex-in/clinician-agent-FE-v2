@@ -96,6 +96,11 @@ const AssessmentPage = () => {
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Ref to latest assessment — lets handleProcessTranscription read current value
+  // without being in its useCallback deps (which would reset the auto-send timer
+  // every time form data arrives from the backend)
+  const assessmentRef = React.useRef<any>(null);
+
   // Initial assessment state
   const [assessment, setAssessment] = useState<AssessmentType>({
     plan: {
@@ -233,6 +238,12 @@ const AssessmentPage = () => {
 
     return () => clearInterval(reconnectInterval);
   }, [connect, isConnected, isConnecting]);
+
+  // Keep assessmentRef in sync so handleProcessTranscription can read latest value
+  // without needing assessment in its useCallback deps
+  useEffect(() => {
+    assessmentRef.current = assessment;
+  }, [assessment]);
 
   // Update transcription when received from WebSocket
   useEffect(() => {
@@ -413,6 +424,10 @@ const AssessmentPage = () => {
 
     console.log('[AutoFill] handleProcessTranscription called, text:', transcriptText.substring(0, 50));
 
+    // Read latest assessment from ref (avoids putting assessment in useCallback deps,
+    // which would reset the auto-send timer every time form data comes back)
+    const currentAssessment = assessmentRef.current;
+
     // Prepare data based on selected sections or all data
     const formData: any = {};
 
@@ -423,18 +438,18 @@ const AssessmentPage = () => {
         const sectionName = sectionPath[sectionPath.length - 1];
 
         if (sectionName === 'plan') {
-          formData.plan = assessment.plan;
+          formData.plan = currentAssessment?.plan;
         } else if (sectionName === 'subjectiveAssessment') {
-          formData.subjectiveAssessment = assessment.subjectiveAssessment;
+          formData.subjectiveAssessment = currentAssessment?.subjectiveAssessment;
         } else if (sectionName === 'objectiveAssessment') {
-          formData.objectiveAssessment = assessment.objectiveAssessment;
+          formData.objectiveAssessment = currentAssessment?.objectiveAssessment;
         } else if (sectionName === 'rpe') {
-          formData.rpe = assessment.rpe;
+          formData.rpe = currentAssessment?.rpe;
         }
       });
     } else {
       // Spread assessment directly so transformFormDataForAPI finds plan/subjectiveAssessment/etc at top level
-      Object.assign(formData, assessment);
+      Object.assign(formData, currentAssessment);
     }
 
     // Send transcription with form data
@@ -447,7 +462,7 @@ const AssessmentPage = () => {
         variant: 'destructive',
       });
     }
-  }, [transcriptText, selectedSections, assessment, processTranscription, toast]);
+  }, [transcriptText, selectedSections, processTranscription, toast]);
 
   // Process section-specific transcription
   const handleSectionTranscriptProcess = (text: string, sectionId: string) => {

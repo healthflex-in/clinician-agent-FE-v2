@@ -208,6 +208,11 @@ export function useWebSocket(options: WebSocketOptions) {
             if (serverResponse.formData) {
               setFormData(serverResponse.formData);
 
+              // Clear transcription so the auto-process timer doesn't fire a
+              // duplicate form-fill request (form was already filled by the backend
+              // in the single audio+form pipeline)
+              setTranscription('');
+
               // Forward form data to parent component if callback is provided
               if (onFormData) {
                 onFormData(serverResponse);
@@ -307,19 +312,23 @@ export function useWebSocket(options: WebSocketOptions) {
         }`;
       }
 
-      // FIXED: Use actual form data from currentFormData parameter
+      const transformedFormData = currentFormData
+        ? transformFormDataForAPI(
+            currentFormData.formData || currentFormData,
+            formKey
+          )
+        : undefined;
+
+      // If we have form data, use 'form_fill' mode so the backend transcribes
+      // AND fills the form in a single pipeline — eliminates the 5-second
+      // auto-process timer round-trip and cuts total latency in half.
       const payload = {
         userId,
-        AppointmentId: appointmentId, // Note: Capital 'A'
+        AppointmentId: appointmentId,
         formKey,
-        mode: 'transcribe_only',
+        mode: transformedFormData ? 'form_fill' : 'transcribe_only',
         audio: audioData,
-        formData: currentFormData
-          ? transformFormDataForAPI(
-              currentFormData.formData || currentFormData,
-              formKey
-            )
-          : undefined, // Only send if we have actual form data
+        formData: transformedFormData,
         apiKey:
           '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20',
       };

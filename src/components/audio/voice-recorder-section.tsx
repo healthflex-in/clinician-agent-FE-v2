@@ -15,11 +15,13 @@ type VoiceRecorderSectionProps = {
   currentlyProcessingPath: string | null;
   recordingMode: 'idle' | 'global' | 'section';
   microphonePermission: 'checking' | 'granted' | 'denied' | 'prompt';
+  autoSendCountdown: number | null;
   onAutoProcess: () => void;
   onRecordingStop: () => void;
   onRecordingStart: () => void;
   onProcessTranscription: () => void;
   onShowPermissionDialog: () => void;
+  onCancelCountdown: () => void;
   setSuggestions: (suggestions: any) => void;
   onAudioEncoded: (base64Audio: string) => void;
   onGlobalTranscriptionChange: (text: string) => void;
@@ -36,6 +38,7 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
   microphonePermission,
   globalRecordingState,
   currentlyProcessingPath,
+  autoSendCountdown,
   onAutoProcess,
   setSuggestions,
   onAudioEncoded,
@@ -43,9 +46,12 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
   onRecordingStart,
   onShowPermissionDialog,
   onProcessTranscription,
+  onCancelCountdown,
   onGlobalTranscriptionChange,
 }) => {
+  // Recorder is disabled during processing OR while countdown is active (waiting to send)
   const isRecorderDisabled = microphonePermission !== 'granted' || !isConnected || isProcessing;
+  const isRecorderFaded = isProcessing; // Fade effect when form-fill is in progress
   const isProcessButtonDisabled =
     isProcessing ||
     !transcriptText.trim() ||
@@ -104,7 +110,7 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
       )}
 
       {/* Compact horizontal recording strip */}
-      <div className="flex items-center gap-2 bg-white/70 border border-stance-steel/8 rounded-2xl px-3 py-2.5 shadow-sm">
+      <div className={`flex items-center gap-2 bg-white/70 border border-stance-steel/8 rounded-2xl px-3 py-2.5 shadow-sm transition-opacity duration-300 ${isRecorderFaded ? 'opacity-50 pointer-events-none' : ''}`}>
         {/* Mic button — hide AudioRecorder's status text below the button */}
         <div className="shrink-0 [&>div>div:last-child]:hidden">
           <AudioRecorder
@@ -122,33 +128,57 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
         {/* Inline transcription textarea */}
         {recordingMode !== 'section' && (
           <textarea
+            id="global-transcription"
+            name="global-transcription"
             value={transcriptText}
             onChange={(e) => onGlobalTranscriptionChange(e.target.value)}
             placeholder={
-              globalRecordingState
+              isProcessing
+                ? 'Processing form...'
+                : globalRecordingState
                 ? 'Recording in progress...'
                 : 'Speak or type to fill the form...'
             }
-            disabled={globalRecordingState}
+            disabled={globalRecordingState || isProcessing}
             rows={2}
             className="flex-1 resize-none bg-transparent border-none outline-none text-sm text-stance-steel/80 placeholder:text-stance-steel/25 min-h-0 leading-snug disabled:opacity-50"
           />
         )}
 
-        {/* Process arrow button */}
-        <button
-          onClick={onProcessTranscription}
-          disabled={isProcessButtonDisabled}
-          title="Process transcription"
-          className={`shrink-0 h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
-            isProcessButtonDisabled
-              ? 'bg-stance-steel/6 text-stance-steel/20 cursor-not-allowed'
-              : 'bg-stance-steel text-white hover:bg-stance-steel/90 active:scale-95 shadow-sm ring-1 ring-stance-neon/30'
-          }`}
-        >
-          <ArrowRight className="h-4 w-4" />
-        </button>
+        {/* Countdown timer OR Process arrow button */}
+        {autoSendCountdown !== null ? (
+          <button
+            onClick={onCancelCountdown}
+            title="Cancel auto-send"
+            className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center bg-stance-neon/20 text-stance-steel font-bold text-sm ring-1 ring-stance-neon/40 animate-pulse transition-all hover:bg-red-100 hover:ring-red-300 hover:text-red-600 active:scale-95"
+          >
+            {autoSendCountdown}
+          </button>
+        ) : (
+          <button
+            onClick={onProcessTranscription}
+            disabled={isProcessButtonDisabled}
+            title="Process transcription"
+            className={`shrink-0 h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
+              isProcessButtonDisabled
+                ? 'bg-stance-steel/6 text-stance-steel/20 cursor-not-allowed'
+                : 'bg-stance-steel text-white hover:bg-stance-steel/90 active:scale-95 shadow-sm ring-1 ring-stance-neon/30'
+            }`}
+          >
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
       </div>
+
+      {/* Processing indicator */}
+      {isProcessing && (
+        <div className="flex items-center justify-center gap-2 py-1">
+          <div className="h-1 w-1 rounded-full bg-stance-neon animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="h-1 w-1 rounded-full bg-stance-neon animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="h-1 w-1 rounded-full bg-stance-neon animate-bounce" style={{ animationDelay: '300ms' }} />
+          <span className="text-[10px] text-stance-steel/40 ml-1">Filling form...</span>
+        </div>
+      )}
     </div>
   );
 };

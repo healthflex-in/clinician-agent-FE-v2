@@ -363,6 +363,17 @@ export const FormRenderer = React.forwardRef<
 
     return (
       <div className="w-full max-w-screen">
+        {!isInitialized ? (
+          /* Placeholder to prevent CLS — reserves space until form data is ready */
+          <div className="animate-pulse space-y-4 py-4">
+            <div className="h-10 bg-stance-steel/5 rounded-xl" />
+            <div className="h-24 bg-stance-steel/5 rounded-xl" />
+            <div className="h-10 bg-stance-steel/5 rounded-xl" />
+            <div className="h-24 bg-stance-steel/5 rounded-xl" />
+            <div className="h-10 bg-stance-steel/5 rounded-xl" />
+          </div>
+        ) : (
+        <>
         {/* Processing queue status */}
         <ProcessingQueueAlert
           processingQueue={formState.processingQueue}
@@ -405,6 +416,8 @@ export const FormRenderer = React.forwardRef<
           {fieldRenderers.renderField(schema, '', 'root')}
         </div>
 
+        </>
+        )}
       </div>
     );
   }

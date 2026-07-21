@@ -102,7 +102,7 @@ export const LLMUpdatesAlert: React.FC<LLMUpdatesAlertProps> = ({
   if (llmUpdatedFields.size === 0) return null;
 
   return (
-    <Card className="mb-3 bg-yellow-50 border-yellow-300">
+    <Card className="mb-3 bg-yellow-50 border-yellow-300 animate-in fade-in slide-in-from-top-2 duration-200">
       <CardContent className="p-2 form-card-content">
         <div className="flex justify-between items-center">
           <div>
@@ -550,6 +550,7 @@ export const InputField: React.FC<InputFieldProps> = ({
       return (
         <div className="relative">
           <Input
+            id={path}
             type="number"
             placeholder={placeholder}
             onChange={(e) => onChange(path, Number(e.target.value))}
@@ -571,6 +572,7 @@ export const InputField: React.FC<InputFieldProps> = ({
       return (
         <div className="relative">
           <Textarea
+            id={path}
             value={value || ''}
             placeholder={placeholder}
             onChange={(e) => onChange(path, e.target.value)}
@@ -591,6 +593,7 @@ export const InputField: React.FC<InputFieldProps> = ({
       return (
         <div className="relative">
           <Input
+            id={path}
             type="text"
             value={value || ''}
             placeholder={placeholder}

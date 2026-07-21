@@ -43,6 +43,24 @@ export const useVoiceRecorder = ({
     [path: string]: boolean;
   }>({});
 
+  // AUTO-SEND COUNTDOWN STATE (for audio recordings only)
+  const [autoSendCountdown, setAutoSendCountdown] = React.useState<number | null>(null);
+  const countdownTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isFromRecordingRef = React.useRef<boolean>(false);
+
+  // Cancel any active countdown
+  const cancelAutoSendCountdown = React.useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearTimeout(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setAutoSendCountdown(null);
+  }, []);
   // Simple function to handle incoming form data
   const handleIncomingFormData = React.useCallback(
     (data: any) => {
@@ -113,7 +131,7 @@ export const useVoiceRecorder = ({
     setTranscription,
     processTranscription,
   } = useWebSocket({
-    url: 'wss://agent.stance.health/ws',
+    url: import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:9080/ws`,
     onFormData: handleIncomingFormData,
     onOpen: () =>
       toast({ title: 'Connected', description: 'Ready to transcribe audio' }),
@@ -202,6 +220,46 @@ export const useVoiceRecorder = ({
     setHasProcessedCurrentTranscription(false); // Reset processing flag for new transcription
   }, [transcription, recordingMode, currentlyProcessingPath, formKey]);
 
+  // AUTO-SEND COUNTDOWN: 5 seconds after transcription arrives from a recording
+  React.useEffect(() => {
+    if (
+      transcriptText.trim() &&
+      isFromRecordingRef.current &&
+      !hasProcessedCurrentTranscription &&
+      !isProcessing &&
+      recordingMode === 'global' &&
+      !globalRecordingState
+    ) {
+      // Cancel any existing countdown
+      cancelAutoSendCountdown();
+
+      // Start countdown from 5
+      setAutoSendCountdown(5);
+
+      countdownIntervalRef.current = setInterval(() => {
+        setAutoSendCountdown((prev) => {
+          if (prev === null || prev <= 1) return prev;
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Auto-send after 5 seconds
+      countdownTimerRef.current = setTimeout(() => {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+        setAutoSendCountdown(null);
+        isFromRecordingRef.current = false;
+        handleProcessTranscription();
+      }, 5000);
+    }
+
+    return () => {
+      cancelAutoSendCountdown();
+    };
+  }, [transcriptText, hasProcessedCurrentTranscription, isProcessing, recordingMode, globalRecordingState]);
+
   // GLOBAL AUDIO RECORDING
   const handleAudioEncoded = (base64Audio: string) => {
     if (!isConnected) {
@@ -219,12 +277,13 @@ export const useVoiceRecorder = ({
     setCurrentlyProcessingPath(null);
     setGlobalRecordingState(false);
     setHasProcessedCurrentTranscription(false); // Reset for new recording
+    isFromRecordingRef.current = true; // Mark that next transcription will be from recording
 
+    // Send audio in transcribe_only mode — form-fill happens after 5s countdown
     const context = {
       formKey,
       recordingType: 'global',
       isGlobalRecording: true,
-      formData: formData || {},
     };
 
     const sent = sendAudio(base64Audio, context);
@@ -442,6 +501,10 @@ export const useVoiceRecorder = ({
       return;
     }
 
+    // Cancel countdown when user manually edits
+    cancelAutoSendCountdown();
+    isFromRecordingRef.current = false; // User is editing — disable auto-send
+
     setTranscription(text);
     setTranscriptText(text);
     setHasProcessedCurrentTranscription(false); // Reset when user manually changes text
@@ -481,6 +544,7 @@ export const useVoiceRecorder = ({
     activeSectionPath,
     globalRecordingState,
     currentlyProcessingPath,
+    autoSendCountdown,
 
     // Actions
     handleAutoProcess,
@@ -491,6 +555,7 @@ export const useVoiceRecorder = ({
     handleProcessTranscription,
     handleFieldTranscriptionProcess,
     handleGlobalTranscriptionChange,
+    cancelAutoSendCountdown,
 
     // Utilities
     setSuggestions,

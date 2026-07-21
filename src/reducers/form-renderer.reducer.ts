@@ -101,30 +101,41 @@ export const formReducer = (
       // Track differences between state and new data
       const differences = findDifferences(state, action.data);
 
+      // Defer side effects — schedule them after render
       if (action.source === 'llm' && differences.length > 0) {
-        setLlmUpdatedFields((prev) => {
-          const newSet = new Set(prev);
-          differences.forEach((field) => newSet.add(field));
-          return newSet;
-        });
+        setTimeout(() => {
+          setLlmUpdatedFields((prev) => {
+            const newSet = new Set(prev);
+            differences.forEach((field) => newSet.add(field));
+            return newSet;
+          });
 
-        toast({
-          title: 'Form Updated by AI',
-          description: `${differences.length} field(s) were updated`,
-        });
+          toast({
+            title: 'Form Updated by AI',
+            description: `${differences.length} field(s) were updated`,
+          });
+        }, 0);
       }
 
       // Deep merge function - merge data recursively
+      // Arrays from LLM source REPLACE existing arrays entirely (LLM sends complete data)
       const mergeDeep = (target: any, source: any): any => {
         if (typeof source !== 'object' || source === null) return target;
 
         for (const key of Object.keys(source)) {
-          if (
+          if (Array.isArray(source[key])) {
+            // Arrays from LLM replace entirely — the LLM sends the complete array
+            target[key] = JSON.parse(JSON.stringify(source[key]));
+          } else if (
             typeof source[key] === 'object' &&
-            source[key] !== null &&
-            !Array.isArray(source[key])
+            source[key] !== null
           ) {
-            target[key] = mergeDeep({ ...(target[key] || {}) }, source[key]);
+            target[key] = mergeDeep(
+              target[key] && typeof target[key] === 'object'
+                ? JSON.parse(JSON.stringify(target[key]))
+                : {},
+              source[key]
+            );
           } else if (source[key] !== undefined && source[key] !== null) {
             target[key] = source[key];
           }
@@ -133,7 +144,7 @@ export const formReducer = (
       };
 
       // Create a deep copy of state to avoid mutations, and merge LLM data
-      const newState = mergeDeep({ ...state }, action.data);
+      const newState = mergeDeep(JSON.parse(JSON.stringify(state)), action.data);
 
       // Log the state to inspect if merge is correct
       console.log(

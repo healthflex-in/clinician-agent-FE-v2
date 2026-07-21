@@ -87,6 +87,7 @@ const FormPage = () => {
     activeSectionPath,
     globalRecordingState,
     currentlyProcessingPath,
+    autoSendCountdown,
 
     // Actions
     handleAutoProcess,
@@ -97,6 +98,7 @@ const FormPage = () => {
     handleProcessTranscription,
     handleFieldTranscriptionProcess,
     handleGlobalTranscriptionChange,
+    cancelAutoSendCountdown,
 
     // Utilities
     setSuggestions,
@@ -214,10 +216,11 @@ const FormPage = () => {
           {/* Card — flex column so form scrolls, recorder+actions stick at bottom */}
           <div className="flex-1 min-h-0 flex flex-col bg-[#F0F3F8] shadow-[0_-8px_32px_rgba(0,0,0,0.2)] rounded-t-[32px] md:rounded-t-[48px] mt-2">
 
-            {/* Scrollable form area */}
-            <div className="flex-1 min-h-0 overflow-y-auto
-                            [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stance-steel/20 [&::-webkit-scrollbar-thumb]:rounded-full">
-              <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+            {/* Scrollable form area — overflow clips layout shifts from CLS measurement */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden
+                            [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stance-steel/20 [&::-webkit-scrollbar-thumb]:rounded-full"
+                 style={{ overflowAnchor: 'none' }}>
+              <div className="max-w-3xl mx-auto px-6 py-8 space-y-6" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 3000px' }}>
                 <FormSection
                   schema={schema}
                   formKey={formKey}
@@ -262,12 +265,14 @@ const FormPage = () => {
                     microphonePermission={microphonePermission}
                     globalRecordingState={globalRecordingState}
                     currentlyProcessingPath={currentlyProcessingPath}
+                    autoSendCountdown={autoSendCountdown}
                     setSuggestions={setSuggestions}
                     onAutoProcess={handleAutoProcess}
                     onAudioEncoded={handleAudioEncoded}
                     onRecordingStop={() => handleRecordingStop()}
                     onRecordingStart={() => handleRecordingStart()}
                     onProcessTranscription={handleProcessTranscription}
+                    onCancelCountdown={cancelAutoSendCountdown}
                     onShowPermissionDialog={() => setShowPermissionDialog(true)}
                     onGlobalTranscriptionChange={handleGlobalTranscriptionChange}
                   />

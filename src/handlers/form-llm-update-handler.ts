@@ -148,6 +148,33 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
     return formData;
   }, []);
 
+  // Helper: Normalize plans data - convert 'sets' to 'set' to match schema
+  const normalizePlansData = React.useCallback((formData: any) => {
+    if (formData?.plan?.plans && Array.isArray(formData.plan.plans)) {
+      formData.plan.plans = formData.plan.plans.map((plan: any) => {
+        const transformedPlan = { ...plan };
+        // Convert 'sets' to 'set' (backend/API uses 'sets', form schema uses 'set')
+        if (plan.sets) {
+          transformedPlan.set = plan.sets;
+          delete transformedPlan.sets;
+        }
+        return transformedPlan;
+      });
+    }
+    // Also handle top-level 'plans' array (for SNC forms)
+    if (formData?.plans && Array.isArray(formData.plans)) {
+      formData.plans = formData.plans.map((plan: any) => {
+        const transformedPlan = { ...plan };
+        if (plan.sets) {
+          transformedPlan.set = plan.sets;
+          delete transformedPlan.sets;
+        }
+        return transformedPlan;
+      });
+    }
+    return formData;
+  }, []);
+
   // Helper: Handle structured payload processing
   const handleStructuredPayload = React.useCallback(
     (llmData: any) => {
@@ -161,10 +188,12 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
 
       // Extract and normalize form data
       const actualFormData = llmData.formData.formData || llmData.formData;
-      const normalizedData = normalizeObjectiveAssessment(actualFormData);
+      let normalizedData = normalizeObjectiveAssessment(actualFormData);
+      // CRITICAL: Normalize 'sets' -> 'set' for real-time LLM updates
+      normalizedData = normalizePlansData(normalizedData);
 
       console.log(
-        'Extracted actualFormData:',
+        'Extracted & normalized actualFormData:',
         JSON.stringify(normalizedData, null, 2)
       );
 
@@ -183,12 +212,15 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
         });
 
         if (onLLMUpdate) {
-          console.log('=== CALLING onLLMUpdate ===');
-          console.log(
-            'Data passed to onLLMUpdate:',
-            JSON.stringify(normalizedData, null, 2)
-          );
-          onLLMUpdate(normalizedData);
+          // Defer to avoid setState-during-render warning
+          setTimeout(() => {
+            console.log('=== CALLING onLLMUpdate ===');
+            console.log(
+              'Data passed to onLLMUpdate:',
+              JSON.stringify(normalizedData, null, 2)
+            );
+            onLLMUpdate(normalizedData);
+          }, 0);
         }
       } else {
         console.log('=== NO FORM DATA TO APPLY (structured) ===');
@@ -197,6 +229,7 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
     [
       clearAllProcessingState,
       normalizeObjectiveAssessment,
+      normalizePlansData,
       dispatch,
       onLLMUpdate,
     ]
@@ -205,32 +238,35 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
   // Helper: Handle global updates
   const handleGlobalUpdate = React.useCallback(
     (llmData: any) => {
+      // Normalize plans data before merging
+      const normalizedFormData = normalizePlansData({ ...llmData.formData });
+
       if (selectedSections.size === 0) {
         // No sections selected - update entire form
         console.log('=== GLOBAL UPDATE - ENTIRE FORM ===');
         console.log(
           'Data being applied to entire form:',
-          JSON.stringify(llmData.formData, null, 2)
+          JSON.stringify(normalizedFormData, null, 2)
         );
 
         dispatch({
           type: 'MERGE_LLM_DATA',
-          data: llmData.formData,
+          data: normalizedFormData,
           source: 'llm',
         });
 
         if (onLLMUpdate) {
           console.log('=== CALLING onLLMUpdate (global) ===');
-          onLLMUpdate(llmData.formData);
+          setTimeout(() => onLLMUpdate(normalizedFormData), 0);
         }
       } else {
         // Apply only to selected sections
         console.log('=== GLOBAL UPDATE - SELECTED SECTIONS ===');
 
         const selectedSectionsData: any = {};
-        Object.keys(llmData.formData).forEach((key) => {
+        Object.keys(normalizedFormData).forEach((key) => {
           if (selectedSections.has(key)) {
-            selectedSectionsData[key] = llmData.formData[key];
+            selectedSectionsData[key] = normalizedFormData[key];
           }
         });
 
@@ -245,7 +281,7 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
             data: selectedSectionsData,
             source: 'llm',
           });
-          if (onLLMUpdate) onLLMUpdate(selectedSectionsData);
+          if (onLLMUpdate) setTimeout(() => onLLMUpdate(selectedSectionsData), 0);
         } else {
           console.log('=== NO DATA FOR SELECTED SECTIONS ===');
           toast({
@@ -256,7 +292,7 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
         }
       }
     },
-    [selectedSections, dispatch, onLLMUpdate, toast]
+    [selectedSections, normalizePlansData, dispatch, onLLMUpdate, toast]
   );
 
   // Helper: Handle section-specific updates
@@ -314,7 +350,7 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
           data: relevantData,
           source: 'llm',
         });
-        if (onLLMUpdate) onLLMUpdate(relevantData);
+        if (onLLMUpdate) setTimeout(() => onLLMUpdate(relevantData), 0);
       } else {
         console.log('=== NO RELEVANT DATA FOR SECTION ===');
         toast({
@@ -409,8 +445,9 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
         JSON.stringify(llmData.formData, null, 2)
       );
 
-      // Normalize objective assessment
-      const normalizedData = normalizeObjectiveAssessment(llmData.formData);
+      // Normalize objective assessment and plans data
+      let normalizedData = normalizeObjectiveAssessment(llmData.formData);
+      normalizedData = normalizePlansData(normalizedData);
 
       // Determine if this is a global or section-specific update
       const processingPath =
@@ -436,6 +473,7 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
     },
     [
       normalizeObjectiveAssessment,
+      normalizePlansData,
       currentlyProcessingPath,
       selectedSections,
       handleGlobalUpdate,

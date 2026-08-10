@@ -552,6 +552,7 @@ export async function fetchAppointments<T = any>(
         appointment {
           _id
           status
+          visitType
           event {
             startTime
             endTime

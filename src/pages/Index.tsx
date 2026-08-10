@@ -45,6 +45,19 @@ const Index = () => {
     clearAppointments: clearEvents,
   } = useAppointments(patientId || '');
 
+  // Auto-select the form type from the chosen appointment's visitType:
+  //   FIRST_VISIT -> firstAssessment, FOLLOW_UP -> assessment.
+  // The clinician can still override via the Form Type dropdown.
+  React.useEffect(() => {
+    if (!appointmentId || !events?.length) return;
+    const selected = events.find(
+      (e: any) => (e.appointment?._id || e._id) === appointmentId
+    );
+    const visitType = (selected as any)?.appointment?.visitType;
+    if (visitType === 'FIRST_VISIT') setFormKey('firstAssessment');
+    else if (visitType === 'FOLLOW_UP') setFormKey('assessment');
+  }, [appointmentId, events]);
+
   React.useEffect(() => {
     const meta = document.createElement('meta');
     meta.name = 'viewport';

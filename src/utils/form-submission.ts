@@ -110,9 +110,15 @@ export const submitFormData = async ({
 
     console.log('=== Submitting filtered data to server ===');
 
+    // Form type determines how the payload is wrapped for UpdateAgentReportInput.
+    const formKey =
+      (typeof localStorage !== 'undefined' && localStorage.getItem('formKey')) ||
+      'assessment';
+
     // Call the API with filtered state
     const response = await updateAgentReport({
       appointmentId,
+      formKey,
       input: filteredState,
     });
 

@@ -239,6 +239,64 @@ function convertToRequiredPayload(inputData: any) {
   return { assessment: assessmentPayload };
 }
 
+// Coerce objective test numeric fields (value/left/right are Float on the API).
+function coerceTestNumbers(tests: any[]) {
+  return tests
+    .map((t: any) => {
+      const out: any = {};
+      if (t.testName && String(t.testName).trim() !== '') out.testName = t.testName;
+      if (t.unitName && String(t.unitName).trim() !== '') out.unitName = t.unitName;
+      if (t.value !== undefined && t.value !== '' && parseFloat(t.value))
+        out.value = parseFloat(t.value);
+      if (t.left !== undefined && t.left !== '' && parseFloat(t.left))
+        out.left = parseFloat(t.left);
+      if (t.right !== undefined && t.right !== '' && parseFloat(t.right))
+        out.right = parseFloat(t.right);
+      if (t.comments && String(t.comments).trim() !== '') out.comments = t.comments;
+      return out;
+    })
+    .filter((t: any) => Object.keys(t).length > 0);
+}
+
+/**
+ * Build the AgentFirstAssessmentInput payload for the first-assessment form.
+ * Section keys already match the API input; only objectiveAssessment {tests}
+ * is remapped to objectiveAssessments: [{ tests }] per AgentPhysioInput.
+ */
+function convertFirstAssessmentPayload(inputData: any) {
+  const filtered = filterEmptyValuesForAPI(inputData);
+  if (!filtered || Object.keys(filtered).length === 0) {
+    return { firstAssessment: {} };
+  }
+
+  const fa: any = {};
+  if (filtered.clinicalDetails) fa.clinicalDetails = filtered.clinicalDetails;
+  if (Array.isArray(filtered.subjectiveAssessments) && filtered.subjectiveAssessments.length)
+    fa.subjectiveAssessments = filtered.subjectiveAssessments;
+  if (Array.isArray(filtered.subjectiveGoals) && filtered.subjectiveGoals.length)
+    fa.subjectiveGoals = filtered.subjectiveGoals;
+  if (Array.isArray(filtered.objectiveGoals) && filtered.objectiveGoals.length)
+    fa.objectiveGoals = filtered.objectiveGoals;
+  if (Array.isArray(filtered.recommendation) && filtered.recommendation.length)
+    fa.recommendation = filtered.recommendation;
+  if (filtered.patientAdvice) fa.patientAdvice = filtered.patientAdvice;
+
+  const tests = filtered.objectiveAssessment?.tests;
+  if (Array.isArray(tests) && tests.length) {
+    const coerced = coerceTestNumbers(tests);
+    if (coerced.length) fa.objectiveAssessments = [{ tests: coerced }];
+  }
+
+  return { firstAssessment: fa };
+}
+
+// Map a formKey to the payload builder that wraps its data into UpdateAgentReportInput.
+// Add new form types here — everything unmapped uses the assessment builder.
+const PAYLOAD_BUILDERS: Record<string, (data: any) => any> = {
+  firstAssessment: convertFirstAssessmentPayload,
+  assessment: convertToRequiredPayload,
+};
+
 /**
  * Update agent report with form data - ONLY SEND NON-EMPTY DATA
  * @param input Update agent report input
@@ -254,8 +312,15 @@ export async function updateAgentReport(input: {
   console.log('=== updateAgentReport called (only non-empty data) ===');
   console.log('Input data received:', JSON.stringify(input.input, null, 2));
 
+  // Pick the payload builder for this form type (defaults to assessment).
+  const formKey =
+    input.formKey ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('formKey') : '') ||
+    'assessment';
+  const buildPayload = PAYLOAD_BUILDERS[formKey] || convertToRequiredPayload;
+
   // Convert to required payload format - only include non-empty data
-  const convertedData = convertToRequiredPayload(input.input);
+  const convertedData = buildPayload(input.input);
 
   console.log(
     '=== Final payload being sent to API (only non-empty data) ===',

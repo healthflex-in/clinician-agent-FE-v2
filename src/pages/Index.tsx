@@ -30,6 +30,8 @@ const Index = () => {
 
   const [centerId, setCenterId] = React.useState<string>('');
   const [formKey, setFormKey] = React.useState<string>('snc');
+  // Locked when the form type was auto-detected from the appointment's visitType.
+  const [formTypeLocked, setFormTypeLocked] = React.useState<boolean>(false);
   const [patientId, setPatientId] = React.useState<string>('');
   const [patientName, setPatientName] = React.useState<string>('');
   const [patientSearch, setPatientSearch] = React.useState<string>('');
@@ -45,17 +47,27 @@ const Index = () => {
     clearAppointments: clearEvents,
   } = useAppointments(patientId || '');
 
-  // Auto-select the form type from the chosen appointment's visitType:
+  // Auto-select the form type from the chosen appointment's visitType and lock it:
   //   FIRST_VISIT -> firstAssessment, FOLLOW_UP -> assessment.
-  // The clinician can still override via the Form Type dropdown.
+  // If visitType is unknown, leave the dropdown unlocked as a fallback.
   React.useEffect(() => {
-    if (!appointmentId || !events?.length) return;
+    if (!appointmentId || !events?.length) {
+      setFormTypeLocked(false);
+      return;
+    }
     const selected = events.find(
       (e: any) => (e.appointment?._id || e._id) === appointmentId
     );
     const visitType = (selected as any)?.appointment?.visitType;
-    if (visitType === 'FIRST_VISIT') setFormKey('firstAssessment');
-    else if (visitType === 'FOLLOW_UP') setFormKey('assessment');
+    if (visitType === 'FIRST_VISIT') {
+      setFormKey('firstAssessment');
+      setFormTypeLocked(true);
+    } else if (visitType === 'FOLLOW_UP') {
+      setFormKey('assessment');
+      setFormTypeLocked(true);
+    } else {
+      setFormTypeLocked(false);
+    }
   }, [appointmentId, events]);
 
   React.useEffect(() => {
@@ -334,8 +346,13 @@ const Index = () => {
             <div className="flex flex-col gap-1.5">
               <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stance-steel/50">
                 <ClipboardList className="h-3 w-3" /> Form Type
+                {formTypeLocked && (
+                  <span className="ml-1 normal-case tracking-normal text-[10px] font-medium text-stance-steel/40">
+                    · auto-detected from appointment
+                  </span>
+                )}
               </label>
-              <Select value={formKey} onValueChange={setFormKey} disabled={!appointmentId}>
+              <Select value={formKey} onValueChange={setFormKey} disabled={!appointmentId || formTypeLocked}>
                 <SelectTrigger className="h-12 bg-white border border-stance-steel/10 rounded-2xl text-stance-steel/80 text-sm shadow-sm focus:ring-1 focus:ring-stance-steel/20 disabled:opacity-40">
                   <SelectValue placeholder="Select a form type" />
                 </SelectTrigger>

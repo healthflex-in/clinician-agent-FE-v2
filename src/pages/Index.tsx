@@ -330,11 +330,16 @@ const Index = () => {
                       <span className="text-sm text-stance-steel/50">Loading...</span>
                     </div>
                   ) : events.length > 0 ? (
-                    events.map((event) => (
-                      <SelectItem key={event._id} value={event.appointment?._id || event._id} className="text-sm">
-                        {`#${event.appointment?.seqNo || 'N/A'} – ${new Date(event.appointment?.event?.startTime).toLocaleDateString()}`}
-                      </SelectItem>
-                    ))
+                    events.map((event) => {
+                      const vt = event.appointment?.visitType;
+                      const vtLabel = vt === 'FIRST_VISIT' ? 'First Assessment' : vt === 'FOLLOW_UP' ? 'Follow-up' : null;
+                      return (
+                        <SelectItem key={event._id} value={event.appointment?._id || event._id} className="text-sm">
+                          <span>{`#${event.appointment?.seqNo || 'N/A'} – ${new Date(event.appointment?.event?.startTime).toLocaleDateString()}`}</span>
+                          {vtLabel && <span className="ml-2 text-[10px] font-semibold text-stance-steel/40 uppercase tracking-wide">{vtLabel}</span>}
+                        </SelectItem>
+                      );
+                    })
                   ) : (
                     <div className="p-3 text-sm text-stance-steel/40 text-center">No appointments found</div>
                   )}
@@ -346,24 +351,28 @@ const Index = () => {
             <div className="flex flex-col gap-1.5">
               <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-stance-steel/50">
                 <ClipboardList className="h-3 w-3" /> Form Type
-                {formTypeLocked && (
-                  <span className="ml-1 normal-case tracking-normal text-[10px] font-medium text-stance-steel/40">
-                    · auto-detected from appointment
-                  </span>
-                )}
               </label>
-              <Select value={formKey} onValueChange={setFormKey} disabled={!appointmentId || formTypeLocked}>
-                <SelectTrigger className="h-12 bg-white border border-stance-steel/10 rounded-2xl text-stance-steel/80 text-sm shadow-sm focus:ring-1 focus:ring-stance-steel/20 disabled:opacity-40">
-                  <SelectValue placeholder="Select a form type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(formSchemas).map((key) => (
-                    <SelectItem key={key} value={key} className="text-sm">
-                      {key.charAt(0).toUpperCase() + key.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {formTypeLocked ? (
+                <div className="h-12 bg-white border border-stance-steel/10 rounded-2xl px-4 flex items-center justify-between shadow-sm">
+                  <span className="text-sm font-semibold text-stance-steel/80">
+                    {formKey === 'firstAssessment' ? 'First Assessment' : formKey === 'assessment' ? 'Follow-up Assessment' : formKey.charAt(0).toUpperCase() + formKey.slice(1)}
+                  </span>
+                  <span className="text-[10px] font-semibold text-stance-steel/35 uppercase tracking-wide">Auto-detected</span>
+                </div>
+              ) : (
+                <Select value={formKey} onValueChange={setFormKey} disabled={!appointmentId}>
+                  <SelectTrigger className="h-12 bg-white border border-stance-steel/10 rounded-2xl text-stance-steel/80 text-sm shadow-sm focus:ring-1 focus:ring-stance-steel/20 disabled:opacity-40">
+                    <SelectValue placeholder="Select a form type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(formSchemas).map((key) => (
+                      <SelectItem key={key} value={key} className="text-sm">
+                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* CTA — neon background, steel text, matching customer-agent-fe */}

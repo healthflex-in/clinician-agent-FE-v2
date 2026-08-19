@@ -8,6 +8,7 @@ export type Appointment = {
   appointment: {
     _id: string;
     seqNo: string;
+    visitType?: string;
     event: {
       startTime: string;
       endTime: string;

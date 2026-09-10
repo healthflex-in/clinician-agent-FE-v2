@@ -736,6 +736,28 @@ export async function fetchReportByAppointment(
               comments
             }
           }
+          patientGoals {
+            shortTermGoals {
+              goal
+              targetDate
+            }
+            longTermGoals {
+              goal
+              targetDate
+            }
+          }
+          subjectiveGoals {
+            goal
+            targetDate
+            goalType
+          }
+          objectiveGoals {
+            goalName
+            goalCategory
+            unitName
+            value
+            targetDate
+          }
           plan {
             advice
             plans {

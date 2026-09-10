@@ -124,7 +124,7 @@ export const useFormManagement = ({
               if (report && report.records) {
                 const mapped = mapRecordsToForm(formKey, report.records);
                 console.log(
-                  `Setting ${formKey} form data from Report.records:`,
+                  `Populated ${formKey} form from Report.records:`,
                   mapped
                 );
                 setFormData(mapped);

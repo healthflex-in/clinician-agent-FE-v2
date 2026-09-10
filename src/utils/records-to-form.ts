@@ -22,6 +22,77 @@ const num = (v: any): number => {
 };
 
 /**
+ * Convert a target date value into a yyyy-mm-dd string for the form's date
+ * inputs. Records store targetDate as a Unix epoch (ms) timestamp; it may also
+ * arrive as an ISO string. Returns '' for empty/invalid values.
+ */
+const toDateInput = (v: any): string => {
+  if (v === null || v === undefined || v === '') return '';
+  let d: Date;
+  if (typeof v === 'number') {
+    d = new Date(v);
+  } else if (typeof v === 'string' && /^\d+$/.test(v)) {
+    // numeric string timestamp
+    d = new Date(Number(v));
+  } else {
+    d = new Date(v);
+  }
+  if (Number.isNaN(d.getTime())) return '';
+  // yyyy-mm-dd (what <input type="date"> expects)
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * Build the form's subjectiveGoals[] ({ goalDetails, targetDate }) from the
+ * records. Goals may live in two places depending on the record version:
+ *   - records.patientGoals.shortTermGoals / longTermGoals  ({ goal, targetDate })
+ *   - records.subjectiveGoals                              ({ goal, targetDate, goalType })
+ * We merge whatever is present so goals populate regardless of source.
+ */
+function mapSubjectiveGoals(rec: Record<string, any>): any[] {
+  const out: { goalDetails: string; targetDate: string }[] = [];
+
+  const pg = rec.patientGoals || {};
+  const push = (entry: any) => {
+    const goalText = str(entry?.goal).trim();
+    if (goalText) {
+      out.push({ goalDetails: goalText, targetDate: toDateInput(entry?.targetDate) });
+    }
+  };
+  if (Array.isArray(pg.shortTermGoals)) pg.shortTermGoals.forEach(push);
+  if (Array.isArray(pg.longTermGoals)) pg.longTermGoals.forEach(push);
+
+  // Fallback / additional: records.subjectiveGoals ({ goal, targetDate, goalType })
+  if (Array.isArray(rec.subjectiveGoals)) {
+    rec.subjectiveGoals.forEach((g: any) => {
+      const goalText = str(g?.goal).trim();
+      if (goalText) {
+        out.push({ goalDetails: goalText, targetDate: toDateInput(g?.targetDate) });
+      }
+    });
+  }
+
+  return out;
+}
+
+/**
+ * Build the form's objectiveGoals[] from records.objectiveGoals.
+ * Schema shape: { goalName, goalCategory, unitName, value, targetDate }.
+ */
+function mapObjectiveGoals(rec: Record<string, any>): any[] {
+  if (!Array.isArray(rec.objectiveGoals)) return [];
+  return rec.objectiveGoals
+    .filter((g: any) => g && (g.goalName || g.goalCategory || g.value))
+    .map((g: any) => ({
+      goalName: str(g?.goalName),
+      goalCategory: str(g?.goalCategory),
+      unitName: str(g?.unitName),
+      value: str(g?.value),
+      targetDate: toDateInput(g?.targetDate),
+    }));
+}
+
+/**
  * Map objectiveAssessment tests from records into the schema test shape.
  * The assessment schema uses numeric value/left/right; the firstAssessment
  * schema uses strings. `numeric` selects which.
@@ -148,6 +219,9 @@ export function mapRecordsToFirstAssessment(records: AnyRecord): any {
       }))
     : [];
 
+  const subjectiveGoals = mapSubjectiveGoals(rec);
+  const objectiveGoals = mapObjectiveGoals(rec);
+
   // Build advice text from subjective assessment + any document investigation
   // notes so nothing is silently dropped from the source records.
   const adviceParts: string[] = [];
@@ -190,16 +264,22 @@ export function mapRecordsToFirstAssessment(records: AnyRecord): any {
               },
             ],
     },
-    subjectiveGoals: [{ goalDetails: '', targetDate: '' }],
-    objectiveGoals: [
-      {
-        goalName: '',
-        goalCategory: '',
-        unitName: '',
-        value: '',
-        targetDate: '',
-      },
-    ],
+    subjectiveGoals:
+      subjectiveGoals.length > 0
+        ? subjectiveGoals
+        : [{ goalDetails: '', targetDate: '' }],
+    objectiveGoals:
+      objectiveGoals.length > 0
+        ? objectiveGoals
+        : [
+            {
+              goalName: '',
+              goalCategory: '',
+              unitName: '',
+              value: '',
+              targetDate: '',
+            },
+          ],
     recommendation:
       recommendations.length > 0
         ? recommendations

@@ -1,7 +1,12 @@
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { graphqlRequest } from '@/utils/graphql-client';
-import { createAgentReport, fetchUserById } from '../utils/api';
+import {
+  createAgentReport,
+  fetchUserById,
+  fetchReportByAppointment,
+} from '../utils/api';
+import { mapRecordsToForm } from '@/utils/records-to-form';
 import { normalizeObjectiveAssessment } from '@/utils/form-renderer.utils';
 
 type UseFormManagementProps = {
@@ -103,8 +108,41 @@ export const useFormManagement = ({
             description: 'New report initialized successfully',
           });
 
+          // PRIMARY populate path: the clinician's real data lives in
+          // Report.records (createAgentReport returns an empty working copy).
+          // Fetch the records for this appointment and map them into the form
+          // schema. This works for every patient because it reads that
+          // patient's own report. Only assessment/firstAssessment forms have a
+          // records mapping; other form types fall through to the legacy logic.
+          let recordsPopulated = false;
+          if (formKey === 'assessment' || formKey === 'firstAssessment') {
+            try {
+              const report = await fetchReportByAppointment(
+                patientId,
+                appointmentId
+              );
+              if (report && report.records) {
+                const mapped = mapRecordsToForm(formKey, report.records);
+                console.log(
+                  `Setting ${formKey} form data from Report.records:`,
+                  mapped
+                );
+                setFormData(mapped);
+                recordsPopulated = true;
+              } else {
+                console.log(
+                  'No Report.records found for this appointment; using defaults/legacy path'
+                );
+              }
+            } catch (recErr) {
+              console.error('Error fetching Report.records:', recErr);
+            }
+          }
+
           // Handle SNC form data transformation
-          if (
+          if (recordsPopulated) {
+            // Already populated from records; nothing further to do.
+          } else if (
             formKey === 'snc' &&
             result.createAgentReport.assessment &&
             result.createAgentReport.assessment.plan

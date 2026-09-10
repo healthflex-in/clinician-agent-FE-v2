@@ -22,6 +22,8 @@ export const useFormRenderer = (
   selectedSections?: Set<string>
 ) => {
   const { toast } = useToast();
+  const liveStatus = useRef({ recordingMode, isProcessing });
+  liveStatus.current = { recordingMode, isProcessing };
 
   // Initialize form state from schema or provided formData
   const initialState = formData || defaultStateFromSchema(schema);
@@ -175,15 +177,6 @@ export const useFormRenderer = (
         return;
       }
 
-      if (recordingMode === 'global') {
-        console.log(
-          `Canceling processing for ${nextItem.path} - global mode detected`
-        );
-        setIsAutoProcessing(false);
-        setCurrentlyProcessingPath(null);
-        return;
-      }
-
       // Mark as processed
       if (isSection) {
         setProcessedSections((prev) => new Set([...prev, nextItem.path]));
@@ -269,7 +262,7 @@ export const useFormRenderer = (
       }
 
       const timeout = setTimeout(() => {
-        if (recordingMode === 'global' || isProcessing) {
+        if (liveStatus.current.recordingMode === 'global' || liveStatus.current.isProcessing) {
           console.log(
             `Canceling queue addition for ${path} - global processing started`
           );
@@ -292,7 +285,7 @@ export const useFormRenderer = (
 
         console.log(`Queued for processing: ${path}`);
 
-        if (!isAutoProcessing && recordingMode !== 'global' && !isProcessing) {
+        if (!isAutoProcessing && !liveStatus.current.isProcessing) {
           processNextInQueue();
         }
 

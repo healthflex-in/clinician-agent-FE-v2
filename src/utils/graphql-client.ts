@@ -1,3 +1,4 @@
+import { buildReportPayload, queueReportSave } from './report-payload';
 import { API_KEY, getApiUrl } from './api-config';
 import { onError } from '@apollo/client/link/error';
 import { ApolloClient, InMemoryCache, HttpLink, from } from '@apollo/client';
@@ -122,56 +123,7 @@ export async function updateAgentReport(input: {
   formKey: string;
   formData: any;
 }) {
-  // Process the form data to remove record fields and fix types
-  const processData = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return obj;
-
-    if (Array.isArray(obj)) {
-      return obj.map((item) => processData(item));
-    }
-
-    const result: any = {};
-    for (const key in obj) {
-      if (key === 'record') continue; // Skip record fields
-
-      if (key === 'load' && typeof obj[key] === 'number') {
-        result[key] = String(obj[key]);
-      } else if (typeof obj[key] === 'object') {
-        result[key] = processData(obj[key]);
-      } else {
-        result[key] = obj[key];
-      }
-    }
-    return result;
-  };
-
-  // Create the input object with the processed form data
-  const inputData: any = {};
-
-  // Set the form data under the formKey, after processing
-  inputData[input.formKey] = processData(input.formData);
-
-  // Use the correct mutation structure with appointmentId as a separate parameter
-  const query = `
-    mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
-      updateAgentReport(appointmentId: $appointmentId, input: $input) {
-        _id
-        createdAt
-        updatedAt
-        version
-        isActive
-        isFilledCompletely
-      }
-    }
-  `;
-
-  // Set up variables with appointmentId separate from input
-  const variables = {
-    appointmentId: input.appointmentId,
-    input: inputData,
-  };
-
-  return graphqlRequest(query, variables);
+  return saveReport(input.appointmentId, input.formKey, input.formData);
 }
 
 /**
@@ -278,3 +230,18 @@ export default {
   searchUsers,
   fetchAppointments,
 };
+
+/** Shared persistence entry point: snapshot payload before waiting on prior saves. */
+export async function saveReport(appointmentId: string, formKey: string, form: any) {
+  if (!appointmentId) throw new Error('Appointment is required');
+  const payload = buildReportPayload(formKey, form);
+  return queueReportSave(appointmentId, async () => {
+    const result = await graphqlRequest<any>(`
+      mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
+        updateAgentReport(appointmentId: $appointmentId, input: $input) { _id }
+      }
+    `, { appointmentId, input: payload });
+    if (!result?.updateAgentReport?._id) throw new Error('Report save was not confirmed');
+    return result;
+  });
+}

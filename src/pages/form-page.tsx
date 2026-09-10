@@ -63,6 +63,7 @@ const FormPage = () => {
     handleFormChange,
     handleFormSubmit,
     handleFormReset,
+    resetVersion,
     setFormData,
   } = useFormManagement({
     formKey,
@@ -99,6 +100,7 @@ const FormPage = () => {
     handleGlobalTranscriptionChange,
 
     // Utilities
+    resetSession,
     setSuggestions,
     setTranscription,
   } = useVoiceRecorder({
@@ -219,6 +221,7 @@ const FormPage = () => {
                             [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stance-steel/20 [&::-webkit-scrollbar-thumb]:rounded-full">
               <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
                 <FormSection
+                  key={`${appointmentId}:${formKey}:${resetVersion}`}
                   schema={schema}
                   formKey={formKey}
                   formData={formData}
@@ -276,14 +279,23 @@ const FormPage = () => {
                 {/* Action buttons — right-aligned, with safe-area bottom padding */}
                 <div className="px-6 pt-2 pb-5 flex items-center justify-end gap-3" style={{ paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))' }}>
                   <button
-                    onClick={handleFormReset}
+                    type="button"
+                    onClick={() => {
+                      if (handleFormReset()) {
+                        formRendererRef.current?.cancelPendingAutoSubmit();
+                        resetSession();
+                      }
+                    }}
                     className="flex items-center gap-1.5 text-sm text-stance-steel/40 hover:text-stance-steel/70 transition-colors px-3 py-2"
                   >
                     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                     Reset
                   </button>
                   <button
-                    onClick={handleFormSubmit}
+                    onClick={() => {
+                      formRendererRef.current?.cancelPendingAutoSubmit();
+                      void handleFormSubmit();
+                    }}
                     disabled={isSubmitting}
                     className="flex items-center gap-2 h-10 px-6 bg-stance-steel text-white text-sm font-bold rounded-xl hover:bg-stance-steel/90 active:scale-[0.98] transition-all shadow-md ring-2 ring-stance-neon ring-offset-2 ring-offset-[#F0F3F8] disabled:opacity-50"
                   >

@@ -43,6 +43,10 @@ export const useVoiceRecorder = ({
     [path: string]: boolean;
   }>({});
 
+  const requestFormSnapshot = React.useRef<string | null>(null);
+  const currentFormData = React.useRef(formData);
+  currentFormData.current = formData;
+
   // Simple function to handle incoming form data
   const handleIncomingFormData = React.useCallback(
     (data: any) => {
@@ -73,6 +77,16 @@ export const useVoiceRecorder = ({
       try {
         // For structured payloads (complete form filling)
         if (data.payloadType === 'structured') {
+          const current = formRendererRef.current?.getFormData?.() ?? currentFormData.current;
+          const snapshot = requestFormSnapshot.current;
+          requestFormSnapshot.current = null;
+          if (snapshot !== null && snapshot !== JSON.stringify(current)) {
+            setCurrentlyProcessingPath(null);
+            setActiveSectionPath(null);
+            setRecordingMode('idle');
+            toast({ title: 'Form changed during processing', description: 'Your manual edits were kept. Process the instruction again to apply it to the current form.' });
+            return false;
+          }
           formRendererRef.current.updateFormWithLLMData(data);
 
           setTranscriptText('');
@@ -103,6 +117,7 @@ export const useVoiceRecorder = ({
   // WebSocket connection
   const {
     connect,
+    disconnect,
     suggestions,
     isConnected,
     isConnecting,
@@ -113,7 +128,7 @@ export const useVoiceRecorder = ({
     setTranscription,
     processTranscription,
   } = useWebSocket({
-    url: 'wss://agent.stance.health/ws',
+    url: import.meta.env.VITE_WS_URL || 'wss://agent.stance.health/ws',
     onFormData: handleIncomingFormData,
     onOpen: () =>
       toast({ title: 'Connected', description: 'Ready to transcribe audio' }),
@@ -136,14 +151,24 @@ export const useVoiceRecorder = ({
     if (microphonePermission !== 'granted') return;
 
     connect();
-    const reconnectInterval = setInterval(() => {
-      if (!isConnected && !isConnecting) {
-        connect();
-      }
-    }, 5000);
+    return () => disconnect();
+  }, [connect, disconnect, microphonePermission]);
 
-    return () => clearInterval(reconnectInterval);
-  }, [connect, isConnected, isConnecting, microphonePermission]);
+  const resetSession = React.useCallback(() => {
+    disconnect(); // Detach old socket callbacks before discarding any response.
+    requestFormSnapshot.current = null;
+    setSuggestions([]);
+    setTranscription('');
+    setTranscriptText('');
+    setHasProcessedCurrentTranscription(false);
+    setRecordingMode('idle');
+    setActiveSectionPath(null);
+    setCurrentlyProcessingPath(null);
+    setGlobalRecordingState(false);
+    setRecordingStates({});
+    setAudioRecorderKey(key => key + 1);
+    if (microphonePermission === 'granted') connect();
+  }, [disconnect, connect, microphonePermission, setSuggestions, setTranscription]);
 
   // SIMPLE TRANSCRIPTION ROUTING - This is the key fix
   React.useEffect(() => {
@@ -228,6 +253,9 @@ export const useVoiceRecorder = ({
     };
 
     const sent = sendAudio(base64Audio, context);
+    if (sent) requestFormSnapshot.current = JSON.stringify(
+      formRendererRef.current?.getFormData?.() ?? currentFormData.current,
+    );
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -291,6 +319,9 @@ export const useVoiceRecorder = ({
     };
 
     const sent = sendAudio(base64Audio, enhancedContext);
+    if (sent) requestFormSnapshot.current = JSON.stringify(
+      formRendererRef.current?.getFormData?.() ?? currentFormData.current,
+    );
     if (!sent) {
       toast({
         title: 'Failed to send audio',
@@ -346,6 +377,9 @@ export const useVoiceRecorder = ({
     };
 
     const sent = processTranscription(transcriptText, context);
+    if (sent) requestFormSnapshot.current = JSON.stringify(
+      formRendererRef.current?.getFormData?.() ?? currentFormData.current,
+    );
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -420,6 +454,9 @@ export const useVoiceRecorder = ({
     };
 
     const sent = processTranscription(fieldTranscription, enhancedContext);
+    if (sent) requestFormSnapshot.current = JSON.stringify(
+      formRendererRef.current?.getFormData?.() ?? currentFormData.current,
+    );
     if (!sent) {
       toast({
         title: 'Failed to process transcription',
@@ -493,6 +530,7 @@ export const useVoiceRecorder = ({
     handleGlobalTranscriptionChange,
 
     // Utilities
+    resetSession,
     setSuggestions,
     setTranscription,
   };

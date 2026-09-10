@@ -89,7 +89,7 @@ export const useFormHandlers = (
   // Add array item handler
   const handleAddArrayItem = React.useCallback(
     (path: string, template: any) => {
-      dispatch({ type: 'ADD_ARRAY_ITEM', path, template });
+      dispatch({ type: 'ADD_ARRAY_ITEM', arrayPath: path, item: template });
     },
     [dispatch]
   );
@@ -97,7 +97,7 @@ export const useFormHandlers = (
   // Remove array item handler
   const handleRemoveArrayItem = React.useCallback(
     (path: string, index: number) => {
-      dispatch({ type: 'REMOVE_ARRAY_ITEM', path, index });
+      dispatch({ type: 'REMOVE_ARRAY_ITEM', arrayPath: path, itemIndex: index });
     },
     [dispatch]
   );

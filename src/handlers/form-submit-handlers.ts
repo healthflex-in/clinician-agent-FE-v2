@@ -6,7 +6,7 @@ import {
 } from '../utils/auto-submit-manager';
 
 export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
-  const { state, appointmentId, toast, setIsSubmitting, onChange } = props;
+  const { state, appointmentId, formKey, toast, setIsSubmitting, onChange } = props;
 
   const autoSubmitManager = useAutoSubmitManager(props);
 
@@ -16,6 +16,7 @@ export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
   // Manual submit handler - REMOVED ALL VALIDATION
   const handleSubmitForm = React.useCallback(
     async (isAutoSubmit: boolean = false) => {
+      autoSubmitManager.cancelAutoSubmit();
       console.log('=== handleSubmitForm called (NO VALIDATION) ===');
       console.log(
         '=== Form data at submission ===',
@@ -33,6 +34,7 @@ export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
         const success = await submitFormData({
           state,
           appointmentId,
+          formKey,
           isAutoSubmit,
           toast,
           setIsSubmitting,
@@ -45,7 +47,7 @@ export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
         console.error('Error during form submission:', error);
       }
     },
-    [state, appointmentId, toast, setIsSubmitting]
+    [state, appointmentId, formKey, toast, setIsSubmitting, autoSubmitManager.cancelAutoSubmit]
   );
 
   // Enhanced handleChange that can cancel auto-submit
@@ -66,7 +68,7 @@ export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
 
   // State update effect that triggers auto-submit
   React.useEffect(() => {
-    if (isStateUpdated && !autoSubmitManager.isLLMUpdateInProgress.current) {
+    if (isStateUpdated) {
       console.log(
         '=== Triggering auto-submit after state update (no validation) ==='
       );

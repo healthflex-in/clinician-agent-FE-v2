@@ -122,9 +122,12 @@ export const useFormManagement = ({
                 appointmentId
               );
               if (report && report.records) {
+                // Always use the formKey from URL for mapping since the form
+                // schema is determined by the URL. The mapping functions handle
+                // data from both first-assessment and follow-up report formats.
                 const mapped = mapRecordsToForm(formKey, report.records);
                 console.log(
-                  `Populated ${formKey} form from Report.records:`,
+                  `Populated ${formKey} form from Report.records (isFirstAssessment=${report.isFirstAssessment}):`,
                   mapped
                 );
                 setFormData(mapped);

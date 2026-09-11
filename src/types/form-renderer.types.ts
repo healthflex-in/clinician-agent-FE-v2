@@ -48,6 +48,9 @@ export interface FormRendererRef {
   clearSectionTranscription: (sectionPath: string) => void;
   updatePlanTranscription: (planPath: string, text: string) => void;
   updateSectionTranscription: (sectionPath: string, text: string) => void;
+  /** Reset the entire form back to blank schema defaults (clears the reducer state
+   *  the fields actually render from). */
+  resetForm: () => void;
 }
 
 // Processing queue item type

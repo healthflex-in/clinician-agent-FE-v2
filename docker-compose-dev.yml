@@ -1,0 +1,14 @@
+services:
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:?Set VITE_API_URL in .env}
+        VITE_WS_URL: ${VITE_WS_URL:?Set VITE_WS_URL in .env}
+        VITE_API_KEY: ${VITE_API_KEY:?Set VITE_API_KEY in .env}
+        VITE_WS_API_KEY: ${VITE_WS_API_KEY:?Set VITE_WS_API_KEY in .env}
+    image: clinician-agent-frontend-uat:latest
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-9000}:8080"

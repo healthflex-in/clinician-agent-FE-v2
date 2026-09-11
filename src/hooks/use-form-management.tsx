@@ -122,15 +122,12 @@ export const useFormManagement = ({
                 appointmentId
               );
               if (report && report.records) {
-                // Use the report's isFirstAssessment flag to determine the
-                // correct mapping, not the formKey from URL. This ensures data
-                // goes to the right fields even if the URL formKey is wrong.
-                const mappingKey = report.isFirstAssessment
-                  ? 'firstAssessment'
-                  : 'assessment';
-                const mapped = mapRecordsToForm(mappingKey, report.records);
+                // Always use the formKey from URL for mapping since the form
+                // schema is determined by the URL. The mapping functions handle
+                // data from both first-assessment and follow-up report formats.
+                const mapped = mapRecordsToForm(formKey, report.records);
                 console.log(
-                  `Populated ${mappingKey} form from Report.records (formKey=${formKey}, isFirstAssessment=${report.isFirstAssessment}):`,
+                  `Populated ${formKey} form from Report.records (isFirstAssessment=${report.isFirstAssessment}):`,
                   mapped
                 );
                 setFormData(mapped);

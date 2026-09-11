@@ -372,3 +372,131 @@ export async function fetchFirstAssessmentReport(patientId: string, appointmentI
   if (matches.length > 1) throw new Error('Multiple reports found for this appointment');
   return matches[0]?.agentReport ?? null;
 }
+
+/**
+ * Fetch the full clinician Report.records for a specific appointment.
+ *
+ * The clinician's real, existing data lives in `Report.records` (chief
+ * complaints, client history, documents, subjective/objective assessment,
+ * plan, recommendations, rpe). `createAgentReport` only creates an empty
+ * working copy and does NOT prefill from records, so to populate the form
+ * with each patient's actual data we read the records here.
+ *
+ * We query `reports(patientId)` and pick the report whose appointment matches
+ * the given appointmentId. Returns the matched report's `records` (plus
+ * isFirstAssessment/visitType for mapping decisions), or null if not found.
+ */
+export async function fetchReportByAppointment(
+  patientId: string,
+  appointmentId: string
+): Promise<{
+  records: any;
+  isFirstAssessment: boolean;
+  visitType?: string;
+} | null> {
+  const query = `
+    query Reports($patientId: ObjectID!) {
+      reports(patientId: $patientId) {
+        _id
+        isFirstAssessment
+        appointment {
+          _id
+        }
+        records {
+          clinicalDetails {
+            bodyChart
+            nprs
+            clientHistory
+            chiefComplaints
+          }
+          subjectiveAssessment {
+            assessment
+          }
+          document {
+            documentName
+            details
+            document
+          }
+          objectiveAssessment {
+            tests {
+              testName
+              unitName
+              value
+              left
+              right
+              comments
+            }
+          }
+          patientGoals {
+            shortTermGoals {
+              goal
+              targetDate
+            }
+            longTermGoals {
+              goal
+              targetDate
+            }
+          }
+          subjectiveGoals {
+            goal
+            targetDate
+            goalType
+          }
+          objectiveGoals {
+            goalName
+            goalCategory
+            unitName
+            value
+            targetDate
+          }
+          plan {
+            advice
+            plans {
+              exercise
+              comments
+              set {
+                repetitions
+                load
+                unit
+              }
+              duration {
+                value
+                unit
+              }
+            }
+          }
+          recommendations {
+            sessionType
+            frequency
+            sessionCount
+            plans
+          }
+          rpe {
+            value
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await graphqlRequest<{ reports: any[] }>(query, { patientId });
+    const reports = data?.reports || [];
+    const match = reports.find(
+      (r) => r?.appointment?._id === appointmentId
+    );
+    if (!match) {
+      console.log(
+        `No report found for appointment ${appointmentId} (patient ${patientId})`
+      );
+      return null;
+    }
+    return {
+      records: match.records || null,
+      isFirstAssessment: !!match.isFirstAssessment,
+    };
+  } catch (error) {
+    console.error('Failed to fetch report by appointment:', error);
+    return null;
+  }
+}

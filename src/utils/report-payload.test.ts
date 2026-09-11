@@ -20,6 +20,26 @@ describe('report payload', () => {
     expect(result.objectiveAssessment).toBeUndefined();
     expect(result.clinicalDetails.chiefComplaint).toBe('Pain');
   });
+  it('normalizes AI aliases and removes fields rejected by First Assessment GraphQL inputs', () => {
+    const result = buildReportPayload('firstAssessment', {
+      objectiveAssessment: { tests: [{
+        name: 'Squats',
+        details: '3 sets of 10 reps with 20 kg load',
+        rpe: '7/10',
+      }] },
+      subjectiveAssessments: [{ description: 'Less pain compared to last week.' }],
+    }).firstAssessment;
+
+    expect(result.objectiveAssessments[0].tests[0]).toEqual({
+      testName: 'Squats',
+      comments: '3 sets of 10 reps with 20 kg load',
+    });
+    expect(result.subjectiveAssessments[0]).toEqual({
+      conclusion: 'Less pain compared to last week.',
+    });
+    expect(result.objectiveAssessments[0].tests[0]).not.toHaveProperty('rpe');
+    expect(result.subjectiveAssessments[0]).not.toHaveProperty('description');
+  });
   it('does not silently save SNC/physio as assessment', () => {
     expect(buildReportPayload('snc', { plans: [{ set: [{ load: 20 }] }] })).toEqual({ snc: { plans: [{ set: [{ load: '20' }] }] } });
     expect(buildReportPayload('physio', { tests: [] })).toEqual({ physio: { tests: [] } });

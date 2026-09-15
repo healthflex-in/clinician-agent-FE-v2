@@ -287,7 +287,10 @@ export const useFieldRenderers = (props: FieldRenderersProps) => {
             {fieldName.toLowerCase().includes('comment') ||
             fieldName.toLowerCase().includes('advice') ||
             fieldName.toLowerCase().includes('notes') ||
-            fieldName.toLowerCase().includes('description')
+            fieldName.toLowerCase().includes('description') ||
+            fieldName.toLowerCase().includes('assessment') ||
+            fieldName.toLowerCase().includes('history') ||
+            fieldName.toLowerCase().includes('conclusion')
               ? renderInputForType(
                   'textarea',
                   value,

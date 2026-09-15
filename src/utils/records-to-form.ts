@@ -113,12 +113,22 @@ function mapTests(tests: any, numeric: boolean): any[] {
 /**
  * Records -> `assessment` form (FOLLOW_UP).
  * Shape must match formSchemas.assessment.
+ *
+ * NOTE: This function handles data from BOTH follow-up and first-assessment
+ * reports since sometimes a first-assessment report is opened in the
+ * assessment form. We check multiple field locations for compatibility:
+ *   - advice: plan.advice OR advice.advice
+ *   - plans: plan.plans OR recommendations (converted)
+ *   - subjectiveAssessment: subjectiveAssessment.assessment
+ *   - objectiveAssessment: objectiveAssessment.tests
  */
 export function mapRecordsToAssessment(records: AnyRecord): any {
   const rec = records || {};
 
   const planRec = rec.plan || {};
-  const plans = Array.isArray(planRec.plans)
+  
+  // Build plans array from plan.plans if available
+  let plans = Array.isArray(planRec.plans)
     ? planRec.plans.map((p: any) => ({
         exercise: str(p?.exercise),
         comments: str(p?.comments),
@@ -136,9 +146,12 @@ export function mapRecordsToAssessment(records: AnyRecord): any {
       }))
     : [];
 
+  // Check for advice in multiple locations
+  const adviceText = str(planRec.advice) || str(rec.advice?.advice);
+
   return {
     plan: {
-      advice: str(planRec.advice),
+      advice: adviceText,
       plans:
         plans.length > 0
           ? plans

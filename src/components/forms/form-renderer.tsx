@@ -7,6 +7,7 @@ import {
 } from './form-renderer.components';
 
 import { useDynamicArrayManagement } from '@/hooks/use-dynamic-array-management';
+import { defaultStateFromSchema } from '@/utils/schema-utils';
 import { useFormRenderer } from '@/hooks';
 import { useFormHandlers } from '@/handlers';
 import { Button } from '@/components/ui/button';
@@ -335,6 +336,34 @@ export const FormRenderer = React.forwardRef<
       ]
     );
 
+    // Reset the ENTIRE form to blank schema defaults. The visible fields render
+    // from the reducer state (formState.state), so a real reset must dispatch
+    // REPLACE_STATE here — clearing the parent's formData alone does nothing.
+    // Also clears LLM highlights and transcription/processed bookkeeping so no
+    // stale UI lingers after reset.
+    const resetForm = React.useCallback(() => {
+      const blank = defaultStateFromSchema(schema);
+      formState.dispatch({ type: 'REPLACE_STATE', data: blank });
+      formState.setLlmUpdatedFields(new Set());
+      formState.setSuggestions(null);
+      formState.setSectionTranscriptions({});
+      formState.setPlanTranscriptions({});
+      formState.setProcessedSections(new Set());
+      formState.setProcessedPlans(new Set());
+      setSelectedSections(new Set());
+      if (onChange) onChange(blank);
+    }, [
+      schema,
+      formState.dispatch,
+      formState.setLlmUpdatedFields,
+      formState.setSuggestions,
+      formState.setSectionTranscriptions,
+      formState.setPlanTranscriptions,
+      formState.setProcessedSections,
+      formState.setProcessedPlans,
+      onChange,
+    ]);
+
     // Expose methods to parent via ref
     React.useImperativeHandle(
       ref,
@@ -349,6 +378,7 @@ export const FormRenderer = React.forwardRef<
         clearSectionTranscription:
           transcriptionHandlers.clearSectionTranscription,
         resetProcessedState,
+        resetForm,
       }),
       [
         llmUpdateHandler.updateFormWithLLMData,
@@ -356,6 +386,7 @@ export const FormRenderer = React.forwardRef<
         submitHandlers.cancelAutoSubmit,
         transcriptionHandlers,
         resetProcessedState,
+        resetForm,
       ]
     );
 

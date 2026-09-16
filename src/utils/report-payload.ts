@@ -22,7 +22,7 @@ function measurement(value: any) {
   return number;
 }
 
-function tests(rows: any) {
+function tests(rows: any, preserveText = false) {
   if (!Array.isArray(rows)) throw new Error('Invalid assessment tests');
   return rows.map(row => {
     if (!row || typeof row !== 'object' || Array.isArray(row)) {
@@ -32,11 +32,20 @@ function tests(rows: any) {
     if ('testName' in row || 'name' in row) result.testName = row.testName ?? row.name ?? '';
     if ('unitName' in row || 'unit' in row) result.unitName = row.unitName ?? row.unit ?? '';
     if ('comments' in row || 'details' in row) result.comments = row.comments ?? row.details ?? '';
+    const notes: string[] = [];
     for (const name of ['value', 'left', 'right']) {
       if (Object.prototype.hasOwnProperty.call(row, name)) {
-        result[name] = measurement(row[name]);
+        if (preserveText && typeof row[name] === 'string' && row[name].trim() && !Number.isFinite(Number(row[name]))) {
+          notes.push(`${name}: ${row[name].trim()}`);
+          result[name] = null;
+        } else {
+          result[name] = measurement(row[name]);
+        }
       }
     }
+    if (notes.length) result.comments = [result.comments, ...notes].filter(Boolean).join('; ');
+    if (result.value !== null && result.value !== undefined &&
+        (result.value === result.left || result.value === result.right)) result.value = null;
     return result;
   });
 }
@@ -67,7 +76,7 @@ function firstAssessmentPayload(data: any) {
   if (objectiveSource !== undefined) {
     result.objectiveAssessments = objectiveSource === null
       ? null
-      : [{ tests: tests(objectiveSource?.tests || []) }];
+      : [{ tests: tests(objectiveSource?.tests || [], true) }];
   }
   if (Object.prototype.hasOwnProperty.call(data, 'subjectiveGoals')) {
     result.subjectiveGoals = (Array.isArray(data.subjectiveGoals)
@@ -110,13 +119,13 @@ export function buildReportPayload(formKey: string, form: any): any {
   }
   if (!form || typeof form !== 'object' || Array.isArray(form)) throw new Error('Invalid form');
   const data = clean(form);
+  if (formKey === 'firstAssessment') return { firstAssessment: firstAssessmentPayload(data) };
   if (data.objectiveAssessment?.tests) data.objectiveAssessment.tests = tests(data.objectiveAssessment.tests);
   if (data.tests) data.tests = tests(data.tests);
   if (data.rpe && Object.prototype.hasOwnProperty.call(data.rpe, 'value')) {
     data.rpe.value = measurement(data.rpe.value);
     if (data.rpe.value !== null && (data.rpe.value < 0 || data.rpe.value > 10)) throw new Error('RPE must be between 0 and 10');
   }
-  if (formKey === 'firstAssessment') return { firstAssessment: firstAssessmentPayload(data) };
   return { [formKey]: data };
 }
 

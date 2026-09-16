@@ -39,7 +39,7 @@ export const submitFormData = async ({
     console.error('=== Form submission failed ===', error);
     toast({
       title: 'Submission failed',
-      description: 'There was an error submitting the form.',
+      description: error instanceof Error ? error.message : 'There was an error submitting the form.',
       variant: 'destructive',
     });
     return false;

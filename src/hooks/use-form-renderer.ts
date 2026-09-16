@@ -2,7 +2,7 @@ import { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 import { formReducer } from '@/reducers';
-import { defaultStateFromSchema } from '@/utils/schema-utils';
+import { defaultStateFromSchema, findDifferences } from '@/utils/schema-utils';
 import { FormAction, ProcessingQueueItem } from '@/types/form-renderer.types';
 import {
   FORM_SECTIONS,
@@ -80,7 +80,20 @@ export const useFormRenderer = (
     [schema, toast]
   );
 
-  const [state, dispatch] = useReducer(wrappedReducer, initialState);
+  const [state, reducerDispatch] = useReducer(wrappedReducer, initialState);
+  const committedState = useRef(state);
+  useEffect(() => { committedState.current = state; }, [state]);
+  // Notifications belong to event handling, never to the render-time reducer.
+  const dispatch = useCallback((action: FormAction) => {
+    if (action.type === 'MERGE_LLM_DATA' && action.source === 'llm') {
+      const differences = findDifferences(committedState.current, action.data);
+      if (differences.length) {
+        setLlmUpdatedFields(prev => new Set([...prev, ...differences]));
+        toast({ title: 'Form Updated by AI', description: `${differences.length} field(s) were updated` });
+      }
+    }
+    reducerDispatch(action);
+  }, [toast]);
 
   // Initialize section transcriptions with empty strings for all sections
   useEffect(() => {

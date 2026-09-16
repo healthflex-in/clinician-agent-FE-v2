@@ -2,6 +2,18 @@ import { describe, it, expect, vi } from 'vitest';
 import { buildReportPayload, queueReportSave } from './report-payload';
 
 describe('report payload', () => {
+  it('saves descriptive First Assessment findings as comments and keeps sided numbers', () => {
+    const form = { objectiveAssessment: { tests: [
+      { testName: 'Right knee flexion', value: '130', right: '130', left: '' },
+      { testName: 'Tenderness', value: 'Mild', right: 'Mild' },
+      { testName: 'Squats', value: '3x10 @ 20kg', comments: 'RPE 7/10' },
+    ] } };
+    const rows = buildReportPayload('firstAssessment', form).firstAssessment.objectiveAssessments[0].tests;
+    expect(rows[0]).toMatchObject({ value: null, right: 130, left: null });
+    expect(rows[1]).toMatchObject({ value: null, right: null, comments: 'value: Mild; right: Mild' });
+    expect(rows[2]).toMatchObject({ value: null, comments: 'RPE 7/10; value: 3x10 @ 20kg' });
+    expect(form.objectiveAssessment.tests[1].value).toBe('Mild');
+  });
   it('preserves zeros, explicit clears and decimal measurements without changing the form', () => {
     const form = { rpe: { value: 0, record: 'private' }, plan: { advice: '', plans: [] }, objectiveAssessment: {
       tests: [{ testName: 'ROM', unitName: 'degrees', value: '17.5', left: '', right: 0 }],

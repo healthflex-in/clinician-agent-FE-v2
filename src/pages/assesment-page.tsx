@@ -94,6 +94,9 @@ const AssessmentPage = () => {
   const [patientName, setPatientName] = useState<string>('Patient');
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null);
+  // Bumped on reset to force the AssessmentForm to fully remount (via key),
+  // clearing any internal/uncontrolled field state left over from the old form.
+  const [formVersion, setFormVersion] = useState(0);
   const { toast } = useToast();
 
   // Ref to latest assessment — lets handleProcessTranscription read current value
@@ -199,7 +202,7 @@ const AssessmentPage = () => {
     setTranscription,
     setSuggestions,
   } = useWebSocket({
-    url: 'wss://agent.stance.health/ws',
+    url: import.meta.env.VITE_AGENT_WS_URL || 'wss://agent.stance.health/ws',
     onOpen: () => {
       toast({
         title: 'Connected',
@@ -808,9 +811,16 @@ const AssessmentPage = () => {
       };
 
       setAssessment(initialAssessment);
+      // Keep the ref in sync immediately. The state->ref sync effect runs only
+      // AFTER the next render, so without this the next voice/transcription send
+      // would read the stale (pre-reset) form from assessmentRef and the old data
+      // would be echoed back by the backend. This line makes the reset authoritative.
+      assessmentRef.current = initialAssessment;
       setTranscriptText('');
       setSelectedSections([]);
       setCurrentSectionId(null);
+      // Force the form to remount so no stale field state survives the reset.
+      setFormVersion((v) => v + 1);
       updateLocalStorage(initialAssessment);
 
       toast({
@@ -909,6 +919,7 @@ const AssessmentPage = () => {
             <CardContent className="p-6">
               <div className="space-y-8">
                 <AssessmentForm
+                  key={formVersion}
                   formData={assessment}
                   onChange={handleFormChange}
                   onAudioEncoded={handleSectionAudioEncoded}

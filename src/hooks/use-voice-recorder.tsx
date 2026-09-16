@@ -113,7 +113,7 @@ export const useVoiceRecorder = ({
     setTranscription,
     processTranscription,
   } = useWebSocket({
-    url: 'wss://agent.stance.health/ws',
+    url: import.meta.env.VITE_AGENT_WS_URL || 'wss://agent.stance.health/ws',
     onFormData: handleIncomingFormData,
     onOpen: () =>
       toast({ title: 'Connected', description: 'Ready to transcribe audio' }),

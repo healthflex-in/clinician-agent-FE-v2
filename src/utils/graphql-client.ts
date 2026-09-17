@@ -84,38 +84,6 @@ export async function graphqlRequest<T = any>(
   }
 }
 
-/**
- * Fetch the filled form the clinician-agent persisted for an appointment, from
- * the clinician_agent_form_data collection. Returns the raw formData (already in
- * the assessment shape the form renderer consumes) or null if none exists.
- */
-export async function getClinicianAgentFormData(
-  appointmentId: string,
-  formKey?: string
-): Promise<any | null> {
-  const query = `
-    query ClinicianAgentFormData($appointmentId: ObjectID!, $formKey: String) {
-      clinicianAgentFormData(appointmentId: $appointmentId, formKey: $formKey) {
-        _id
-        appointmentId
-        formKey
-        formData
-        updatedAt
-      }
-    }
-  `;
-  try {
-    const data = await graphqlRequest<{ clinicianAgentFormData: any }>(query, {
-      appointmentId,
-      formKey: formKey ?? null,
-    });
-    return data?.clinicianAgentFormData ?? null;
-  } catch (error) {
-    console.error('Failed to fetch clinician agent form data:', error);
-    return null;
-  }
-}
-
 export async function updateAgentReport(input: {
   patientId: string;
   appointmentId: string;

@@ -19,121 +19,55 @@ export type Appointment = {
 export const useAppointments = (patientId: string) => {
   const { toast } = useToast();
 
-  const isAutoSelectingRef = React.useRef(false);
-
   const [appointmentId, setAppointmentId] = React.useState<string>('');
   const [appointments, setAppointments] = React.useState<Appointment[]>([]);
   const [loadingAppointments, setLoadingAppointments] = React.useState(false);
-  const [lastLoadedPatientId, setLastLoadedPatientId] =
-    React.useState<string>('');
+  const requestVersion = React.useRef(0);
 
   const clearAppointments = React.useCallback(() => {
+    requestVersion.current += 1;
     setAppointments([]);
     setAppointmentId('');
-    setLastLoadedPatientId('');
-    isAutoSelectingRef.current = false;
+    setLoadingAppointments(false);
   }, []);
 
-  const handleAppointmentChange = React.useCallback(
-    (newAppointmentId: string) => {
-      // Only process if this is not an auto-selection
-      if (!isAutoSelectingRef.current) {
-        setAppointmentId(newAppointmentId);
-      } else {
-        // Reset the flag after auto-selection is processed
-        isAutoSelectingRef.current = false;
-      }
-    },
-    []
-  );
+  // A user selection must always replace the automatic default.
+  const handleAppointmentChange = React.useCallback((id: string) => {
+    setAppointmentId(id);
+  }, []);
 
-  // Load appointments when patient changes
   React.useEffect(() => {
-    const loadAppointments = async (currentPatientId: string) => {
-      // Prevent loading if already loading for the same patient
-      if (loadingAppointments && lastLoadedPatientId === currentPatientId) {
-        return;
-      }
+    const version = ++requestVersion.current;
+    let active = true;
+    const isCurrent = () => active && requestVersion.current === version;
+    setAppointments([]);
+    setAppointmentId('');
+    setLoadingAppointments(Boolean(patientId?.trim()));
+    if (!patientId?.trim()) return;
 
-      // Validate patientId before making the request
-      if (!currentPatientId || currentPatientId.trim() === '') {
-        console.warn('Cannot load appointments: patientId is empty or invalid');
-        return;
-      }
-
+    const load = async () => {
       try {
-        setLoadingAppointments(true);
-        setLastLoadedPatientId(currentPatientId);
-
-        console.log('Loading appointments for patientId:', currentPatientId);
-        const response = await fetchAppointments(currentPatientId);
-
-        if (response && response.reports) {
-          // Filter out reports without appointments and sort by startTime (most recent first)
-          const sortedAppointments = response.reports
-            .filter(
-              (report) =>
-                report && report._id && report.appointment?.event?.startTime
-            )
-            .sort(
-              (a, b) =>
-                new Date(b.appointment.event.startTime).getTime() -
-                new Date(a.appointment.event.startTime).getTime()
-            );
-          setAppointments(sortedAppointments);
-
-          // Check if we should restore from localStorage
-          const savedAppointmentId = localStorage.getItem('appointmentId');
-          const savedPatientId = localStorage.getItem('userId');
-
-          if (savedPatientId === currentPatientId && savedAppointmentId) {
-            // Restore from localStorage if the appointment exists in the list
-            const appointmentExists = sortedAppointments.find(
-              (apt) => apt.appointment._id === savedAppointmentId
-            );
-            if (appointmentExists) {
-              isAutoSelectingRef.current = true;
-              setAppointmentId(savedAppointmentId);
-              return;
-            }
-          }
-
-          // Auto-select the most recent appointment
-          if (sortedAppointments.length > 0) {
-            const mostRecentAppointment = sortedAppointments[0];
-            console.log('@@ mostRecentAppointment: ', mostRecentAppointment);
-            isAutoSelectingRef.current = true;
-            setAppointmentId(mostRecentAppointment.appointment._id);
-          }
-        }
+        const response = await fetchAppointments(patientId);
+        if (!isCurrent()) return;
+        const sorted: Appointment[] = (response?.reports ?? [])
+          .filter((report: Appointment) => report?._id && report.appointment?._id && report.appointment?.event?.startTime)
+          .sort((a: Appointment, b: Appointment) =>
+            new Date(b.appointment.event.startTime).getTime() - new Date(a.appointment.event.startTime).getTime());
+        setAppointments(sorted);
+        const savedId = localStorage.getItem('appointmentId');
+        const restored = localStorage.getItem('userId') === patientId &&
+          sorted.some(row => row.appointment._id === savedId);
+        setAppointmentId(restored ? savedId! : sorted[0]?.appointment._id ?? '');
       } catch (error) {
-        console.error('Error fetching appointments:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load appointments. Please try again.',
-          variant: 'destructive',
-        });
+        if (!isCurrent()) return;
+        toast({ title: 'Error', description: 'Failed to load appointments. Please try again.', variant: 'destructive' });
       } finally {
-        setLoadingAppointments(false);
+        if (isCurrent()) setLoadingAppointments(false);
       }
     };
-
-    if (
-      patientId &&
-      patientId.trim() !== '' &&
-      patientId !== lastLoadedPatientId
-    ) {
-      loadAppointments(patientId);
-    } else if (!patientId) {
-      clearAppointments();
-    }
-  }, [
-    patientId,
-    lastLoadedPatientId,
-    loadingAppointments,
-    toast,
-    clearAppointments,
-  ]);
+    void load();
+    return () => { active = false; };
+  }, [patientId, toast]);
 
   return {
     appointments,

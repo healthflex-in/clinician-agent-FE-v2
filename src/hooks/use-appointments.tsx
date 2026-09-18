@@ -54,10 +54,8 @@ export const useAppointments = (patientId: string) => {
           .sort((a: Appointment, b: Appointment) =>
             new Date(b.appointment.event.startTime).getTime() - new Date(a.appointment.event.startTime).getTime());
         setAppointments(sorted);
-        const savedId = localStorage.getItem('appointmentId');
-        const restored = localStorage.getItem('userId') === patientId &&
-          sorted.some(row => row.appointment._id === savedId);
-        setAppointmentId(restored ? savedId! : sorted[0]?.appointment._id ?? '');
+        // Default to the latest scheduled date, regardless of a previous session.
+        setAppointmentId(sorted[0]?.appointment._id ?? '');
       } catch (error) {
         if (!isCurrent()) return;
         toast({ title: 'Error', description: 'Failed to load appointments. Please try again.', variant: 'destructive' });

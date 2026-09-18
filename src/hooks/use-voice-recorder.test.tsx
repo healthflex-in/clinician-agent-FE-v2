@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVoiceRecorder } from './use-voice-recorder';
 
 const mocks = vi.hoisted(() => ({
-  options: null as any, toast: vi.fn(), connect: vi.fn(), disconnect: vi.fn(),
+  options: null as any, toast: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), resetProcessingSession: vi.fn(),
   sendAudio: vi.fn(() => true), processTranscription: vi.fn(() => true),
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));

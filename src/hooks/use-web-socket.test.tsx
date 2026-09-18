@@ -70,4 +70,19 @@ describe('socket request lifecycle', () => {
     act(() => socket.receive({ transcription: '', processingComplete: true }));
     expect(result.current.isProcessing).toBe(false);
   });
+  it('starts a separate processing draft after reset without changing the appointment', () => {
+    localStorage.setItem('appointmentId', 'visit');
+    const { result } = renderHook(() => useWebSocket({ url: 'ws://test/ws' }));
+    act(() => result.current.connect());
+    const first = FakeSocket.instances[0];
+    act(() => first.open());
+    act(() => result.current.processTranscription('Old note', { plan: {} }));
+    const old = first.sent.at(-1);
+    act(() => { result.current.disconnect(); result.current.resetProcessingSession(); result.current.connect(); });
+    const next = FakeSocket.instances.at(-1)!;
+    act(() => next.open());
+    act(() => result.current.processTranscription('New note', { plan: {} }));
+    expect(next.sent.at(-1).processingSessionId).not.toBe(old.processingSessionId);
+    expect(next.sent.at(-1).AppointmentId).toBe('visit');
+  });
 });

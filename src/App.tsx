@@ -4,6 +4,7 @@ import IndexPage from './pages/Index';
 import { lazy, Suspense } from 'react';
 const FormPage = lazy(() => import('./pages/form-page'));
 import NotFoundPage from './pages/not-found';
+import { Toaster } from '@/components/ui/toaster';
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
@@ -20,6 +21,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       </Suspense>
+      <Toaster />
     </Router>
   );
 }

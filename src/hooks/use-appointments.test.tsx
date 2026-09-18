@@ -10,6 +10,14 @@ const report = (id: string, date: string) => ({ _id: `report-${id}`, appointment
 } });
 describe('appointment selection', () => {
   beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+  it('selects the latest appointment even when an older visit was saved locally', async () => {
+    localStorage.setItem('userId', 'patient');
+    localStorage.setItem('appointmentId', 'older');
+    mocks.fetch.mockResolvedValue({ reports: [report('older', '2026-09-01'), report('latest', '2026-09-18')] });
+    const { result } = renderHook(() => useAppointments('patient'));
+    await waitFor(() => expect(result.current.appointmentId).toBe('latest'));
+    expect(result.current.appointments.map(row => row.appointment._id)).toEqual(['latest', 'older']);
+  });
   it('accepts the first manual change after automatically selecting the latest visit', async () => {
     mocks.fetch.mockResolvedValue({ reports: [report('older', '2026-09-01'), report('latest', '2026-09-18')] });
     const { result } = renderHook(() => useAppointments('patient'));

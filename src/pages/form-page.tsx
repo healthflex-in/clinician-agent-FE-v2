@@ -114,11 +114,12 @@ const FormPage = () => {
   // render from) AND the parent form state / localStorage. Clearing only the
   // parent state (handleFormReset) leaves the renderer's own state on screen.
   const handleFullReset = React.useCallback(() => {
+    resetSession();
     if (formRendererRef.current) {
       formRendererRef.current.resetForm();
     }
     handleFormReset();
-  }, [handleFormReset]);
+  }, [handleFormReset, resetSession]);
 
   // Form transcription clearing handlers
   const handleSectionTranscriptionClear = (sectionPath: string) => {

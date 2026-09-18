@@ -25,6 +25,12 @@ export function useWebSocket(options: WebSocketOptions) {
   const [suggestions, setSuggestions] = React.useState<any>(null);
   const [recommendations, setRecommendations] = React.useState<any>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
+  const processingSession = React.useRef(crypto.randomUUID());
+  const resetProcessingSession = React.useCallback(() => {
+    processingSession.current = crypto.randomUUID();
+    setFormData(null);
+    setRecommendations(null);
+  }, []);
   const intentionalClose = React.useRef(false);
   const reconnectAttempts = React.useRef(0);
   const reconnectTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +190,7 @@ export function useWebSocket(options: WebSocketOptions) {
     userId: localStorage.getItem('userId') || '',
     AppointmentId: localStorage.getItem('appointmentId') || '',
     formKey: localStorage.getItem('formKey') || 'assessment',
+    processingSessionId: processingSession.current,
   });
   const sendAudio = React.useCallback((base64Audio: string, currentFormData?: any) => {
     const context = identity();
@@ -213,7 +220,7 @@ export function useWebSocket(options: WebSocketOptions) {
   return {
     isConnected, isConnecting, isProcessing, error, connect, disconnect,
     sendMessage, sendAudio, processTranscription, transcription, formData,
-    suggestions, recommendations, setTranscription, setSuggestions, setRecommendations,
+    suggestions, recommendations, setTranscription, setSuggestions, setRecommendations, resetProcessingSession,
   };
 }
 

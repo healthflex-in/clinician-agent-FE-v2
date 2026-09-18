@@ -118,6 +118,7 @@ export const useVoiceRecorder = ({
   const {
     connect,
     disconnect,
+    resetProcessingSession,
     suggestions,
     isConnected,
     isConnecting,
@@ -156,6 +157,7 @@ export const useVoiceRecorder = ({
 
   const resetSession = React.useCallback(() => {
     disconnect(); // Detach old socket callbacks before discarding any response.
+    resetProcessingSession();
     requestFormSnapshot.current = null;
     setSuggestions([]);
     setTranscription('');
@@ -168,7 +170,7 @@ export const useVoiceRecorder = ({
     setRecordingStates({});
     setAudioRecorderKey(key => key + 1);
     if (microphonePermission === 'granted') connect();
-  }, [disconnect, connect, microphonePermission, setSuggestions, setTranscription]);
+  }, [disconnect, connect, microphonePermission, setSuggestions, setTranscription, resetProcessingSession]);
 
   // SIMPLE TRANSCRIPTION ROUTING - This is the key fix
   React.useEffect(() => {
@@ -249,7 +251,7 @@ export const useVoiceRecorder = ({
       formKey,
       recordingType: 'global',
       isGlobalRecording: true,
-      formData: formData || {},
+      formData: formRendererRef.current?.getFormData?.() ?? currentFormData.current ?? {},
     };
 
     const sent = sendAudio(base64Audio, context);
@@ -371,7 +373,7 @@ export const useVoiceRecorder = ({
 
     const context = {
       formKey,
-      formData: formData || {},
+      formData: formRendererRef.current?.getFormData?.() ?? currentFormData.current ?? {},
       isGlobalRecording: true,
       recordingType: 'global',
     };

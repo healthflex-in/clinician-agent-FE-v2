@@ -2,7 +2,7 @@ import { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 import { formReducer } from '@/reducers';
-import { defaultStateFromSchema } from '@/utils/schema-utils';
+import { defaultStateFromSchema, findDifferences } from '@/utils/schema-utils';
 import { FormAction, ProcessingQueueItem } from '@/types/form-renderer.types';
 import {
   FORM_SECTIONS,
@@ -22,6 +22,8 @@ export const useFormRenderer = (
   selectedSections?: Set<string>
 ) => {
   const { toast } = useToast();
+  const liveStatus = useRef({ recordingMode, isProcessing });
+  liveStatus.current = { recordingMode, isProcessing };
 
   // Initialize form state from schema or provided formData
   const initialState = formData || defaultStateFromSchema(schema);
@@ -78,7 +80,20 @@ export const useFormRenderer = (
     [schema, toast]
   );
 
-  const [state, dispatch] = useReducer(wrappedReducer, initialState);
+  const [state, reducerDispatch] = useReducer(wrappedReducer, initialState);
+  const committedState = useRef(state);
+  useEffect(() => { committedState.current = state; }, [state]);
+  // Notifications belong to event handling, never to the render-time reducer.
+  const dispatch = useCallback((action: FormAction) => {
+    if (action.type === 'MERGE_LLM_DATA' && action.source === 'llm') {
+      const differences = findDifferences(committedState.current, action.data);
+      if (differences.length) {
+        setLlmUpdatedFields(prev => new Set([...prev, ...differences]));
+        toast({ title: 'Form Updated by AI', description: `${differences.length} field(s) were updated` });
+      }
+    }
+    reducerDispatch(action);
+  }, [toast]);
 
   // Initialize section transcriptions with empty strings for all sections
   useEffect(() => {
@@ -175,15 +190,6 @@ export const useFormRenderer = (
         return;
       }
 
-      if (recordingMode === 'global') {
-        console.log(
-          `Canceling processing for ${nextItem.path} - global mode detected`
-        );
-        setIsAutoProcessing(false);
-        setCurrentlyProcessingPath(null);
-        return;
-      }
-
       // Mark as processed
       if (isSection) {
         setProcessedSections((prev) => new Set([...prev, nextItem.path]));
@@ -269,7 +275,7 @@ export const useFormRenderer = (
       }
 
       const timeout = setTimeout(() => {
-        if (recordingMode === 'global' || isProcessing) {
+        if (liveStatus.current.recordingMode === 'global' || liveStatus.current.isProcessing) {
           console.log(
             `Canceling queue addition for ${path} - global processing started`
           );
@@ -292,7 +298,7 @@ export const useFormRenderer = (
 
         console.log(`Queued for processing: ${path}`);
 
-        if (!isAutoProcessing && recordingMode !== 'global' && !isProcessing) {
+        if (!isAutoProcessing && !liveStatus.current.isProcessing) {
           processNextInQueue();
         }
 

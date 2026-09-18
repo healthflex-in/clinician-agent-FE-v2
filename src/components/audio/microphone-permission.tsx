@@ -46,13 +46,13 @@ export const MicrophonePermissionDialog: React.FC<MicrophonePermissionDialogProp
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-white text-slate-900 border-slate-200 shadow-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mic className="h-5 w-5 text-primary" />
+            <Mic className="h-5 w-5 text-slate-700" />
             Microphone Access Required
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-slate-600">
             {microphonePermission === 'denied'
               ? 'Microphone access was denied. Please enable it in your browser settings to use voice recording features.'
               : 'This application needs access to your microphone to provide voice recording and transcription features. Please allow microphone access when prompted by your browser.'}
@@ -62,7 +62,7 @@ export const MicrophonePermissionDialog: React.FC<MicrophonePermissionDialogProp
           {microphonePermission === 'denied' ? (
             <Button
               onClick={handleBrowserSettings}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
               variant="outline"
             >
               Check Browser Settings
@@ -70,7 +70,7 @@ export const MicrophonePermissionDialog: React.FC<MicrophonePermissionDialogProp
           ) : (
             <Button
               onClick={onRequestPermission}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto bg-slate-900 text-white hover:bg-slate-800"
             >
               Allow Microphone Access
             </Button>

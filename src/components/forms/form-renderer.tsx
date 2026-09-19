@@ -83,6 +83,7 @@ export const FormRenderer = React.forwardRef<
 
     // Initialize submit handlers
     const submitHandlers = useFormSubmitHandlers({
+      formKey,
       autoSubmitOnLLMUpdate,
       autoSubmitDelay,
       isInitialized,
@@ -367,6 +368,8 @@ export const FormRenderer = React.forwardRef<
     React.useImperativeHandle(
       ref,
       () => ({
+        getFormData: () => formState.state,
+        cancelPendingAutoSubmit: submitHandlers.cancelAutoSubmit,
         updateFormWithLLMData: llmUpdateHandler.updateFormWithLLMData,
         updatePlanTranscription: transcriptionHandlers.updatePlanTranscription,
         clearPlanTranscription: transcriptionHandlers.clearPlanTranscription,
@@ -379,6 +382,8 @@ export const FormRenderer = React.forwardRef<
       }),
       [
         llmUpdateHandler.updateFormWithLLMData,
+        formState.state,
+        submitHandlers.cancelAutoSubmit,
         transcriptionHandlers,
         resetProcessedState,
         resetForm,

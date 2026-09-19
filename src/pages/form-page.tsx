@@ -63,6 +63,7 @@ const FormPage = () => {
     handleFormChange,
     handleFormSubmit,
     handleFormReset,
+    resetVersion,
     setFormData,
   } = useFormManagement({
     formKey,
@@ -99,6 +100,7 @@ const FormPage = () => {
     handleGlobalTranscriptionChange,
 
     // Utilities
+    resetSession,
     setSuggestions,
     setTranscription,
   } = useVoiceRecorder({
@@ -229,6 +231,7 @@ const FormPage = () => {
                             [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-stance-steel/20 [&::-webkit-scrollbar-thumb]:rounded-full">
               <div className="max-w-3xl mx-auto px-6 py-8 space-y-6">
                 <FormSection
+                  key={`${appointmentId}:${formKey}:${resetVersion}`}
                   schema={schema}
                   formKey={formKey}
                   formData={formData}
@@ -293,7 +296,10 @@ const FormPage = () => {
                     Reset
                   </button>
                   <button
-                    onClick={handleFormSubmit}
+                    onClick={() => {
+                      formRendererRef.current?.cancelPendingAutoSubmit();
+                      void handleFormSubmit();
+                    }}
                     disabled={isSubmitting}
                     className="flex items-center gap-2 h-10 px-6 bg-stance-steel text-white text-sm font-bold rounded-xl hover:bg-stance-steel/90 active:scale-[0.98] transition-all shadow-md ring-2 ring-stance-neon ring-offset-2 ring-offset-[#F0F3F8] disabled:opacity-50"
                   >

@@ -1,12 +1,14 @@
 // vite.config.ts with CORS proxy added to your existing configuration
 
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { componentTagger } from 'lovable-tagger';
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  return ({
   server: {
     port: 9000,
     proxy: {
@@ -16,10 +18,7 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => path.replace(/^\/api\/graphql/, '/graphql'),
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            proxyReq.setHeader(
-              'x-api-key',
-              '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20'
-            );
+            proxyReq.setHeader('x-api-key', env.VITE_API_KEY || '');
 
             const orgId = req.headers['x-organization-id'];
             if (orgId) {
@@ -44,4 +43,5 @@ export default defineConfig(({ mode }) => ({
     // 'import.meta.env.VITE_CORS_STRATEGY': JSON.stringify('local_proxy'),
     // 'import.meta.env.VITE_PROXY_URL': JSON.stringify('/api/graphql'),
   },
-}));
+  });
+});

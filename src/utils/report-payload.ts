@@ -22,6 +22,31 @@ function measurement(value: any) {
   return number;
 }
 
+function nonNegative(value: any, label: string, numericText = false) {
+  if (value === '' || value === null || value === undefined) return;
+  const parsed = Number(value);
+  // Loads may contain valid non-numeric descriptions such as "bodyweight".
+  if (!Number.isFinite(parsed)) {
+    if (numericText) return;
+    throw new Error(`${label} must be a valid number`);
+  }
+  if (parsed < 0) throw new Error(`${label} cannot be negative`);
+}
+
+function validatePlanNumbers(data: any) {
+  const plans = data?.plan?.plans ?? data?.plans;
+  if (!Array.isArray(plans)) return;
+  plans.forEach((plan: any) => {
+    nonNegative(plan?.duration?.value, 'Duration');
+    const sets = plan?.set ?? plan?.sets;
+    if (!Array.isArray(sets)) return;
+    sets.forEach((set: any) => {
+      nonNegative(set?.repetitions, 'Repetitions');
+      nonNegative(set?.load, 'Load', true);
+    });
+  });
+}
+
 function tests(rows: any, preserveText = false) {
   if (!Array.isArray(rows)) throw new Error('Invalid assessment tests');
   return rows.map(row => {
@@ -120,6 +145,7 @@ export function buildReportPayload(formKey: string, form: any): any {
   if (!form || typeof form !== 'object' || Array.isArray(form)) throw new Error('Invalid form');
   const data = clean(form);
   if (formKey === 'firstAssessment') return { firstAssessment: firstAssessmentPayload(data) };
+  validatePlanNumbers(data);
   if (data.objectiveAssessment?.tests) data.objectiveAssessment.tests = tests(data.objectiveAssessment.tests);
   if (data.tests) data.tests = tests(data.tests);
   if (data.rpe && Object.prototype.hasOwnProperty.call(data.rpe, 'value')) {

@@ -541,6 +541,11 @@ export const InputField: React.FC<InputFieldProps> = ({
   onChange,
   onRejectLLMChange,
 }) => {
+  const isNonNegativeNumber =
+    /(?:^|\.)(?:repetitions|sessionCount)$/.test(path) ||
+    /(?:^|\.)duration\.value$/.test(path) ||
+    path === 'rpe.value';
+  const maximum = path === 'rpe.value' ? 10 : undefined;
   const baseClassName = isLLMUpdated
     ? 'border-yellow-400 bg-yellow-50'
     : 'border-stance-steel/12 bg-white focus-visible:ring-stance-steel/20 focus-visible:ring-1 text-stance-steel/80 placeholder:text-stance-steel/25 rounded-xl';
@@ -551,8 +556,15 @@ export const InputField: React.FC<InputFieldProps> = ({
         <div className="relative">
           <Input
             type="number"
+            min={isNonNegativeNumber ? 0 : undefined}
+            max={maximum}
             placeholder={placeholder}
-            onChange={(e) => onChange(path, Number(e.target.value))}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              if (isNonNegativeNumber && next < 0) return;
+              if (maximum !== undefined && next > maximum) return;
+              onChange(path, next);
+            }}
             value={value === null || value === undefined ? '' : value}
             className={`${baseClassName} text-sm form-input touch-manipulation`}
           />

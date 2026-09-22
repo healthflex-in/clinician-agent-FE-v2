@@ -1,7 +1,7 @@
 import { ToastAction } from '@/components/ui/toast';
 import formSchemas from '@/schemas/form-schemas';
-import { defaultStateFromSchema } from '@/utils/schema-utils';
-import { firstAssessmentToForm } from '@/utils/first-assessment';
+import { defaultStateFromSchema, isFormDataEmpty } from '@/utils/schema-utils';
+import { assessmentToForm, firstAssessmentToForm, hasPersistedAgentChanges } from '@/utils/first-assessment';
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { submitFormData } from '@/utils/form-submission';
@@ -13,6 +13,7 @@ import {
 } from '../utils/api';
 import { mapRecordsToForm } from '@/utils/records-to-form';
 import { normalizeObjectiveAssessment } from '@/utils/form-renderer.utils';
+import { clearFormDraft, loadFormDraft, saveFormDraft } from '@/utils/form-draft';
 
 type UseFormManagementProps = {
   formKey: string;
@@ -40,6 +41,7 @@ export const useFormManagement = ({
   appointmentId,
 }: UseFormManagementProps): UseFormManagementReturn => {
   const resetEpoch = React.useRef(0);
+  const allowBlankSaveAfterReset = React.useRef(false);
   const [resetVersion, setResetVersion] = React.useState(0);
   const [formData, setFormData] = React.useState<any>(null);
   const latestDraft = React.useRef(formData);
@@ -84,9 +86,11 @@ export const useFormManagement = ({
   React.useEffect(() => {
     let active = true;
     const epoch = ++resetEpoch.current;
+    allowBlankSaveAfterReset.current = false;
     setIsInitialLoadComplete(false);
     setReportId(null);
     setFormData(null);
+    const pendingDraft = loadFormDraft(appointmentId, formKey);
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) {
         setFormData(null); // null means use schema defaults
@@ -135,14 +139,15 @@ export const useFormManagement = ({
             description: 'New report initialized successfully',
           });
 
-          // PRIMARY populate path: the clinician's real data lives in
-          // Report.records (createAgentReport returns an empty working copy).
-          // Fetch the records for this appointment and map them into the form
-          // schema. This works for every patient because it reads that
-          // patient's own report. Only assessment/firstAssessment forms have a
-          // records mapping; other form types fall through to the legacy logic.
+          // Prefer a previously edited Agent draft. Report.records is only the
+          // prefill fallback for a new blank working copy; otherwise it can be
+          // older than the Agent draft and overwrite the clinician's saved edit.
           let recordsPopulated = false;
-          if (formKey === 'assessment' || formKey === 'firstAssessment') {
+          if (formKey === 'assessment' && hasPersistedAgentChanges(result.createAgentReport)) {
+            setFormData(assessmentToForm(result.createAgentReport.assessment));
+            recordsPopulated = true;
+          }
+          if (!recordsPopulated && (formKey === 'assessment' || formKey === 'firstAssessment')) {
             try {
               const report = await fetchReportByAppointment(
                 patientId,
@@ -305,7 +310,13 @@ export const useFormManagement = ({
         });
       } finally {
         console.log('Form initialization complete');
-        if (active && epoch === resetEpoch.current) setIsInitialLoadComplete(true);
+        if (active && epoch === resetEpoch.current) {
+          // A draft is the latest browser state when refresh interrupted the
+          // debounce. Restore it after server prefill so stale server data
+          // cannot overwrite the unsaved edit.
+          if (pendingDraft) setFormData(pendingDraft);
+          setIsInitialLoadComplete(true);
+        }
       }
     };
 
@@ -316,6 +327,7 @@ export const useFormManagement = ({
   // Handle form data changes
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
+    if (isInitialLoadComplete) saveFormDraft(appointmentId, formKey, newFormData);
 
     try {
       const savedReport = localStorage.getItem('agentReport');
@@ -351,9 +363,22 @@ export const useFormManagement = ({
       return;
     }
 
-    await submitFormData({
+    if (isFormDataEmpty(currentFormData) && !allowBlankSaveAfterReset.current) {
+      toast({
+        title: 'Assessment Details Required',
+        description: 'Please add assessment details before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const saved = await submitFormData({
       state: currentFormData, appointmentId, formKey, toast, setIsSubmitting,
     });
+    if (saved) {
+      allowBlankSaveAfterReset.current = false;
+      clearFormDraft(appointmentId, formKey);
+    }
   };
 
   // Reset form
@@ -362,8 +387,10 @@ export const useFormManagement = ({
       const previous = formData;
       const resetAt = resetEpoch.current + 1;
       resetEpoch.current += 1;
+      allowBlankSaveAfterReset.current = true;
       const blank = defaultStateFromSchema(formSchemas[formKey as keyof typeof formSchemas] || formSchemas.assessment);
       setFormData(blank);
+      saveFormDraft(appointmentId, formKey, blank);
       setResetVersion(version => version + 1);
       setIsInitialLoadComplete(true);
 
@@ -385,7 +412,9 @@ export const useFormManagement = ({
           // An old toast must not overwrite edits or a later reset.
           if (resetEpoch.current !== resetAt || JSON.stringify(latestDraft.current) !== JSON.stringify(blank)) return;
           resetEpoch.current += 1;
+          allowBlankSaveAfterReset.current = false;
           setFormData(previous);
+          saveFormDraft(appointmentId, formKey, previous);
           setResetVersion(version => version + 1);
         }}>Undo</ToastAction>,
       });

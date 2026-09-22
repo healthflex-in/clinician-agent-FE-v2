@@ -1,5 +1,6 @@
 import React from 'react';
 import { submitFormData } from './form-submission';
+import { clearFormDraft } from './form-draft';
 
 export interface AutoSubmitManagerProps {
   autoSubmitOnLLMUpdate: boolean;
@@ -46,6 +47,16 @@ export const useAutoSubmitManager = (props: AutoSubmitManagerProps) => {
     cancelAutoSubmit();
   }, [props.appointmentId, props.formKey, props.autoSubmitOnLLMUpdate, props.isInitialized, cancelAutoSubmit]);
 
+  React.useEffect(() => {
+    if (!pendingAutoSubmit) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [pendingAutoSubmit]);
+
   const triggerAutoSubmit = React.useCallback(() => {
     cancelAutoSubmit();
     const config = latest.current;
@@ -75,7 +86,10 @@ export const useAutoSubmitManager = (props: AutoSubmitManagerProps) => {
       }).catch(() => false);
       inFlight.current = save;
       try {
-        await save;
+        const successful = await save;
+        if (successful && generation.current === scheduledGeneration) {
+          clearFormDraft(current.appointmentId, current.formKey || 'assessment');
+        }
       } finally {
         if (inFlight.current === save) inFlight.current = null;
         if (mounted.current && generation.current === scheduledGeneration) {
@@ -91,9 +105,13 @@ export const useAutoSubmitManager = (props: AutoSubmitManagerProps) => {
     value: any,
     originalHandleChange: (path: string, value: any) => void,
   ) => {
+    // A manual edit supersedes any pending AI save. Apply the edit first, then
+    // start a new debounce window; when it expires `latest.current.state`
+    // contains the newly rendered form state.
     cancelAutoSubmit();
     originalHandleChange(path, value);
-  }, [cancelAutoSubmit]);
+    triggerAutoSubmit();
+  }, [cancelAutoSubmit, triggerAutoSubmit]);
 
   return {
     pendingAutoSubmit,

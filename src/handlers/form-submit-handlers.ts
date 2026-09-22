@@ -6,7 +6,7 @@ import {
 } from '../utils/auto-submit-manager';
 
 export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
-  const { state, appointmentId, formKey, toast, setIsSubmitting, onChange } = props;
+  const { state, appointmentId, formKey, toast, setIsSubmitting } = props;
 
   const autoSubmitManager = useAutoSubmitManager(props);
 
@@ -79,14 +79,14 @@ export const useFormSubmitHandlers = (props: AutoSubmitManagerProps) => {
 
   // Function to call when LLM updates form data
   const handleLLMUpdate = React.useCallback(
-    (data: any) => {
+    (_data: any) => {
       console.log('=== handleLLMUpdate called (no validation) ===');
-      if (onChange) {
-        onChange(data);
-      }
+      // The renderer state effect publishes the complete merged form. Sending
+      // the raw LLM fragment here can temporarily replace the parent/draft
+      // with only the fields present in that response.
       setIsStateUpdated(true);
     },
-    [onChange]
+    []
   );
 
   return {

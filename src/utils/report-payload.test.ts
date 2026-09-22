@@ -32,6 +32,28 @@ describe('report payload', () => {
     expect(result.objectiveAssessment).toBeUndefined();
     expect(result.clinicalDetails.chiefComplaint).toBe('Pain');
   });
+  it('preserves first-assessment goals, dates and recommendations for the dashboard adapter', () => {
+    const result = buildReportPayload('firstAssessment', {
+      subjectiveGoals: [{ goalDetails: 'Return to football', targetDate: '2027-03-01' }],
+      objectiveGoals: [{
+        goalName: 'Knee flexion', goalCategory: 'Range of Motion',
+        unitName: 'degrees', value: '130', targetDate: '2026-11-01',
+      }],
+      recommendation: [{
+        sessionType: 'Strength and Conditioning', sessionFrequency: '2 sessions per week',
+      }],
+    }).firstAssessment;
+
+    expect(result.subjectiveGoals).toEqual([
+      { goalDetails: 'Return to football', targetDate: '2027-03-01' },
+    ]);
+    expect(result.objectiveGoals[0]).toMatchObject({
+      goalName: 'Knee flexion', value: '130', targetDate: '2026-11-01',
+    });
+    expect(result.recommendation).toEqual([{
+      sessionType: 'Strength and Conditioning', sessionFrequency: '2 sessions per week',
+    }]);
+  });
   it('normalizes AI aliases and removes fields rejected by First Assessment GraphQL inputs', () => {
     const result = buildReportPayload('firstAssessment', {
       objectiveAssessment: { tests: [{
@@ -60,6 +82,21 @@ describe('report payload', () => {
   it('rejects invalid measurements and out-of-range RPE', () => {
     expect(() => buildReportPayload('assessment', { rpe: { value: 11 } })).toThrow();
     expect(() => buildReportPayload('physio', { tests: [{ value: 'bad' }] })).toThrow();
+  });
+  it('rejects negative repetitions, exercise load and duration but permits signed clinical measurements', () => {
+    const assessment = (plan: any) => ({ plan: { plans: [plan] } });
+    expect(() => buildReportPayload('assessment', assessment({
+      set: [{ repetitions: -1, load: '20' }], duration: { value: 10 },
+    }))).toThrow('Repetitions cannot be negative');
+    expect(() => buildReportPayload('assessment', assessment({
+      set: [{ repetitions: 10, load: '-5' }], duration: { value: 10 },
+    }))).toThrow('Load cannot be negative');
+    expect(() => buildReportPayload('assessment', assessment({
+      set: [{ repetitions: 10, load: 'bodyweight' }], duration: { value: -2 },
+    }))).toThrow('Duration cannot be negative');
+    expect(buildReportPayload('assessment', {
+      objectiveAssessment: { tests: [{ testName: 'Extension', value: -5, left: -3, right: -4 }] },
+    }).assessment.objectiveAssessment.tests[0]).toMatchObject({ value: -5, left: -3, right: -4 });
   });
   it('orders saves for one appointment and recovers after failure', async () => {
     let reject!: (error: Error) => void;

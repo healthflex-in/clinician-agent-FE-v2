@@ -27,13 +27,22 @@ describe('automatic report saves', () => {
     expect(submitFormData).toHaveBeenCalledWith(expect.objectContaining({ state: { plan: { advice: 'latest' } } }));
   });
 
-  it('cancels on user edit and on unmount', async () => {
-    const { result, unmount } = renderHook(useAutoSubmitManager, { initialProps: props() });
+  it('restarts the debounce with the latest manual edit and cancels on unmount', async () => {
+    const initial = props();
+    const { result, rerender, unmount } = renderHook(useAutoSubmitManager, { initialProps: initial });
     const edit = vi.fn();
     act(() => { result.current.triggerAutoSubmit(); result.current.handleUserChange('plan.advice', 'manual', edit); });
-    await act(() => vi.advanceTimersByTimeAsync(5000));
     expect(edit).toHaveBeenCalledWith('plan.advice', 'manual');
+    rerender({ ...initial, state: { plan: { advice: 'manual' } } });
+    await act(() => vi.advanceTimersByTimeAsync(2999));
     expect(submitFormData).not.toHaveBeenCalled();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(submitFormData).toHaveBeenCalledOnce();
+    expect(submitFormData).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: { plan: { advice: 'manual' } } }),
+    );
+
+    vi.mocked(submitFormData).mockClear();
     act(() => result.current.triggerAutoSubmit());
     unmount();
     await act(() => vi.advanceTimersByTimeAsync(5000));

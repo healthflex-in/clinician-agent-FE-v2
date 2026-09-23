@@ -91,9 +91,17 @@ describe('appointment initialization', () => {
     const { result } = renderHook(useFormManagement, { initialProps: {
       patientId: 'patient', appointmentId: 'appointment', formKey: 'assessment',
     }});
-    await act(async () => {});
+    await act(async () => { await Promise.resolve(); });
 
     expect(result.current.formData.subjectiveAssessment.assessment).toBe('Unsaved latest edit');
+    expect(submitFormData).toHaveBeenCalledOnce();
+    expect(submitFormData).toHaveBeenCalledWith(expect.objectContaining({
+      state: { subjectiveAssessment: { assessment: 'Unsaved latest edit' } },
+      appointmentId: 'appointment',
+      formKey: 'assessment',
+      isAutoSubmit: true,
+    }));
+    expect(localStorage.getItem('clinician-agent-draft:appointment:assessment')).toBeNull();
   });
 
   it('clears prefetched fields and changes the renderer reset key', async () => {

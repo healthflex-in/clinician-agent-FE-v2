@@ -46,6 +46,8 @@ export const useFormManagement = ({
   const [formData, setFormData] = React.useState<any>(null);
   const latestDraft = React.useRef(formData);
   latestDraft.current = formData;
+  const [restoredDraftToSave, setRestoredDraftToSave] = React.useState<any>(null);
+  const resumedDraftSaveKey = React.useRef<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [reportId, setReportId] = React.useState<string | null>(null);
   const [patientName, setPatientName] = React.useState<string>('Patient');
@@ -87,6 +89,8 @@ export const useFormManagement = ({
     let active = true;
     const epoch = ++resetEpoch.current;
     allowBlankSaveAfterReset.current = false;
+    resumedDraftSaveKey.current = null;
+    setRestoredDraftToSave(null);
     setIsInitialLoadComplete(false);
     setReportId(null);
     setFormData(null);
@@ -314,7 +318,10 @@ export const useFormManagement = ({
           // A draft is the latest browser state when refresh interrupted the
           // debounce. Restore it after server prefill so stale server data
           // cannot overwrite the unsaved edit.
-          if (pendingDraft) setFormData(pendingDraft);
+          if (pendingDraft) {
+            setFormData(pendingDraft);
+            setRestoredDraftToSave(pendingDraft);
+          }
           setIsInitialLoadComplete(true);
         }
       }
@@ -323,6 +330,34 @@ export const useFormManagement = ({
     createInitialReport();
     return () => { active = false; };
   }, [patientId, appointmentId, toast, formKey]);
+
+  // A refresh can interrupt the debounce after the browser draft is written but
+  // before GraphQL is updated. Once initialization has restored that draft,
+  // resume the interrupted save so the Dashboard and Agent converge again.
+  React.useEffect(() => {
+    if (!isInitialLoadComplete || !reportId || !restoredDraftToSave || !appointmentId) return;
+
+    const snapshot = restoredDraftToSave;
+    const snapshotJson = JSON.stringify(snapshot);
+    const saveKey = `${appointmentId}:${formKey}:${snapshotJson}`;
+    if (resumedDraftSaveKey.current === saveKey) return;
+    resumedDraftSaveKey.current = saveKey;
+
+    void submitFormData({
+      state: snapshot,
+      appointmentId,
+      formKey,
+      toast,
+      setIsSubmitting,
+      isAutoSubmit: true,
+    }).then((saved) => {
+      if (resumedDraftSaveKey.current !== saveKey) return;
+      if (saved && JSON.stringify(latestDraft.current) === snapshotJson) {
+        clearFormDraft(appointmentId, formKey);
+      }
+      setRestoredDraftToSave(null);
+    });
+  }, [appointmentId, formKey, isInitialLoadComplete, reportId, restoredDraftToSave, toast]);
 
   // Handle form data changes
   const handleFormChange = (newFormData: any) => {

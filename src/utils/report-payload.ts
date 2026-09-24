@@ -69,8 +69,6 @@ function tests(rows: any, preserveText = false) {
       }
     }
     if (notes.length) result.comments = [result.comments, ...notes].filter(Boolean).join('; ');
-    if (result.value !== null && result.value !== undefined &&
-        (result.value === result.left || result.value === result.right)) result.value = null;
     return result;
   });
 }

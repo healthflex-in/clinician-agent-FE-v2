@@ -31,7 +31,7 @@ type UseFormManagementReturn = {
   handleFormReset: () => boolean;
   resetVersion: number;
   setFormData: (data: any) => void;
-  handleFormSubmit: () => Promise<void>;
+  handleFormSubmit: (dataOverride?: any) => Promise<void>;
   handleFormChange: (newFormData: any) => void;
 };
 
@@ -377,7 +377,7 @@ export const useFormManagement = ({
   };
 
   // Submit form data
-  const handleFormSubmit = async () => {
+  const handleFormSubmit = async (dataOverride?: any) => {
     if (!reportId || !appointmentId) {
       toast({
         title: 'Missing Information',
@@ -387,7 +387,7 @@ export const useFormManagement = ({
       return;
     }
 
-    const currentFormData = formData;
+    const currentFormData = dataOverride ?? formData;
 
     if (!currentFormData) {
       toast({

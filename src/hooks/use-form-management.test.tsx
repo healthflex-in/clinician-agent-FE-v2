@@ -151,6 +151,28 @@ describe('appointment initialization', () => {
     vi.unstubAllGlobals();
   });
 
+  it('submits the renderer snapshot supplied by the Save button', async () => {
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({
+      _id: 'existing',
+      firstAssessment: { objectiveAssessments: [{ tests: [{ testName: 'Strength', left: 9, right: 9 }] }] },
+    });
+    const { result } = renderHook(useFormManagement, {
+      initialProps: { patientId: 'patient', appointmentId: 'appointment', formKey: 'firstAssessment' },
+    });
+    await act(async () => {});
+
+    const visibleRendererState = {
+      objectiveAssessment: { tests: [{ testName: 'Strength', left: 8, right: 7 }] },
+    };
+    await act(async () => { await result.current.handleFormSubmit(visibleRendererState); });
+
+    expect(submitFormData).toHaveBeenCalledWith(expect.objectContaining({
+      state: visibleRendererState,
+      appointmentId: 'appointment',
+      formKey: 'firstAssessment',
+    }));
+  });
+
   it('blocks an untouched blank form but allows an intentional reset to be saved', async () => {
     vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({
       _id: 'existing',

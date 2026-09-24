@@ -298,8 +298,9 @@ const FormPage = () => {
                   </button>
                   <button
                     onClick={() => {
+                      const currentFormData = formRendererRef.current?.getFormData();
                       formRendererRef.current?.cancelPendingAutoSubmit();
-                      void handleFormSubmit();
+                      void handleFormSubmit(currentFormData);
                     }}
                     disabled={isSubmitting}
                     className="flex items-center gap-2 h-10 px-6 bg-stance-steel text-white text-sm font-bold rounded-xl hover:bg-stance-steel/90 active:scale-[0.98] transition-all shadow-md ring-2 ring-stance-neon ring-offset-2 ring-offset-[#F0F3F8] disabled:opacity-50"

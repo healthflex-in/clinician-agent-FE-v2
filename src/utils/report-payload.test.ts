@@ -9,7 +9,7 @@ describe('report payload', () => {
       { testName: 'Squats', value: '3x10 @ 20kg', comments: 'RPE 7/10' },
     ] } };
     const rows = buildReportPayload('firstAssessment', form).firstAssessment.objectiveAssessments[0].tests;
-    expect(rows[0]).toMatchObject({ value: null, right: 130, left: null });
+    expect(rows[0]).toMatchObject({ value: 130, right: 130, left: null });
     expect(rows[1]).toMatchObject({ value: null, right: null, comments: 'value: Mild; right: Mild' });
     expect(rows[2]).toMatchObject({ value: null, comments: 'RPE 7/10; value: 3x10 @ 20kg' });
     expect(form.objectiveAssessment.tests[1].value).toBe('Mild');

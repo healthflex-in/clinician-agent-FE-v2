@@ -162,7 +162,9 @@ describe('appointment initialization', () => {
     await act(async () => {});
 
     const visibleRendererState = {
-      objectiveAssessment: { tests: [{ testName: 'Strength', left: 8, right: 7 }] },
+      objectiveAssessment: {
+        tests: [{ testName: 'Strength', unitName: 'kg', value: 9, left: 10, right: 10 }],
+      },
     };
     await act(async () => { await result.current.handleFormSubmit(visibleRendererState); });
 
@@ -171,6 +173,8 @@ describe('appointment initialization', () => {
       appointmentId: 'appointment',
       formKey: 'firstAssessment',
     }));
+    expect(vi.mocked(submitFormData).mock.calls.at(-1)?.[0].state)
+      .toEqual(visibleRendererState);
   });
 
   it('blocks an untouched blank form but allows an intentional reset to be saved', async () => {

@@ -27,8 +27,8 @@ export interface FormRendererProps {
 // Action types for the reducer
 export type FormAction =
   | { type: 'UPDATE_FIELD'; path: string; value: any }
-  | { type: 'ADD_ARRAY_ITEM'; path: string; template: any }
-  | { type: 'REMOVE_ARRAY_ITEM'; path: string; index: number }
+  | { type: 'ADD_ARRAY_ITEM'; arrayPath: string; item: any }
+  | { type: 'REMOVE_ARRAY_ITEM'; arrayPath: string; itemIndex: number }
   | { type: 'UPDATE_ARRAY_ITEM'; itemPath: string; value: any }
   | {
       type: 'MOVE_ARRAY_ITEM';
@@ -43,6 +43,8 @@ export type FormAction =
 
 // Type for the form renderer ref
 export interface FormRendererRef {
+  getFormData: () => any;
+  cancelPendingAutoSubmit: () => void;
   updateFormWithLLMData: (llmData: any) => void;
   clearPlanTranscription: (planPath: string) => void;
   clearSectionTranscription: (sectionPath: string) => void;

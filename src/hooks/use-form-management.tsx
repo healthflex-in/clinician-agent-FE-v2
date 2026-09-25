@@ -1,13 +1,19 @@
+import { ToastAction } from '@/components/ui/toast';
+import formSchemas from '@/schemas/form-schemas';
+import { defaultStateFromSchema, isFormDataEmpty } from '@/utils/schema-utils';
+import { assessmentToForm, firstAssessmentToForm, hasPersistedAgentChanges } from '@/utils/first-assessment';
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { graphqlRequest } from '@/utils/graphql-client';
+import { submitFormData } from '@/utils/form-submission';
 import {
   createAgentReport,
   fetchUserById,
+  fetchFirstAssessmentReport,
   fetchReportByAppointment,
 } from '../utils/api';
 import { mapRecordsToForm } from '@/utils/records-to-form';
 import { normalizeObjectiveAssessment } from '@/utils/form-renderer.utils';
+import { clearFormDraft, loadFormDraft, saveFormDraft } from '@/utils/form-draft';
 
 type UseFormManagementProps = {
   formKey: string;
@@ -22,9 +28,10 @@ type UseFormManagementReturn = {
   reportId: string | null;
   isInitialLoadComplete: boolean;
 
-  handleFormReset: () => void;
+  handleFormReset: () => boolean;
+  resetVersion: number;
   setFormData: (data: any) => void;
-  handleFormSubmit: () => Promise<void>;
+  handleFormSubmit: (dataOverride?: any) => Promise<void>;
   handleFormChange: (newFormData: any) => void;
 };
 
@@ -33,7 +40,14 @@ export const useFormManagement = ({
   patientId,
   appointmentId,
 }: UseFormManagementProps): UseFormManagementReturn => {
+  const resetEpoch = React.useRef(0);
+  const allowBlankSaveAfterReset = React.useRef(false);
+  const [resetVersion, setResetVersion] = React.useState(0);
   const [formData, setFormData] = React.useState<any>(null);
+  const latestDraft = React.useRef(formData);
+  latestDraft.current = formData;
+  const [restoredDraftToSave, setRestoredDraftToSave] = React.useState<any>(null);
+  const resumedDraftSaveKey = React.useRef<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [reportId, setReportId] = React.useState<string | null>(null);
   const [patientName, setPatientName] = React.useState<string>('Patient');
@@ -72,6 +86,15 @@ export const useFormManagement = ({
 
   // MAIN: Create initial report (only API call we need to wait for)
   React.useEffect(() => {
+    let active = true;
+    const epoch = ++resetEpoch.current;
+    allowBlankSaveAfterReset.current = false;
+    resumedDraftSaveKey.current = null;
+    setRestoredDraftToSave(null);
+    setIsInitialLoadComplete(false);
+    setReportId(null);
+    setFormData(null);
+    const pendingDraft = loadFormDraft(appointmentId, formKey);
     const createInitialReport = async () => {
       if (!patientId || !appointmentId) {
         setFormData(null); // null means use schema defaults
@@ -83,6 +106,17 @@ export const useFormManagement = ({
         console.log('Starting createAgentReport API call...');
         const startTime = Date.now();
 
+        if (formKey === 'firstAssessment') {
+          const existing = await fetchFirstAssessmentReport(patientId, appointmentId);
+          if (!active || epoch !== resetEpoch.current) return;
+          if (existing?._id) {
+            const restored = firstAssessmentToForm(existing.firstAssessment);
+            setReportId(existing._id);
+            setFormData(restored);
+            return;
+          }
+        }
+
         const centerId =
           localStorage.getItem('centerId') || '67fe35f25e42152fb5185a5e';
         const variables = {
@@ -91,7 +125,8 @@ export const useFormManagement = ({
           appointment: appointmentId,
         };
 
-        const result = await createAgentReport(variables);
+        const result = await createAgentReport(variables, formKey);
+        if (!active || epoch !== resetEpoch.current) return;
         console.log(
           `API response received in ${Date.now() - startTime}ms:`,
           result
@@ -108,14 +143,15 @@ export const useFormManagement = ({
             description: 'New report initialized successfully',
           });
 
-          // PRIMARY populate path: the clinician's real data lives in
-          // Report.records (createAgentReport returns an empty working copy).
-          // Fetch the records for this appointment and map them into the form
-          // schema. This works for every patient because it reads that
-          // patient's own report. Only assessment/firstAssessment forms have a
-          // records mapping; other form types fall through to the legacy logic.
+          // Prefer a previously edited Agent draft. Report.records is only the
+          // prefill fallback for a new blank working copy; otherwise it can be
+          // older than the Agent draft and overwrite the clinician's saved edit.
           let recordsPopulated = false;
-          if (formKey === 'assessment' || formKey === 'firstAssessment') {
+          if (formKey === 'assessment' && hasPersistedAgentChanges(result.createAgentReport)) {
+            setFormData(assessmentToForm(result.createAgentReport.assessment));
+            recordsPopulated = true;
+          }
+          if (!recordsPopulated && (formKey === 'assessment' || formKey === 'firstAssessment')) {
             try {
               const report = await fetchReportByAppointment(
                 patientId,
@@ -251,7 +287,9 @@ export const useFormManagement = ({
               `Setting ${formKey} form data:`,
               result.createAgentReport[formKey]
             );
-            setFormData(result.createAgentReport[formKey]);
+            setFormData(formKey === "firstAssessment"
+              ? firstAssessmentToForm(result.createAgentReport[formKey])
+              : result.createAgentReport[formKey]);
           } else {
             console.log(
               'No data returned for this form key, using schema defaults'
@@ -265,6 +303,7 @@ export const useFormManagement = ({
           setFormData(null);
         }
       } catch (error) {
+        if (!active || epoch !== resetEpoch.current) return;
         console.error('Error creating initial report:', error);
         // On error, set to null so form can still load with schema defaults
         setFormData(null);
@@ -275,16 +314,55 @@ export const useFormManagement = ({
         });
       } finally {
         console.log('Form initialization complete');
-        setIsInitialLoadComplete(true);
+        if (active && epoch === resetEpoch.current) {
+          // A draft is the latest browser state when refresh interrupted the
+          // debounce. Restore it after server prefill so stale server data
+          // cannot overwrite the unsaved edit.
+          if (pendingDraft) {
+            setFormData(pendingDraft);
+            setRestoredDraftToSave(pendingDraft);
+          }
+          setIsInitialLoadComplete(true);
+        }
       }
     };
 
     createInitialReport();
+    return () => { active = false; };
   }, [patientId, appointmentId, toast, formKey]);
+
+  // A refresh can interrupt the debounce after the browser draft is written but
+  // before GraphQL is updated. Once initialization has restored that draft,
+  // resume the interrupted save so the Dashboard and Agent converge again.
+  React.useEffect(() => {
+    if (!isInitialLoadComplete || !reportId || !restoredDraftToSave || !appointmentId) return;
+
+    const snapshot = restoredDraftToSave;
+    const snapshotJson = JSON.stringify(snapshot);
+    const saveKey = `${appointmentId}:${formKey}:${snapshotJson}`;
+    if (resumedDraftSaveKey.current === saveKey) return;
+    resumedDraftSaveKey.current = saveKey;
+
+    void submitFormData({
+      state: snapshot,
+      appointmentId,
+      formKey,
+      toast,
+      setIsSubmitting,
+      isAutoSubmit: true,
+    }).then((saved) => {
+      if (resumedDraftSaveKey.current !== saveKey) return;
+      if (saved && JSON.stringify(latestDraft.current) === snapshotJson) {
+        clearFormDraft(appointmentId, formKey);
+      }
+      setRestoredDraftToSave(null);
+    });
+  }, [appointmentId, formKey, isInitialLoadComplete, reportId, restoredDraftToSave, toast]);
 
   // Handle form data changes
   const handleFormChange = (newFormData: any) => {
     setFormData(newFormData);
+    if (isInitialLoadComplete) saveFormDraft(appointmentId, formKey, newFormData);
 
     try {
       const savedReport = localStorage.getItem('agentReport');
@@ -299,7 +377,7 @@ export const useFormManagement = ({
   };
 
   // Submit form data
-  const handleFormSubmit = async () => {
+  const handleFormSubmit = async (dataOverride?: any) => {
     if (!reportId || !appointmentId) {
       toast({
         title: 'Missing Information',
@@ -309,7 +387,7 @@ export const useFormManagement = ({
       return;
     }
 
-    const currentFormData = formData;
+    const currentFormData = dataOverride ?? formData;
 
     if (!currentFormData) {
       toast({
@@ -320,132 +398,42 @@ export const useFormManagement = ({
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      const mutation = `
-        mutation UpdateAgentReport($appointmentId: ObjectID!, $input: UpdateAgentReportInput!) {
-          updateAgentReport(appointmentId: $appointmentId, input: $input) {
-            _id
-            createdAt
-            updatedAt
-            version
-            isActive
-            isFilledCompletely
-          }
-        }
-      `;
-
-      const formDataCopy = JSON.parse(JSON.stringify(currentFormData));
-
-      const processData = (obj: any): any => {
-        if (!obj || typeof obj !== 'object') return obj;
-
-        if (Array.isArray(obj)) {
-          return obj.map((item) => processData(item));
-        }
-
-        const result: any = {};
-        for (const key in obj) {
-          if (key === 'record') continue;
-
-          if (key === 'load' && typeof obj[key] === 'number') {
-            result[key] = String(obj[key]);
-          } else if (typeof obj[key] === 'object') {
-            result[key] = processData(obj[key]);
-          } else {
-            result[key] = obj[key];
-          }
-        }
-        return result;
-      };
-
-      // FIXED: Prepare input based on form type
-      let input: any = {};
-
-      if (formKey === 'assessment') {
-        // For assessment forms, wrap data under 'assessment' key and convert set to set
-        const processedFormData = processData(formDataCopy);
-
-        // Convert 'set' arrays back to 'set' arrays for API compatibility
-        if (processedFormData.plan && processedFormData.plan.plans) {
-          processedFormData.plan.plans = processedFormData.plan.plans.map(
-            (plan: any) => {
-              if (plan.set && Array.isArray(plan.set)) {
-                const { set, ...rest } = plan;
-                return {
-                  ...rest,
-                  set: set, // Convert 'set' back to 'set' for API
-                };
-              }
-              return plan;
-            }
-          );
-        }
-
-        input.assessment = processedFormData;
-      } else if (formKey === 'snc') {
-        // For SNC forms, convert sets to set and wrap under snc key
-        const processedFormData = processData(formDataCopy);
-
-        if (processedFormData.plans) {
-          processedFormData.plans = processedFormData.plans.map((plan: any) => {
-            if (plan.set && Array.isArray(plan.set)) {
-              const { set, ...rest } = plan;
-              return {
-                ...rest,
-                set: set, // Convert 'set' back to 'set' for API
-              };
-            }
-            return plan;
-          });
-        }
-
-        input.snc = processedFormData;
-      } else {
-        // For other form types, use as is
-        input[formKey] = processData(formDataCopy);
-      }
-
-      const variables = {
-        appointmentId,
-        input,
-      };
-
-      console.log('Submitting with variables:', variables);
-
-      await graphqlRequest(mutation, variables);
-
+    if (isFormDataEmpty(currentFormData) && !allowBlankSaveAfterReset.current) {
       toast({
-        title: 'Form Submitted',
-        description: 'Your form has been successfully submitted',
-      });
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      toast({
-        title: 'Submission Failed',
-        description: 'There was an error submitting your form',
+        title: 'Assessment Details Required',
+        description: 'Please add assessment details before saving.',
         variant: 'destructive',
       });
-    } finally {
-      setIsSubmitting(false);
+      return;
+    }
+
+    const saved = await submitFormData({
+      state: currentFormData, appointmentId, formKey, toast, setIsSubmitting,
+    });
+    if (saved) {
+      allowBlankSaveAfterReset.current = false;
+      clearFormDraft(appointmentId, formKey);
     }
   };
 
   // Reset form
   const handleFormReset = () => {
-    if (
-      confirm(
-        'Are you sure you want to reset this form? All your data will be lost.'
-      )
-    ) {
-      setFormData(null);
+    {
+      const previous = formData;
+      const resetAt = resetEpoch.current + 1;
+      resetEpoch.current += 1;
+      allowBlankSaveAfterReset.current = true;
+      const blank = defaultStateFromSchema(formSchemas[formKey as keyof typeof formSchemas] || formSchemas.assessment);
+      setFormData(blank);
+      saveFormDraft(appointmentId, formKey, blank);
+      setResetVersion(version => version + 1);
+      setIsInitialLoadComplete(true);
 
       try {
         const savedReport = localStorage.getItem('agentReport');
         if (savedReport) {
           const reportData = JSON.parse(savedReport);
-          reportData[formKey] = null;
+          reportData[formKey] = blank;
           localStorage.setItem('agentReport', JSON.stringify(reportData));
         }
       } catch (error) {
@@ -454,13 +442,24 @@ export const useFormManagement = ({
 
       toast({
         title: 'Form Reset',
-        description: 'All form data has been reset',
+        description: 'All fields cleared. Save to keep this change after refresh.',
+        action: <ToastAction altText="Undo clearing the form" onClick={() => {
+          // An old toast must not overwrite edits or a later reset.
+          if (resetEpoch.current !== resetAt || JSON.stringify(latestDraft.current) !== JSON.stringify(blank)) return;
+          resetEpoch.current += 1;
+          allowBlankSaveAfterReset.current = false;
+          setFormData(previous);
+          saveFormDraft(appointmentId, formKey, previous);
+          setResetVersion(version => version + 1);
+        }}>Undo</ToastAction>,
       });
+      return true;
     }
   };
 
   return {
     formData,
+    resetVersion,
     isSubmitting,
     reportId,
     patientName,

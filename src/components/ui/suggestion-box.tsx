@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { X, MessageSquare } from 'lucide-react';
 import { themeColors } from '@/styles/theme';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface SuggestionBoxProps {
-  suggestions: string;
+  suggestions: string | string[] | null;
   onClose: () => void;
   autoCloseDelay?: number;
   maxLines?: number;
@@ -18,39 +18,26 @@ const SuggestionBox: React.FC<SuggestionBoxProps> = ({
   maxLines = 2,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
-  const [parsedSuggestions, setParsedSuggestions] = useState<string[]>([]);
-
-  // Parse the suggestions when they change
-  useEffect(() => {
-    if (typeof suggestions === 'string') {
+  const parsedSuggestions = useMemo(() => {
+    let values: unknown = suggestions;
+    if (typeof values === 'string') {
+      const text = values.trim();
+      if (!text) return [];
       try {
-        // Try to extract JSON array if it's in markdown code format
-        if (suggestions.includes('[') && suggestions.includes(']')) {
-          const jsonStart = suggestions.indexOf('[');
-          const jsonEnd = suggestions.lastIndexOf(']') + 1;
-          if (jsonStart >= 0 && jsonEnd > jsonStart) {
-            const jsonContent = suggestions.substring(jsonStart, jsonEnd);
-            const parsed = JSON.parse(jsonContent);
-            if (Array.isArray(parsed)) {
-              // Limit to the first two suggestions
-              setParsedSuggestions(parsed.slice(0, 2));
-              return;
-            }
-          }
-        }
-        // If not parseable as JSON array, use the raw string
-        setParsedSuggestions([suggestions]);
-      } catch (e) {
-        console.error('Error parsing suggestions:', e);
-        setParsedSuggestions([suggestions]);
-      }
-    } else {
-      setParsedSuggestions([]);
+        const start = text.indexOf('[');
+        const end = text.lastIndexOf(']');
+        values = start >= 0 && end > start ? JSON.parse(text.slice(start, end + 1)) : [text];
+      } catch { values = [text]; }
     }
+    return Array.isArray(values)
+      ? values.filter((value): value is string => typeof value === 'string' && Boolean(value.trim())).slice(0, 3)
+      : [];
   }, [suggestions]);
 
   // Auto-close after delay
   useEffect(() => {
+    if (!parsedSuggestions.length) return;
+    setIsVisible(true);
     if (autoCloseDelay > 0) {
       const timer = setTimeout(() => {
         setIsVisible(false);
@@ -59,13 +46,15 @@ const SuggestionBox: React.FC<SuggestionBoxProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [autoCloseDelay, onClose]);
+  }, [autoCloseDelay, onClose, parsedSuggestions]);
 
   // Handle manual close
   const handleClose = () => {
     setIsVisible(false);
     setTimeout(onClose, 300); // Wait for animation to complete
   };
+
+  if (!parsedSuggestions.length) return null;
 
   return (
     <AnimatePresence>

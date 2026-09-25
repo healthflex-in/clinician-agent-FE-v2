@@ -31,6 +31,21 @@ export function defaultStateFromSchema(schema: any): any {
   return result;
 }
 
+/**
+ * Returns true when a form contains only schema placeholders/defaults.
+ * Numeric zero is a default by itself; a zero measurement is still meaningful
+ * when its row also contains a test name or another populated field.
+ */
+export function isFormDataEmpty(value: any): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (typeof value === 'number') return value === 0 || !Number.isFinite(value);
+  if (typeof value === 'boolean') return value === false;
+  if (Array.isArray(value)) return value.every(isFormDataEmpty);
+  if (typeof value === 'object') return Object.values(value).every(isFormDataEmpty);
+  return false;
+}
+
 export function setNestedValue(obj: any, path: string, value: any): void {
   const keys = path.split('.');
   let current = obj;
@@ -231,4 +246,20 @@ export function findDifferences(
   }
 
   return differences;
+}
+
+/** Compare only values supplied by an AI response; omitted form sections are unchanged. */
+export function findProvidedDifferences(before: any, incoming: any, path = ''): string[] {
+  if (incoming === null || typeof incoming !== 'object') {
+    return before !== incoming ? [path] : [];
+  }
+  if (Array.isArray(incoming)) {
+    if (!Array.isArray(before)) return [path];
+    return incoming.flatMap((item, index) =>
+      findProvidedDifferences(before[index], item, path ? `${path}.${index}` : String(index)));
+  }
+  return Object.keys(incoming).flatMap(key => {
+    const keyPath = path ? `${path}.${key}` : key;
+    return findProvidedDifferences(before?.[key], incoming[key], keyPath);
+  });
 }

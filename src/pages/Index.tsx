@@ -152,19 +152,19 @@ const Index = () => {
     e.preventDefault();
 
     if (!centerId) {
-      toast({ title: 'Center Required', description: 'Please select a center first', variant: 'destructive' });
+      toast({ title: 'Select a center to start', description: 'Choose a center, then select your patient, appointment and form type.', variant: 'destructive' });
       return;
     }
     if (!patientId) {
-      toast({ title: 'Patient Required', description: 'Please select a patient', variant: 'destructive' });
+      toast({ title: 'Select a patient to start', description: 'Search for your patient and select them from the results.', variant: 'destructive' });
       return;
     }
     if (!appointmentId) {
-      toast({ title: 'Appointment Required', description: 'Please select an appointment', variant: 'destructive' });
+      toast({ title: 'Select an appointment to start', description: loadingEvents ? 'Appointments are loading. Please wait, then select a visit.' : events.length ? 'Choose the visit you want to document from the Appointment dropdown.' : 'No appointments are available for this patient. Check their appointments on the dashboard.', variant: 'destructive' });
       return;
     }
-    if (!formKey) {
-      toast({ title: 'Form Selection Required', description: 'Please select a form type', variant: 'destructive' });
+    if (!formKey || !Object.prototype.hasOwnProperty.call(formSchemas, formKey)) {
+      toast({ title: 'Select a form type to start', description: 'Choose First Assessment or Assessment for this visit.', variant: 'destructive' });
       return;
     }
 

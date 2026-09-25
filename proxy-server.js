@@ -11,10 +11,7 @@ const apiProxy = createProxyMiddleware({
     '^/api/graphql': '/graphql',
   },
   onProxyReq: (proxyReq, req) => {
-    proxyReq.setHeader(
-      'x-api-key',
-      '192090f41c5eac71ac2ff52e3ae4b4b80f4a083d71b64f704c0101b5b5d03e20'
-    );
+    proxyReq.setHeader('x-api-key', process.env.VITE_API_KEY || '');
 
     const orgId = req.headers['x-organization-id'];
     if (orgId) {

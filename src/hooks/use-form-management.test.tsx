@@ -1,0 +1,202 @@
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useFormManagement } from './use-form-management';
+import { createAgentReport, fetchFirstAssessmentReport, fetchReportByAppointment } from '../utils/api';
+import { submitFormData } from '@/utils/form-submission';
+const toast = vi.fn();
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
+vi.mock('../utils/api', () => ({
+  createAgentReport: vi.fn(),
+  fetchFirstAssessmentReport: vi.fn(async () => null),
+  fetchReportByAppointment: vi.fn(async () => null),
+  fetchUserById: vi.fn(async () => ({})),
+}));
+vi.mock('@/utils/form-submission', () => ({ submitFormData: vi.fn(async () => true) }));
+
+describe('appointment initialization', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    toast.mockClear();
+    vi.mocked(submitFormData).mockClear().mockResolvedValue(true);
+    vi.mocked(createAgentReport).mockReset();
+    vi.mocked(fetchFirstAssessmentReport).mockReset().mockResolvedValue(null);
+    vi.mocked(fetchReportByAppointment).mockReset().mockResolvedValue(null);
+  });
+  it('ignores an old appointment response after navigation', async () => {
+    let oldResponse!: (value: any) => void;
+    vi.mocked(createAgentReport).mockImplementationOnce(() => new Promise(resolve => { oldResponse = resolve; }))
+      .mockResolvedValueOnce({ createAgentReport: { _id: 'new-report', firstAssessment: { clinicalDetails: { chiefComplaint: 'new' } } } });
+    const { result, rerender } = renderHook(useFormManagement, { initialProps: {
+      patientId: 'patient', appointmentId: 'old', formKey: 'firstAssessment',
+    }});
+    await act(async () => { rerender({ patientId: 'patient', appointmentId: 'new', formKey: 'firstAssessment' }); });
+    expect(result.current.reportId).toBe('new-report');
+    await act(async () => { oldResponse({ createAgentReport: { _id: 'old-report', firstAssessment: {} } }); });
+    expect(result.current.reportId).toBe('new-report');
+    expect(result.current.formData.clinicalDetails.chiefComplaint).toBe('new');
+  });
+  it('loads an existing First Assessment without creating it again', async () => {
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({ _id: 'existing', firstAssessment: {
+      clinicalDetails: { chiefComplaint: 'Pain' }, objectiveAssessments: [{ tests: [{ value: 0 }] }],
+    }});
+    const { result } = renderHook(useFormManagement, { initialProps: {
+      patientId: 'patient', appointmentId: 'appointment', formKey: 'firstAssessment',
+    }});
+    await act(async () => {});
+    expect(createAgentReport).not.toHaveBeenCalled();
+    expect(result.current.reportId).toBe('existing');
+    expect(result.current.formData.objectiveAssessment.tests[0].value).toBe(0);
+    expect(result.current.formData.objectiveAssessments).toBeUndefined();
+  });
+
+  it('keeps a saved Agent edit instead of overwriting it with older dashboard records', async () => {
+    vi.mocked(createAgentReport).mockResolvedValue({
+      createAgentReport: {
+        _id: 'agent-report',
+        version: 2,
+        assessment: {
+          subjectiveAssessment: { assessment: 'Latest Agent edit' },
+          objectiveAssessment: { tests: [] },
+          plan: { advice: '', plans: [] },
+          rpe: { value: 0 },
+        },
+      },
+    });
+    vi.mocked(fetchReportByAppointment).mockResolvedValue({
+      isFirstAssessment: false,
+      records: { subjectiveAssessment: { assessment: 'Old dashboard value' } },
+    });
+
+    const { result } = renderHook(useFormManagement, { initialProps: {
+      patientId: 'patient', appointmentId: 'appointment', formKey: 'assessment',
+    }});
+    await act(async () => {});
+
+    expect(result.current.formData.subjectiveAssessment.assessment).toBe('Latest Agent edit');
+    expect(fetchReportByAppointment).not.toHaveBeenCalled();
+  });
+
+  it('restores the latest local draft when refresh happened before autosave', async () => {
+    localStorage.setItem('clinician-agent-draft:appointment:assessment', JSON.stringify({
+      savedAt: Date.now(),
+      data: { subjectiveAssessment: { assessment: 'Unsaved latest edit' } },
+    }));
+    vi.mocked(createAgentReport).mockResolvedValue({
+      createAgentReport: {
+        _id: 'agent-report', version: 2,
+        assessment: { subjectiveAssessment: { assessment: 'Older server edit' } },
+      },
+    });
+
+    const { result } = renderHook(useFormManagement, { initialProps: {
+      patientId: 'patient', appointmentId: 'appointment', formKey: 'assessment',
+    }});
+    await act(async () => { await Promise.resolve(); });
+
+    expect(result.current.formData.subjectiveAssessment.assessment).toBe('Unsaved latest edit');
+    expect(submitFormData).toHaveBeenCalledOnce();
+    expect(submitFormData).toHaveBeenCalledWith(expect.objectContaining({
+      state: { subjectiveAssessment: { assessment: 'Unsaved latest edit' } },
+      appointmentId: 'appointment',
+      formKey: 'assessment',
+      isAutoSubmit: true,
+    }));
+    expect(localStorage.getItem('clinician-agent-draft:appointment:assessment')).toBeNull();
+  });
+
+  it('clears prefetched fields and changes the renderer reset key', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({ _id: 'existing', firstAssessment: {
+      clinicalDetails: { chiefComplaint: 'Pain' }, objectiveAssessments: [{ tests: [{testName:'Old squat',value:20}] }],
+    }});
+    const { result } = renderHook(useFormManagement, { initialProps: {
+      patientId:'patient', appointmentId:'appointment', formKey:'firstAssessment',
+    }});
+    await act(async () => {});
+    act(() => { expect(result.current.handleFormReset()).toBe(true); });
+    expect(result.current.resetVersion).toBe(1);
+    expect(result.current.reportId).toBe('existing');
+    expect(result.current.formData.clinicalDetails.chiefComplaint).toBe('');
+    expect(result.current.formData.objectiveAssessment.tests[0].testName).toBe('');
+    expect(result.current.formData.subjectiveAssessments[0].conclusion).toBe('');
+    vi.unstubAllGlobals();
+  });
+
+  it('does not let a late prefetch undo reset', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    let resolve!: (value:any) => void;
+    vi.mocked(fetchFirstAssessmentReport).mockImplementation(() => new Promise(done => { resolve=done; }));
+    const { result } = renderHook(useFormManagement, { initialProps: {
+      patientId:'patient',appointmentId:'appointment',formKey:'firstAssessment',
+    }});
+    act(() => { result.current.handleFormReset(); });
+    await act(async () => { resolve({ _id:'existing',firstAssessment:{clinicalDetails:{chiefComplaint:'Old'}} }); });
+    expect(result.current.formData.clinicalDetails.chiefComplaint).toBe('');
+    expect(result.current.isInitialLoadComplete).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('clears immediately without depending on a browser dialog and supports Undo', async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal('confirm', confirm);
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({ _id:'existing', firstAssessment:{clinicalDetails:{chiefComplaint:'Pain'}} });
+    const { result } = renderHook(useFormManagement, { initialProps:{patientId:'p',appointmentId:'a',formKey:'firstAssessment'} });
+    await act(async () => {});
+    act(() => { expect(result.current.handleFormReset()).toBe(true); });
+    expect(confirm).not.toHaveBeenCalled();
+    expect(result.current.formData.clinicalDetails.chiefComplaint).toBe('');
+    const resetToast = toast.mock.calls.filter(([arg]) => arg.title === 'Form Reset').at(-1)![0];
+    act(() => resetToast.action.props.onClick());
+    expect(result.current.formData.clinicalDetails.chiefComplaint).toBe('Pain');
+    vi.unstubAllGlobals();
+  });
+
+  it('submits the renderer snapshot supplied by the Save button', async () => {
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({
+      _id: 'existing',
+      firstAssessment: { objectiveAssessments: [{ tests: [{ testName: 'Strength', left: 9, right: 9 }] }] },
+    });
+    const { result } = renderHook(useFormManagement, {
+      initialProps: { patientId: 'patient', appointmentId: 'appointment', formKey: 'firstAssessment' },
+    });
+    await act(async () => {});
+
+    const visibleRendererState = {
+      objectiveAssessment: {
+        tests: [{ testName: 'Strength', unitName: 'kg', value: 9, left: 10, right: 10 }],
+      },
+    };
+    await act(async () => { await result.current.handleFormSubmit(visibleRendererState); });
+
+    expect(submitFormData).toHaveBeenCalledWith(expect.objectContaining({
+      state: visibleRendererState,
+      appointmentId: 'appointment',
+      formKey: 'firstAssessment',
+    }));
+    expect(vi.mocked(submitFormData).mock.calls.at(-1)?.[0].state)
+      .toEqual(visibleRendererState);
+  });
+
+  it('blocks an untouched blank form but allows an intentional reset to be saved', async () => {
+    vi.mocked(fetchFirstAssessmentReport).mockResolvedValue({
+      _id: 'existing',
+      firstAssessment: {},
+    });
+    const { result } = renderHook(useFormManagement, {
+      initialProps: { patientId: 'patient', appointmentId: 'appointment', formKey: 'firstAssessment' },
+    });
+    await act(async () => {});
+
+    await act(async () => { await result.current.handleFormSubmit(); });
+    expect(submitFormData).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Assessment Details Required',
+      variant: 'destructive',
+    }));
+
+    act(() => { result.current.handleFormReset(); });
+    await act(async () => { await result.current.handleFormSubmit(); });
+    expect(submitFormData).toHaveBeenCalledOnce();
+  });
+
+});

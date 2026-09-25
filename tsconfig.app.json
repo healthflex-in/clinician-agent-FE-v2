@@ -27,5 +27,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "proxy-server.js"]
+  "include": ["src", "proxy-server.js"],
+  "exclude": ["src/pages/legacy", "legacy"]
 }

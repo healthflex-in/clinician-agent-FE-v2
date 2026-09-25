@@ -134,7 +134,6 @@ export const FormSection: React.FC<FormSectionProps> = ({
         isWebSocketConnected={isConnected}
         activeSectionPath={activeSectionPath}
         onChange={onFormChange}
-        onLLMUpdate={onFormChange}
         onAudioRecorded={onAudioRecorded}
         onRecordingStop={onRecordingStop}
         onRecordingStart={onRecordingStart}

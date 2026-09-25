@@ -98,22 +98,6 @@ export const formReducer = (
       return action.data;
 
     case 'MERGE_LLM_DATA': {
-      // Track differences between state and new data
-      const differences = findDifferences(state, action.data);
-
-      if (action.source === 'llm' && differences.length > 0) {
-        setLlmUpdatedFields((prev) => {
-          const newSet = new Set(prev);
-          differences.forEach((field) => newSet.add(field));
-          return newSet;
-        });
-
-        toast({
-          title: 'Form Updated by AI',
-          description: `${differences.length} field(s) were updated`,
-        });
-      }
-
       // Deep merge function - merge data recursively
       const mergeDeep = (target: any, source: any): any => {
         if (typeof source !== 'object' || source === null) return target;

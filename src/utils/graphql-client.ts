@@ -61,6 +61,7 @@ export async function graphqlRequest<T = any>(
         Origin: window.location.origin,
       },
       mode: 'cors',
+      cache: 'no-store',
       body: JSON.stringify({ query, variables }),
     });
 

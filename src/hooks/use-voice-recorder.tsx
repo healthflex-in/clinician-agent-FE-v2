@@ -19,6 +19,7 @@ export const useVoiceRecorder = ({
   microphonePermission,
 }: UseVoiceRecorderProps) => {
   const { toast } = useToast();
+  const audioUploadEnabled = import.meta.env.VITE_ENABLE_AUDIO_UPLOAD === 'true';
 
   const [
     hasProcessedCurrentTranscription,
@@ -150,13 +151,14 @@ export const useVoiceRecorder = ({
       }),
   });
 
-  // Connect to WebSocket when permission is granted
+  // Upload testing does not require microphone permission, but it uses the
+  // same authenticated WebSocket processing path as a live recording.
   React.useEffect(() => {
-    if (microphonePermission !== 'granted') return;
+    if (microphonePermission !== 'granted' && !audioUploadEnabled) return;
 
     connect();
     return () => disconnect();
-  }, [connect, disconnect, microphonePermission]);
+  }, [audioUploadEnabled, connect, disconnect, microphonePermission]);
 
   const resetSession = React.useCallback(() => {
     disconnect(); // Detach old socket callbacks before discarding any response.
@@ -172,8 +174,8 @@ export const useVoiceRecorder = ({
     setGlobalRecordingState(false);
     setRecordingStates({});
     setAudioRecorderKey(key => key + 1);
-    if (microphonePermission === 'granted') connect();
-  }, [disconnect, connect, microphonePermission, setSuggestions, setTranscription, resetProcessingSession]);
+    if (microphonePermission === 'granted' || audioUploadEnabled) connect();
+  }, [audioUploadEnabled, disconnect, connect, microphonePermission, setSuggestions, setTranscription, resetProcessingSession]);
 
   // SIMPLE TRANSCRIPTION ROUTING - This is the key fix
   React.useEffect(() => {

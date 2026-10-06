@@ -8,6 +8,7 @@ services:
         VITE_WS_URL: ${VITE_WS_URL:?Set VITE_WS_URL in .env}
         VITE_API_KEY: ${VITE_API_KEY:?Set VITE_API_KEY in .env}
         VITE_WS_API_KEY: ${VITE_WS_API_KEY:?Set VITE_WS_API_KEY in .env}
+        VITE_ENABLE_AUDIO_UPLOAD: ${VITE_ENABLE_AUDIO_UPLOAD:-false}
     image: clinician-agent-frontend-uat:latest
     restart: unless-stopped
     ports:

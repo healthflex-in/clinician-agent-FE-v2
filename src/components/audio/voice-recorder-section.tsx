@@ -1,8 +1,9 @@
 import React from 'react';
-import { ArrowRight, WifiOff, MicOff } from 'lucide-react';
+import { ArrowRight, WifiOff, MicOff, Upload } from 'lucide-react';
 
 import SuggestionBox from '@/components/ui/suggestion-box';
 import AudioRecorder from '@/components/audio/audio-recorder';
+import { useToast } from '@/hooks/use-toast';
 
 type VoiceRecorderSectionProps = {
   suggestions: any;
@@ -45,6 +46,9 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
   onProcessTranscription,
   onGlobalTranscriptionChange,
 }) => {
+  const { toast } = useToast();
+  const audioUploadEnabled = import.meta.env.VITE_ENABLE_AUDIO_UPLOAD === 'true';
+  const uploadInputRef = React.useRef<HTMLInputElement>(null);
   const isRecorderDisabled = microphonePermission !== 'granted' || !isConnected || isProcessing;
   const isProcessButtonDisabled =
     isProcessing ||
@@ -52,7 +56,30 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
     !isConnected ||
     recordingMode === 'section' ||
     currentlyProcessingPath !== null ||
-    microphonePermission !== 'granted';
+    (microphonePermission !== 'granted' && !audioUploadEnabled);
+
+  const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const supportedExtension = /\.(mp3|wav|m4a|mp4|mpeg|ogg|webm)$/i.test(file.name);
+    if (!file.type.startsWith('audio/') && !supportedExtension) {
+      toast({ variant: 'destructive', title: 'Invalid audio file', description: 'Select an MP3, WAV, M4A, OGG or WebM audio file.' });
+      return;
+    }
+    const maximumBytes = 20 * 1024 * 1024;
+    if (file.size > maximumBytes) {
+      toast({ variant: 'destructive', title: 'Audio file is too large', description: 'The maximum upload size is 20 MB.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') onAudioEncoded(reader.result);
+    };
+    reader.onerror = () => toast({ variant: 'destructive', title: 'Audio upload failed', description: 'The selected file could not be read.' });
+    reader.readAsDataURL(file);
+  };
 
   const statusColor = isConnected
     ? 'bg-stance-neon'
@@ -118,6 +145,28 @@ export const VoiceRecorderSection: React.FC<VoiceRecorderSectionProps> = ({
             onRecordingStop={onRecordingStop}
           />
         </div>
+
+        {audioUploadEnabled && (
+          <>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.mp4,.mpeg,.ogg,.webm"
+              className="hidden"
+              onChange={handleAudioUpload}
+            />
+            <button
+              type="button"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={!isConnected || isProcessing}
+              title="Upload audio for testing"
+              aria-label="Upload audio for testing"
+              className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center bg-stance-steel/6 text-stance-steel/55 hover:bg-stance-steel/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Upload className="h-4 w-4" />
+            </button>
+          </>
+        )}
 
         {/* Inline transcription textarea */}
         {recordingMode !== 'section' && (

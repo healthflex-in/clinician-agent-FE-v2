@@ -17,7 +17,22 @@ export function firstAssessmentToForm(saved: any) {
   }
   return {
     ...rest,
-    objectiveAssessment: objectiveAssessments?.[0] ?? { tests: [] },
+    objectiveAssessment: rest.objectiveAssessment ?? objectiveAssessments?.[0] ?? { tests: [] },
+  };
+}
+
+/** Normalize backend/API and renderer names at the First Assessment boundary. */
+export function normalizeFirstAssessmentFormData(data: any) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const source = data.firstAssessment && typeof data.firstAssessment === 'object'
+    ? data.firstAssessment
+    : data;
+  if (!Object.prototype.hasOwnProperty.call(source, 'objectiveAssessments')) return source;
+  const groups = source.objectiveAssessments;
+  const { objectiveAssessments, ...rest } = source;
+  return {
+    ...rest,
+    objectiveAssessment: rest.objectiveAssessment ?? (Array.isArray(groups) ? groups[0] : groups) ?? { tests: [] },
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessmentToForm, firstAssessmentToForm, hasPersistedAgentChanges } from './first-assessment';
+import { assessmentToForm, firstAssessmentToForm, hasPersistedAgentChanges, normalizeFirstAssessmentFormData } from './first-assessment';
 import { buildReportPayload } from './report-payload';
 
 describe('first assessment round trip', () => {
@@ -25,5 +25,23 @@ describe('first assessment round trip', () => {
   });
   it('rejects multiple groups rather than silently discarding one', () => {
     expect(() => firstAssessmentToForm({ objectiveAssessments: [{tests:[]},{tests:[]}] })).toThrow();
+  });
+  it('normalizes persisted plural objective groups without dropping clinical sections', () => {
+    const api = { firstAssessment: {
+      clinicalDetails: { clinicalHistory: 'Prior injury' },
+      subjectiveAssessments: [{ testName: 'Pain', conclusion: 'Pain after walking' }],
+      objectiveAssessments: [{ tests: [{ testName: 'Knee flexion', value: 130, comments: 'End range pain' }] }],
+      patientAdvice: { adviceDetails: 'Continue home exercises' },
+    } };
+    expect(normalizeFirstAssessmentFormData(api)).toEqual({
+      clinicalDetails: { clinicalHistory: 'Prior injury' },
+      subjectiveAssessments: [{ testName: 'Pain', conclusion: 'Pain after walking' }],
+      objectiveAssessment: { tests: [{ testName: 'Knee flexion', value: 130, comments: 'End range pain' }] },
+      patientAdvice: { adviceDetails: 'Continue home exercises' },
+    });
+  });
+  it('keeps renderer-shaped objective data unchanged', () => {
+    const form = { objectiveAssessment: { tests: [{ testName: 'ROM', value: 0 }] }, subjectiveAssessments: [] };
+    expect(normalizeFirstAssessmentFormData(form)).toBe(form);
   });
 });

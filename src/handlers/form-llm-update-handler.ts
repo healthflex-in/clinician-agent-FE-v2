@@ -1,5 +1,6 @@
 import React from 'react';
 import { FORM_SECTIONS } from '@/constants';
+import { normalizeFirstAssessmentFormData } from '@/utils/first-assessment';
 
 export interface LLMUpdateHandlerProps {
   formKey: string;
@@ -161,7 +162,10 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
 
       // Extract and normalize form data
       const actualFormData = llmData.formData.formData || llmData.formData;
-      const normalizedData = normalizeObjectiveAssessment(actualFormData);
+      const firstAssessmentData = formKey === 'firstAssessment'
+        ? normalizeFirstAssessmentFormData(actualFormData)
+        : actualFormData;
+      const normalizedData = normalizeObjectiveAssessment(firstAssessmentData);
 
       console.log(
         'Extracted actualFormData:',
@@ -410,7 +414,10 @@ export const useLLMUpdateHandler = (props: LLMUpdateHandlerProps) => {
       );
 
       // Normalize objective assessment
-      const normalizedData = normalizeObjectiveAssessment(llmData.formData);
+      const firstAssessmentData = formKey === 'firstAssessment'
+        ? normalizeFirstAssessmentFormData(llmData.formData)
+        : llmData.formData;
+      const normalizedData = normalizeObjectiveAssessment(firstAssessmentData);
 
       // Determine if this is a global or section-specific update
       const processingPath =
